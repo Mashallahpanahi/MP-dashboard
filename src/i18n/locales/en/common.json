@@ -1,0 +1,30 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "stats": {
+      "totalUsers": "Total Users",
+      "revenue": "Revenue",
+      "orders": "Orders"
+    }
+  },
+  "sidebar": {
+    "home": "Home",
+    "teachers": "Teachers",
+    "teacherRegister": "Register a Teacher",
+    "allTeachers": "All Teachers",
+    "students": "Students",
+    "studentRegister": "Register a Student",
+    "allStudents": "All Students",
+    "books": "Books",
+    "addBook": "Add a Book",
+    "allBooks": "All Books",
+    "classes": "Classes",
+    "addClass": "Add a Class",
+    "allClasses": "All Classes",
+     "payment": "Payment",
+    "teacherPayment": "Teacher Payment",
+    "otherExpenses": "Other Expenses",
+      "notes": "Notes",                 
+    "settings": "Settings"
+  }
+}

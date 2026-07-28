@@ -1,0 +1,30 @@
+{
+  "dashboard": {
+    "title": "داشبورد",
+    "stats": {
+      "totalUsers": "کل کاربران",
+      "revenue": "درآمد",
+      "orders": "سفارشات"
+    }
+  },
+  "sidebar": {
+    "home": "خانه",
+    "teachers": "اساتید",
+    "teacherRegister": "راجستر نمودن یک استاد",
+    "allTeachers": "همه اساتید",
+    "students": "شاگردان",
+    "studentRegister": "راجستر نمودن یگ شاگرد",
+    "allStudents": "همه شاگردان",
+    "books": "کتاب‌ها",
+    "addBook": "افزودن کتاب",
+    "allBooks": "همه کتاب‌ها",
+    "classes": "صنف‌ها",
+    "addClass": "افزودن صنف",
+    "allClasses": "همه صنف‌ها",
+    "payment": "پرداخت ها",
+    "teacherPayment": "پرداخت معاش اساتید",
+    "otherExpenses": "سایر پرداخت ها",
+    "notes": "یاداشت‌ها",
+    "settings": "تنظیمات"
+  }
+}
