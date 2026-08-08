@@ -12,6 +12,7 @@ import TeacherRegister from "@pages/Teachers/TeacherRegister";
 // Student pages
 import AllStudents from "@/pages/Students/AllStudents";
 import StudentRegister from "@/pages/Students/StudentRegister";
+import EnrollStudent from "@/pages/Students/EnrollStudent"; // ✅ Add this import
 
 // Book pages
 import AllBooks from "@/pages/Books/AllBooks";
@@ -43,6 +44,7 @@ const AppRoutes = () => (
           {/* Student Routes */}
           <Route path="/students/all" element={<AllStudents />} />
           <Route path="/students/register" element={<StudentRegister />} />
+          <Route path="/students/enroll/:studentId" element={<EnrollStudent />} /> {/* ✅ Add this route */}
           
           {/* Class Routes */}
           <Route path="/classes/all" element={<AllClasses />} />
