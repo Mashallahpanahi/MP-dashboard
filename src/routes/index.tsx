@@ -3,7 +3,6 @@ import DashboardLayout from "@components/layout/DashboardLayout/DashboardLayout"
 import Dashboard from "@pages/Dashboard/Dashboard";
 import PrivateRoute from "./PrivateRoute";
 import Login from "@pages/Login/Login"; // 👈 real Login
-import TeacherRegister from "@pages/Teachers/TeacherRegister";
 import AllTeachers from "@pages/Teachers/AllTeachers";
 import StudentRegister from "@/pages/Students/StudentRegister";
 import AllStudents from "@/pages/Students/AllStudents";
@@ -14,6 +13,7 @@ import AddClass from "@/pages/Classes/AddClass";
 import TeacherPayment from "@/pages/Payment/TeacherPayment";
 import OtherExpenses from "@/pages/Payment/OtherExpenses";
 import Notes from "@/pages/Notes/Notes";
+import TeacherRegister from "@/pages/Teachers/TeacherRegister";
 
 const AppRoutes = () => (
   <BrowserRouter>
@@ -22,8 +22,8 @@ const AppRoutes = () => (
       <Route element={<PrivateRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/teachers/register" element={<TeacherRegister />} />
           <Route path="/teachers/all" element={<AllTeachers />} />
+          <Route path="/teachers/register" element={<TeacherRegister />}/>
           <Route path="/students/register" element={<StudentRegister />} />
           <Route path="/students/all" element={<AllStudents />} />
           <Route path="/books/add" element={<AddBook />} />
