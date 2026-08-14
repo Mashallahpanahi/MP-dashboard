@@ -1,3 +1,4 @@
+// src/components/layout/Sidebar/Sidebar.tsx
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation } from "react-router-dom";
@@ -18,6 +19,9 @@ import {
   FaStickyNote,
   FaChevronDown,
   FaChevronUp,
+  FaCreditCard,
+  FaWallet,
+  FaReceipt,
 } from "react-icons/fa";
 import { TbDatabaseHeart } from "react-icons/tb";
 
@@ -121,19 +125,33 @@ const Sidebar = () => {
       icon: <FaMoneyBillWave />,
       menuId: "payment",
       subItems: [
+        // Student Payments
         {
-          path: "/payment/teacher",
-          label: "sidebar.teacherPayment",
+          path: "/payment/students",
+          label: "Student Payments",
+          icon: <FaCreditCard />,
+        },
+        // Add Student Payment
+        {
+          path: "/payment/students/add",
+          label: "Add Payment",
           icon: <FaUserPlus />,
         },
+        // Teacher Payroll
+        {
+          path: "/payment/teacher",
+          label: "Teacher Payroll",
+          icon: <FaWallet />,
+        },
+        // Other Expenses
         {
           path: "/payment/expenses",
-          label: "sidebar.otherExpenses",
-          icon: <FaUserCheck />,
+          label: "Other Expenses",
+          icon: <FaReceipt />,
         },
       ],
     },
-  { path: "/notes", label: "sidebar.notes", icon: <FaStickyNote /> },
+    { path: "/notes", label: "sidebar.notes", icon: <FaStickyNote /> },
 
     { path: "/settings", label: "sidebar.settings", icon: <FaCog /> },
   ];
@@ -146,7 +164,9 @@ const Sidebar = () => {
     >
       {/* Header / Logo */}
       <div
-        className={`flex items-center h-16 px-3 border-b border-blue-800/50 ${isRtl ? "space-x-reverse" : ""}`}
+        className={`flex items-center h-16 px-3 border-b border-blue-800/50 ${
+          isRtl ? "space-x-reverse" : ""
+        }`}
       >
         <span className="text-2xl flex-shrink-0">
           <TbDatabaseHeart />
@@ -204,7 +224,7 @@ const Sidebar = () => {
             }
 
             const isActive = isSubItemActive(
-              item.subItems.map((sub) => sub.path),
+              item.subItems.map((sub) => sub.path)
             );
             const isExpanded = expandedMenu === item.menuId;
 
@@ -235,27 +255,31 @@ const Sidebar = () => {
 
                 {!isCollapsed && isExpanded && (
                   <ul className="mt-1 ms-6 border-s-2 ps-3 space-y-1 border-blue-700/30">
-                    {item.subItems.map((sub) => (
-                      <li key={sub.path}>
-                        <NavLink
-                          to={sub.path}
-                          className={({ isActive }) =>
-                            `flex items-center px-3 py-2 rounded-lg transition-all duration-200 ${
-                              isActive
-                                ? "bg-blue-700/50 text-white"
-                                : "text-gray-400 hover:bg-blue-800/40 hover:text-white"
-                            } ${isRtl ? "space-x-reverse" : ""}`
-                          }
-                        >
-                          <span className="text-base w-6 text-center flex-shrink-0">
-                            {sub.icon}
-                          </span>
-                          <span className="text-sm font-medium ms-2">
-                            {t(sub.label)}
-                          </span>
-                        </NavLink>
-                      </li>
-                    ))}
+                    {item.subItems.map((sub) => {
+                      // Check if label is a translation key or hardcoded
+                      const isTranslationKey = sub.label.startsWith("sidebar.");
+                      return (
+                        <li key={sub.path}>
+                          <NavLink
+                            to={sub.path}
+                            className={({ isActive }) =>
+                              `flex items-center px-3 py-2 rounded-lg transition-all duration-200 ${
+                                isActive
+                                  ? "bg-blue-700/50 text-white"
+                                  : "text-gray-400 hover:bg-blue-800/40 hover:text-white"
+                              } ${isRtl ? "space-x-reverse" : ""}`
+                            }
+                          >
+                            <span className="text-base w-6 text-center flex-shrink-0">
+                              {sub.icon}
+                            </span>
+                            <span className="text-sm font-medium ms-2">
+                              {isTranslationKey ? t(sub.label) : sub.label}
+                            </span>
+                          </NavLink>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </li>

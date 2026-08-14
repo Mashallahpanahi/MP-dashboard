@@ -1,5 +1,7 @@
 // src/types/index.ts
 export * from './teacher';
 export * from './book';
-// Add other type exports as needed
 export * from './student';
+export * from './studentPayment';
+export * from './teacherPayroll';
+export * from './expense';
