@@ -1,3 +1,4 @@
+// src/api/teacherApi.ts
 import type { Teacher } from "@/types/teacher";
 
 const API_URL =
@@ -18,6 +19,7 @@ export class ApiError extends Error {
 
 /**
  * Get all teachers
+ * GET /teachers
  */
 export const getTeachers = async (): Promise<Teacher[]> => {
   const response = await fetch(`${API_URL}/teachers`, {
@@ -35,12 +37,35 @@ export const getTeachers = async (): Promise<Teacher[]> => {
   }
 
   const data: Teacher[] = await response.json();
+  return data;
+};
 
+/**
+ * Get all active teachers only
+ * GET /teachers/active
+ */
+export const getActiveTeachers = async (): Promise<Teacher[]> => {
+  const response = await fetch(`${API_URL}/teachers/active`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to fetch active teachers. Status: ${response.status}`,
+      response.status
+    );
+  }
+
+  const data: Teacher[] = await response.json();
   return data;
 };
 
 /**
  * Get a single teacher by ID
+ * GET /teachers/{id}
  */
 export const getTeacherById = async (id: string): Promise<Teacher> => {
   const response = await fetch(`${API_URL}/teachers/${id}`, {
@@ -58,12 +83,12 @@ export const getTeacherById = async (id: string): Promise<Teacher> => {
   }
 
   const data: Teacher = await response.json();
-
   return data;
 };
 
 /**
  * Create a new teacher
+ * POST /teachers
  */
 export interface CreateTeacherData {
   firstName: string;
@@ -98,37 +123,25 @@ export const createTeacher = async (
       const errorData = await response.json();
       errorDetails = errorData;
 
-      // Handle the duplicate key error
       if (errorData.message && typeof errorData.message === 'string') {
-        // Check for duplicate phone number error
         if (errorData.message.includes('UQ_9c5ae9e15a042292bb8d83ca34c') || 
             errorData.message.toLowerCase().includes('duplicate key') && 
             errorData.message.toLowerCase().includes('phone')) {
           errorMessage = 'This phone number is already registered. Please use a different phone number.';
-        }
-        // Check for duplicate email error
-        else if (errorData.message.includes('UQ_6c6e1c4b7c9c8e9d2f8e9d2f8e9d2f8e') || 
+        } else if (errorData.message.includes('UQ_6c6e1c4b7c9c8e9d2f8e9d2f8e9d2f8e') || 
                  errorData.message.toLowerCase().includes('duplicate key') && 
                  errorData.message.toLowerCase().includes('email')) {
           errorMessage = 'This email address is already registered. Please use a different email address.';
-        }
-        // Check for both phone and email in the same error
-        else if (errorData.message.toLowerCase().includes('duplicate key') && 
+        } else if (errorData.message.toLowerCase().includes('duplicate key') && 
                  (errorData.message.toLowerCase().includes('phone') || 
                   errorData.message.toLowerCase().includes('email'))) {
           errorMessage = 'The phone number or email address is already registered. Please use unique values.';
-        }
-        // If it's a validation error array
-        else if (Array.isArray(errorData.message)) {
+        } else if (Array.isArray(errorData.message)) {
           errorMessage = errorData.message.join(", ");
-        }
-        // Otherwise use the message as is
-        else {
+        } else {
           errorMessage = errorData.message;
         }
-      }
-      // Handle array of messages
-      else if (Array.isArray(errorData.message)) {
+      } else if (Array.isArray(errorData.message)) {
         errorMessage = errorData.message.join(", ");
       }
     } catch {
@@ -139,12 +152,12 @@ export const createTeacher = async (
   }
 
   const data: Teacher = await response.json();
-
   return data;
 };
 
 /**
  * Update a teacher by ID
+ * PATCH /teachers/{id}
  */
 export interface UpdateTeacherData extends Partial<CreateTeacherData> {
   id: string;
@@ -170,37 +183,25 @@ export const updateTeacher = async (
       const errorData = await response.json();
       errorDetails = errorData;
 
-      // Handle the duplicate key error for update
       if (errorData.message && typeof errorData.message === 'string') {
-        // Check for duplicate phone number error
         if (errorData.message.includes('UQ_9c5ae9e15a042292bb8d83ca34c') || 
             errorData.message.toLowerCase().includes('duplicate key') && 
             errorData.message.toLowerCase().includes('phone')) {
           errorMessage = 'This phone number is already registered by another teacher. Please use a different phone number.';
-        }
-        // Check for duplicate email error
-        else if (errorData.message.includes('UQ_6c6e1c4b7c9c8e9d2f8e9d2f8e9d2f8e') || 
+        } else if (errorData.message.includes('UQ_6c6e1c4b7c9c8e9d2f8e9d2f8e9d2f8e') || 
                  errorData.message.toLowerCase().includes('duplicate key') && 
                  errorData.message.toLowerCase().includes('email')) {
           errorMessage = 'This email address is already registered by another teacher. Please use a different email address.';
-        }
-        // Check for both phone and email in the same error
-        else if (errorData.message.toLowerCase().includes('duplicate key') && 
+        } else if (errorData.message.toLowerCase().includes('duplicate key') && 
                  (errorData.message.toLowerCase().includes('phone') || 
                   errorData.message.toLowerCase().includes('email'))) {
           errorMessage = 'The phone number or email address is already registered. Please use unique values.';
-        }
-        // If it's a validation error array
-        else if (Array.isArray(errorData.message)) {
+        } else if (Array.isArray(errorData.message)) {
           errorMessage = errorData.message.join(", ");
-        }
-        // Otherwise use the message as is
-        else {
+        } else {
           errorMessage = errorData.message;
         }
-      }
-      // Handle array of messages
-      else if (Array.isArray(errorData.message)) {
+      } else if (Array.isArray(errorData.message)) {
         errorMessage = errorData.message.join(", ");
       }
     } catch {
@@ -211,12 +212,12 @@ export const updateTeacher = async (
   }
 
   const data: Teacher = await response.json();
-
   return data;
 };
 
 /**
  * Delete a teacher by ID
+ * DELETE /teachers/{id}
  */
 export const deleteTeacher = async (id: string): Promise<void> => {
   const response = await fetch(`${API_URL}/teachers/${id}`, {
@@ -231,7 +232,6 @@ export const deleteTeacher = async (id: string): Promise<void> => {
 
     try {
       const errorData = await response.json();
-
       if (Array.isArray(errorData.message)) {
         errorMessage = errorData.message.join(", ");
       } else if (errorData.message) {
@@ -243,4 +243,43 @@ export const deleteTeacher = async (id: string): Promise<void> => {
 
     throw new ApiError(errorMessage, response.status);
   }
+};
+
+/**
+ * Update teacher activation status
+ * PATCH /teachers/{id}/status
+ */
+export const updateTeacherStatus = async (
+  id: string,
+  data: { isActive: boolean }
+): Promise<Teacher> => {
+  const response = await fetch(`${API_URL}/teachers/${id}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Failed to update teacher status. Status: ${response.status}`;
+    let errorDetails = null;
+
+    try {
+      const errorData = await response.json();
+      errorDetails = errorData;
+      if (errorData.message && typeof errorData.message === 'string') {
+        errorMessage = errorData.message;
+      } else if (Array.isArray(errorData.message)) {
+        errorMessage = errorData.message.join(", ");
+      }
+    } catch {
+      // Keep the default error message
+    }
+
+    throw new ApiError(errorMessage, response.status, errorDetails);
+  }
+
+  const result: Teacher = await response.json();
+  return result;
 };

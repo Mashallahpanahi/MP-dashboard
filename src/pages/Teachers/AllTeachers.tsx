@@ -1,10 +1,11 @@
 // src/pages/Teachers/AllTeachers.tsx
 import { useEffect, useState } from "react";
 import {
-  getTeachers,
+  getActiveTeachers,  // ✅ Changed from getTeachers to getActiveTeachers
   deleteTeacher,
   getTeacherById,
   updateTeacher,
+  updateTeacherStatus,
   type UpdateTeacherData,
 } from "@/api/teacherApi";
 import type { Teacher } from "@/types/teacher";
@@ -16,7 +17,7 @@ const AllTeachers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Delete state
+  // Delete state - Keeping for backward compatibility but not using
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -26,12 +27,16 @@ const AllTeachers = () => {
   const [teacherToUpdate, setTeacherToUpdate] = useState<Teacher | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
 
+  // Status update state
+  const [statusLoading, setStatusLoading] = useState<string | null>(null);
+
   const fetchTeachers = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const data = await getTeachers();
+      // ✅ Using getActiveTeachers instead of getTeachers
+      const data = await getActiveTeachers();
 
       setTeachers(data);
     } catch (error) {
@@ -51,7 +56,48 @@ const AllTeachers = () => {
     fetchTeachers();
   }, []);
 
-  // Delete handlers
+  // Status toggle handler
+  const handleToggleStatus = async (teacher: Teacher) => {
+    const newStatus = !teacher.isActive;
+    const action = newStatus ? "activate" : "deactivate";
+
+    if (!confirm(`Are you sure you want to ${action} ${teacher.firstName} ${teacher.lastName}?`)) {
+      return;
+    }
+
+    try {
+      setStatusLoading(teacher.id);
+      
+      await updateTeacherStatus(teacher.id, { isActive: newStatus });
+
+      // If deactivated, remove from list (since we only show active teachers)
+      if (!newStatus) {
+        setTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
+      } else {
+        // If activated, update the teacher in the list
+        setTeachers((prev) =>
+          prev.map((t) =>
+            t.id === teacher.id ? { ...t, isActive: newStatus } : t
+          )
+        );
+      }
+
+      // Show success message
+      const statusText = newStatus ? "activated" : "deactivated";
+      alert(`Teacher ${statusText} successfully!`);
+    } catch (error) {
+      console.error("Failed to update teacher status:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update teacher status"
+      );
+    } finally {
+      setStatusLoading(null);
+    }
+  };
+
+  // Delete handlers - Keeping but not used
   const handleDeleteClick = (teacher: Teacher) => {
     setTeacherToDelete(teacher);
     setShowDeleteModal(true);
@@ -62,13 +108,10 @@ const AllTeachers = () => {
 
     try {
       setDeleteLoading(true);
-
       await deleteTeacher(teacherToDelete.id);
-
       setTeachers((prev) =>
         prev.filter((teacher) => teacher.id !== teacherToDelete.id)
       );
-
       setShowDeleteModal(false);
       setTeacherToDelete(null);
     } catch (error) {
@@ -92,10 +135,7 @@ const AllTeachers = () => {
   const handleUpdateClick = async (teacher: Teacher) => {
     try {
       setUpdateLoading(true);
-
-      // Fetch the latest teacher data
       const teacherData = await getTeacherById(teacher.id);
-
       setTeacherToUpdate(teacherData);
       setShowUpdateModal(true);
     } catch (error) {
@@ -115,8 +155,6 @@ const AllTeachers = () => {
     data: Partial<UpdateTeacherData>
   ) => {
     const updatedTeacher = await updateTeacher(id, data);
-
-    // Update the teacher in the list
     setTeachers((prev) =>
       prev.map((teacher) =>
         teacher.id === updatedTeacher.id ? updatedTeacher : teacher
@@ -139,7 +177,7 @@ const AllTeachers = () => {
           </h1>
 
           <p className="mt-1 text-sm text-gray-500">
-            View and manage all registered teachers
+            View and manage all active teachers
           </p>
         </div>
 
@@ -193,11 +231,11 @@ const AllTeachers = () => {
       {!loading && !error && teachers.length === 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900">
-            No Teachers Found
+            No Active Teachers Found
           </h3>
 
           <p className="mt-2 text-sm text-gray-500">
-            There are no registered teachers yet.
+            There are no active teachers currently. Register a new teacher or activate an existing one.
           </p>
         </div>
       )}
@@ -205,7 +243,7 @@ const AllTeachers = () => {
       {/* Teachers */}
       {!loading && !error && teachers.length > 0 && (
         <>
-          {/* Desktop Table - Same as before */}
+          {/* Desktop Table */}
           <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:block">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -271,7 +309,7 @@ const AllTeachers = () => {
                         </p>
 
                         <p className="mt-1 text-xs text-gray-500">
-                          {teacher.email}
+                          {teacher.email || "No email"}
                         </p>
                       </td>
 
@@ -285,7 +323,9 @@ const AllTeachers = () => {
                       {/* Salary */}
                       <td className="px-6 py-4">
                         <p className="font-semibold text-gray-900">
-                          {teacher.salaryAmount.toLocaleString()}
+                          {teacher.salaryType === "Fixed" 
+                            ? teacher.salaryAmount.toLocaleString()
+                            : teacher.feePercentage + "%"}
                         </p>
 
                         <p className="mt-1 text-xs text-gray-500">
@@ -307,17 +347,10 @@ const AllTeachers = () => {
 
                       {/* Status */}
                       <td className="px-6 py-4">
-                        {teacher.isActive ? (
-                          <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                            <span className="mr-2 h-2 w-2 rounded-full bg-green-500" />
-                            Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                            <span className="mr-2 h-2 w-2 rounded-full bg-red-500" />
-                            Inactive
-                          </span>
-                        )}
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                          <span className="mr-2 h-2 w-2 rounded-full bg-green-500" />
+                          Active
+                        </span>
                       </td>
 
                       {/* Actions */}
@@ -345,26 +378,56 @@ const AllTeachers = () => {
                             Edit
                           </button>
 
+                          {/* Deactivate Button */}
                           <button
                             type="button"
-                            onClick={() => handleDeleteClick(teacher)}
-                            className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 hover:text-red-700"
+                            onClick={() => handleToggleStatus(teacher)}
+                            disabled={statusLoading === teacher.id}
+                            className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <svg
-                              className="mr-2 h-4 w-4"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                            Delete
+                            {statusLoading === teacher.id ? (
+                              <>
+                                <svg
+                                  className="mr-2 h-4 w-4 animate-spin"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                  />
+                                  <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                  />
+                                </svg>
+                                Updating...
+                              </>
+                            ) : (
+                              <>
+                                <svg
+                                  className="mr-2 h-4 w-4"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                                  />
+                                </svg>
+                                Deactivate
+                              </>
+                            )}
                           </button>
                         </div>
                       </td>
@@ -375,7 +438,7 @@ const AllTeachers = () => {
             </div>
           </div>
 
-          {/* Mobile / Tablet - Same as before but with updated handlers */}
+          {/* Mobile / Tablet Cards */}
           <div className="grid grid-cols-1 gap-4 lg:hidden">
             {teachers.map((teacher) => (
               <div
@@ -401,17 +464,9 @@ const AllTeachers = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    {teacher.isActive ? (
-                      <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                        Inactive
-                      </span>
-                    )}
-                  </div>
+                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                    Active
+                  </span>
                 </div>
 
                 {/* Details */}
@@ -432,7 +487,7 @@ const AllTeachers = () => {
                     </p>
 
                     <p className="mt-1 break-all text-sm text-gray-800">
-                      {teacher.email}
+                      {teacher.email || "No email"}
                     </p>
                   </div>
 
@@ -442,7 +497,9 @@ const AllTeachers = () => {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-800">
-                      {teacher.salaryAmount.toLocaleString()}
+                      {teacher.salaryType === "Fixed" 
+                        ? teacher.salaryAmount.toLocaleString()
+                        : teacher.feePercentage + "%"}
                     </p>
                   </div>
 
@@ -484,7 +541,7 @@ const AllTeachers = () => {
                   </p>
 
                   <p className="mt-1 text-sm text-gray-700">
-                    {teacher.address}
+                    {teacher.address || "No address provided"}
                   </p>
 
                   <div className="mt-4 flex gap-2">
@@ -512,24 +569,53 @@ const AllTeachers = () => {
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteClick(teacher)}
-                      className="flex-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 hover:text-red-700"
+                      onClick={() => handleToggleStatus(teacher)}
+                      disabled={statusLoading === teacher.id}
+                      className="flex-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <svg
-                        className="mr-2 inline h-4 w-4"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                      Delete
+                      {statusLoading === teacher.id ? (
+                        <>
+                          <svg
+                            className="mr-2 inline h-4 w-4 animate-spin"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            className="mr-2 inline h-4 w-4"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                            />
+                          </svg>
+                          Deactivate
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

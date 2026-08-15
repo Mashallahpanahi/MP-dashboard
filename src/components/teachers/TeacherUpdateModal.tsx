@@ -93,6 +93,15 @@ const TeacherUpdateModal = ({
           : undefined,
       };
 
+      // If salary type is Fixed, set feePercentage to 0
+      if (submitData.salaryType === "Fixed") {
+        submitData.feePercentage = 0;
+      }
+      // If salary type is PerStudent, set salaryAmount to 0
+      else if (submitData.salaryType === "PerStudent") {
+        submitData.salaryAmount = 0;
+      }
+
       // Remove any fields that are empty strings or undefined
       Object.keys(submitData).forEach((key) => {
         const value = submitData[key as keyof typeof submitData];
@@ -135,6 +144,9 @@ const TeacherUpdateModal = ({
       setSuccess("");
     }
   };
+
+  // Get current salary type for conditional rendering
+  const currentSalaryType = formData.salaryType;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -224,7 +236,7 @@ const TeacherUpdateModal = ({
                   htmlFor="update-firstName"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  First Name *
+                  First Name <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -246,7 +258,7 @@ const TeacherUpdateModal = ({
                   htmlFor="update-lastName"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  Last Name *
+                  Last Name <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -268,7 +280,7 @@ const TeacherUpdateModal = ({
                   htmlFor="update-gender"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  Gender *
+                  Gender <span className="text-red-500">*</span>
                 </label>
 
                 <select
@@ -292,7 +304,7 @@ const TeacherUpdateModal = ({
                   htmlFor="update-phone"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  Phone *
+                  Phone <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -311,13 +323,13 @@ const TeacherUpdateModal = ({
                 </p>
               </div>
 
-              {/* Email */}
+              {/* Email - Optional */}
               <div>
                 <label
                   htmlFor="update-email"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  Email *
+                  Email
                 </label>
 
                 <input
@@ -326,13 +338,12 @@ const TeacherUpdateModal = ({
                   type="email"
                   value={formData.email || ""}
                   onChange={handleChange}
-                  placeholder="teacher@example.com"
-                  required
+                  placeholder="teacher@example.com (optional)"
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Email address must be unique in the system
+                  Optional - Can be left empty
                 </p>
               </div>
 
@@ -342,7 +353,7 @@ const TeacherUpdateModal = ({
                   htmlFor="update-hireDate"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  Hire Date *
+                  Hire Date <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -357,13 +368,13 @@ const TeacherUpdateModal = ({
                 />
               </div>
 
-              {/* Address */}
+              {/* Address - Optional */}
               <div className="md:col-span-2">
                 <label
                   htmlFor="update-address"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  Address *
+                  Address
                 </label>
 
                 <textarea
@@ -371,12 +382,14 @@ const TeacherUpdateModal = ({
                   name="address"
                   value={formData.address || ""}
                   onChange={handleChange}
-                  placeholder="Enter teacher address"
+                  placeholder="Enter teacher address (optional)"
                   rows={2}
-                  required
                   disabled={isLoading || isSubmitting}
                   className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional - Can be left empty
+                </p>
               </div>
             </div>
           </div>
@@ -394,7 +407,7 @@ const TeacherUpdateModal = ({
                   htmlFor="update-salaryType"
                   className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  Salary Type *
+                  Salary Type <span className="text-red-500">*</span>
                 </label>
 
                 <select
@@ -408,58 +421,80 @@ const TeacherUpdateModal = ({
                 >
                   <option value="">Select salary type</option>
                   <option value="Fixed">Fixed</option>
-                  <option value="Percentage">Percentage</option>
+                  <option value="PerStudent">Per Student</option>
                 </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select "Fixed" for monthly salary or "Per Student" for percentage-based
+                </p>
               </div>
 
-              {/* Salary Amount */}
-              <div>
-                <label
-                  htmlFor="update-salaryAmount"
-                  className="mb-1.5 block text-sm font-medium text-gray-700"
-                >
-                  Salary Amount *
-                </label>
+              {/* ✅ Show Salary Amount only if Fixed is selected */}
+              {currentSalaryType === "Fixed" && (
+                <div>
+                  <label
+                    htmlFor="update-salaryAmount"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Salary Amount <span className="text-red-500">*</span>
+                  </label>
 
-                <input
-                  id="update-salaryAmount"
-                  name="salaryAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.salaryAmount ?? ""}
-                  onChange={handleChange}
-                  placeholder="4000"
-                  required
-                  disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
+                  <input
+                    id="update-salaryAmount"
+                    name="salaryAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.salaryAmount ?? ""}
+                    onChange={handleChange}
+                    placeholder="Enter fixed salary amount"
+                    required={currentSalaryType === "Fixed"}
+                    disabled={isLoading || isSubmitting}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Fixed salary amount per month
+                  </p>
+                </div>
+              )}
 
-              {/* Fee Percentage */}
-              <div>
-                <label
-                  htmlFor="update-feePercentage"
-                  className="mb-1.5 block text-sm font-medium text-gray-700"
-                >
-                  Fee Percentage (%) *
-                </label>
+              {/* ✅ Show Fee Percentage only if PerStudent is selected */}
+              {currentSalaryType === "PerStudent" && (
+                <div>
+                  <label
+                    htmlFor="update-feePercentage"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Fee Percentage (%) <span className="text-red-500">*</span>
+                  </label>
 
-                <input
-                  id="update-feePercentage"
-                  name="feePercentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={formData.feePercentage ?? ""}
-                  onChange={handleChange}
-                  placeholder="40"
-                  required
-                  disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
+                  <input
+                    id="update-feePercentage"
+                    name="feePercentage"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={formData.feePercentage ?? ""}
+                    onChange={handleChange}
+                    placeholder="Enter percentage"
+                    required={currentSalaryType === "PerStudent"}
+                    disabled={isLoading || isSubmitting}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Percentage of student fee
+                  </p>
+                </div>
+              )}
+
+              {/* Info message when no salary type selected */}
+              {!currentSalaryType && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500 italic">
+                    Please select a salary type to configure salary details
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
