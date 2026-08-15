@@ -10,8 +10,8 @@ const AddBook = () => {
   const [success, setSuccess] = useState("");
 
   const [formData, setFormData] = useState<Partial<CreateBookData>>({
-    name: "",
     code: "",
+    name: "",
     description: "",
     level: "",
     category: "",
@@ -23,6 +23,7 @@ const AddBook = () => {
     totalLessons: 0,
     totalHours: 0,
     passingScore: 0,
+    levelOrder: 0,
     isActive: true,
   });
 
@@ -36,10 +37,14 @@ const AddBook = () => {
     setFormData((prev) => ({
       ...prev,
       [name]:
-        type === "number" || name === "bookPrice" ||
-        name === "durationWeeks" || name === "totalLessons" ||
-        name === "totalHours" || name === "passingScore"
-          ? value === "" ? undefined : parseFloat(value)
+        type === "number" || 
+        name === "bookPrice" || 
+        name === "durationWeeks" || 
+        name === "totalLessons" ||
+        name === "totalHours" || 
+        name === "passingScore" ||
+        name === "levelOrder"
+          ? value === "" ? 0 : parseFloat(value)
           : value,
     }));
   };
@@ -51,22 +56,79 @@ const AddBook = () => {
     setSuccess("");
 
     try {
-      // Only send fields that have values
+      // Prepare submit data
       const submitData: Partial<CreateBookData> = {};
       
-      // Only include fields that have values (not undefined, null, or empty string)
-      Object.keys(formData).forEach((key) => {
+      // Validate required fields
+      if (!formData.name || formData.name.trim() === "") {
+        setError("Book name is required");
+        setLoading(false);
+        return;
+      }
+      
+      if (!formData.levelOrder || formData.levelOrder <= 0) {
+        setError("Level order is required and must be greater than 0");
+        setLoading(false);
+        return;
+      }
+      
+      if (!formData.durationWeeks || formData.durationWeeks <= 0) {
+        setError("Duration weeks is required and must be greater than 0");
+        setLoading(false);
+        return;
+      }
+      
+      if (!formData.passingScore || formData.passingScore <= 0) {
+        setError("Passing score is required and must be greater than 0");
+        setLoading(false);
+        return;
+      }
+
+      // Build submit data - only include fields that have values
+      const fields = [
+        'name',
+        'levelOrder', 
+        'durationWeeks',
+        'passingScore',
+        'code',
+        'description',
+        'level',
+        'category',
+        'author',
+        'publisher',
+        'isbn',
+        'bookPrice',
+        'totalLessons',
+        'totalHours',
+        'isActive'
+      ];
+
+      fields.forEach((key) => {
         const value = formData[key as keyof CreateBookData];
         if (value !== undefined && value !== null && value !== "") {
           submitData[key as keyof CreateBookData] = value;
         }
       });
 
-      // Make sure name is always included (it's required)
-      if (!submitData.name) {
-        setError("Book name is required");
-        setLoading(false);
-        return;
+      // Make sure required fields are included
+      if (formData.levelOrder !== undefined) {
+        submitData.levelOrder = Number(formData.levelOrder);
+      }
+      if (formData.durationWeeks !== undefined) {
+        submitData.durationWeeks = Number(formData.durationWeeks);
+      }
+      if (formData.passingScore !== undefined) {
+        submitData.passingScore = Number(formData.passingScore);
+      }
+
+      // If code is empty string, don't send it
+      if (submitData.code === "") {
+        delete submitData.code;
+      }
+
+      // If isbn is empty string, don't send it
+      if (submitData.isbn === "") {
+        delete submitData.isbn;
       }
 
       await createBook(submitData as CreateBookData);
@@ -76,13 +138,32 @@ const AddBook = () => {
       }, 1500);
     } catch (error) {
       console.error("Failed to create book:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to create book"
-      );
+      const errorMsg = error instanceof Error ? error.message : "Failed to create book";
+      if (errorMsg.includes("duplicate key") || errorMsg.includes("UQ_")) {
+        if (errorMsg.includes("code")) {
+          setError("This book code is already taken. Please use a different code.");
+        } else if (errorMsg.includes("isbn")) {
+          setError("This ISBN is already registered. Please use a different ISBN.");
+        } else {
+          setError("A book with this information already exists. Please check your inputs.");
+        }
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Level options for datalist
+  const levelOptions = [
+    "A1 - Beginner",
+    "A2 - Elementary",
+    "B1 - Intermediate",
+    "B2 - Upper Intermediate",
+    "C1 - Advanced",
+    "C2 - Proficiency"
+  ];
 
   return (
     <div className="p-6">
@@ -114,19 +195,20 @@ const AddBook = () => {
           onSubmit={handleSubmit}
           className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
         >
-          {/* Basic Information */}
+          {/* ===== REQUIRED FIELDS SECTION ===== */}
           <div className="mb-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Basic Information
+              Required Information <span className="text-sm font-normal text-red-500">*</span>
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* Name - Required */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Name <span className="text-red-500">*</span>
+                  Book Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   name="name"
+                  type="text"
                   value={formData.name || ""}
                   onChange={handleChange}
                   placeholder="Enter book name"
@@ -138,6 +220,90 @@ const AddBook = () => {
                 </p>
               </div>
 
+              {/* Level Order - Required */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Level Order <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="levelOrder"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.levelOrder || ""}
+                  onChange={handleChange}
+                  placeholder="1, 2, 3..."
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Higher number = higher level (Required)
+                </p>
+              </div>
+
+              {/* Duration Weeks - Required */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Duration (Weeks) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="durationWeeks"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.durationWeeks || ""}
+                  onChange={handleChange}
+                  placeholder="8"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Estimated weeks to complete (Required)
+                </p>
+              </div>
+
+              {/* Passing Score - Required */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Passing Score (%) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="passingScore"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.passingScore || ""}
+                  onChange={handleChange}
+                  placeholder="60"
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Score required to pass the book (Required)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ===== SEPARATOR LINE ===== */}
+          <div className="relative mb-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-4 text-sm text-gray-500">
+                Optional Information
+              </span>
+            </div>
+          </div>
+
+          {/* ===== OPTIONAL FIELDS SECTION ===== */}
+          <div className="mb-8">
+            <p className="mb-4 text-sm text-gray-500">
+              These fields are optional and can be left empty
+            </p>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* Code - Optional */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -151,7 +317,24 @@ const AddBook = () => {
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Optional - Must be unique if provided
+                  Must be unique if provided (Leave empty if not needed)
+                </p>
+              </div>
+
+              {/* ISBN - Optional */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  ISBN
+                </label>
+                <input
+                  name="isbn"
+                  value={formData.isbn || ""}
+                  onChange={handleChange}
+                  placeholder="978-0-521-67580-2"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Must be unique if provided (Leave empty if not needed)
                 </p>
               </div>
 
@@ -182,25 +365,28 @@ const AddBook = () => {
                 </select>
               </div>
 
-              {/* Level - Optional */}
+              {/* Level - Optional with Datalist (Type + Select) */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Level
                 </label>
-                <select
+                <input
                   name="level"
+                  type="text"
                   value={formData.level || ""}
                   onChange={handleChange}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Select level (optional)</option>
-                  <option value="A1">A1 - Beginner</option>
-                  <option value="A2">A2 - Elementary</option>
-                  <option value="B1">B1 - Intermediate</option>
-                  <option value="B2">B2 - Upper Intermediate</option>
-                  <option value="C1">C1 - Advanced</option>
-                  <option value="C2">C2 - Proficiency</option>
-                </select>
+                  placeholder="Type or select level (optional)"
+                  list="level-options"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <datalist id="level-options">
+                  {levelOptions.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-gray-500">
+                  Type any value or select from dropdown
+                </p>
               </div>
 
               {/* Author - Optional */}
@@ -231,20 +417,63 @@ const AddBook = () => {
                 />
               </div>
 
-              {/* ISBN - Optional */}
+              {/* Book Price - Optional */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  ISBN
+                  Price ($)
                 </label>
                 <input
-                  name="isbn"
-                  value={formData.isbn || ""}
+                  name="bookPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.bookPrice === 0 ? "" : formData.bookPrice}
                   onChange={handleChange}
-                  placeholder="978-0-521-67580-2 (optional)"
+                  placeholder="29.99"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Optional - Must be unique if provided
+                  Leave empty if not applicable
+                </p>
+              </div>
+
+              {/* Total Lessons - Optional */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Total Lessons
+                </label>
+                <input
+                  name="totalLessons"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.totalLessons === 0 ? "" : formData.totalLessons}
+                  onChange={handleChange}
+                  placeholder="24"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Leave empty if not applicable
+                </p>
+              </div>
+
+              {/* Total Hours - Optional */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Total Hours
+                </label>
+                <input
+                  name="totalHours"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={formData.totalHours === 0 ? "" : formData.totalHours}
+                  onChange={handleChange}
+                  placeholder="36"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Leave empty if not applicable
                 </p>
               </div>
 
@@ -261,96 +490,9 @@ const AddBook = () => {
                   placeholder="Book description (optional)"
                   className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing & Duration - All Optional */}
-          <div className="mb-8 border-t border-gray-200 pt-8">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Pricing & Duration <span className="text-sm font-normal text-gray-500">(All optional)</span>
-            </h2>
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-              {/* Book Price */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Price ($)
-                </label>
-                <input
-                  name="bookPrice"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.bookPrice || ""}
-                  onChange={handleChange}
-                  placeholder="29.99"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              {/* Duration Weeks */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Duration (Weeks)
-                </label>
-                <input
-                  name="durationWeeks"
-                  type="number"
-                  min="0"
-                  value={formData.durationWeeks || ""}
-                  onChange={handleChange}
-                  placeholder="8"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              {/* Total Lessons */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Total Lessons
-                </label>
-                <input
-                  name="totalLessons"
-                  type="number"
-                  min="0"
-                  value={formData.totalLessons || ""}
-                  onChange={handleChange}
-                  placeholder="24"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              {/* Total Hours */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Total Hours
-                </label>
-                <input
-                  name="totalHours"
-                  type="number"
-                  min="0"
-                  value={formData.totalHours || ""}
-                  onChange={handleChange}
-                  placeholder="36"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              {/* Passing Score */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Passing Score (%)
-                </label>
-                <input
-                  name="passingScore"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.passingScore || ""}
-                  onChange={handleChange}
-                  placeholder="60"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Leave empty if not applicable
+                </p>
               </div>
             </div>
           </div>

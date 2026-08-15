@@ -5,7 +5,8 @@ import { ApiError } from "./teacherApi";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 /**
- * Get all books
+ * Get all books (including inactive)
+ * GET /books
  */
 export const getBooks = async (): Promise<Book[]> => {
   const response = await fetch(`${API_URL}/books`, {
@@ -27,7 +28,54 @@ export const getBooks = async (): Promise<Book[]> => {
 };
 
 /**
+ * Get all active books only
+ * GET /books/active
+ */
+export const getActiveBooks = async (): Promise<Book[]> => {
+  const response = await fetch(`${API_URL}/books/active`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to fetch active books. Status: ${response.status}`,
+      response.status
+    );
+  }
+
+  const data: Book[] = await response.json();
+  return data;
+};
+
+/**
+ * Get books by level order
+ * GET /books/level/{levelOrder}
+ */
+export const getBooksByLevel = async (levelOrder: number): Promise<Book[]> => {
+  const response = await fetch(`${API_URL}/books/level/${levelOrder}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      `Failed to fetch books by level. Status: ${response.status}`,
+      response.status
+    );
+  }
+
+  const data: Book[] = await response.json();
+  return data;
+};
+
+/**
  * Get a single book by ID
+ * GET /books/{id}
  */
 export const getBookById = async (id: string): Promise<Book> => {
   const response = await fetch(`${API_URL}/books/${id}`, {
@@ -50,6 +98,7 @@ export const getBookById = async (id: string): Promise<Book> => {
 
 /**
  * Create a new book
+ * POST /books
  */
 export const createBook = async (book: CreateBookData): Promise<Book> => {
   const response = await fetch(`${API_URL}/books`, {
@@ -69,24 +118,18 @@ export const createBook = async (book: CreateBookData): Promise<Book> => {
       errorDetails = errorData;
 
       if (errorData.message && typeof errorData.message === 'string') {
-        // Check for duplicate code error
         if (errorData.message.includes('duplicate') && 
             errorData.message.toLowerCase().includes('code')) {
           errorMessage = 'This book code is already registered. Please use a different code.';
-        }
-        // Check for duplicate ISBN error
-        else if (errorData.message.includes('duplicate') && 
-                 errorData.message.toLowerCase().includes('isbn')) {
+        } else if (errorData.message.includes('duplicate') && 
+                   errorData.message.toLowerCase().includes('isbn')) {
           errorMessage = 'This ISBN is already registered. Please use a different ISBN.';
-        }
-        else if (Array.isArray(errorData.message)) {
+        } else if (Array.isArray(errorData.message)) {
           errorMessage = errorData.message.join(", ");
-        }
-        else {
+        } else {
           errorMessage = errorData.message;
         }
-      }
-      else if (Array.isArray(errorData.message)) {
+      } else if (Array.isArray(errorData.message)) {
         errorMessage = errorData.message.join(", ");
       }
     } catch {
@@ -102,6 +145,7 @@ export const createBook = async (book: CreateBookData): Promise<Book> => {
 
 /**
  * Update a book by ID
+ * PATCH /books/{id}
  */
 export const updateBook = async (
   id: string,
@@ -124,24 +168,18 @@ export const updateBook = async (
       errorDetails = errorData;
 
       if (errorData.message && typeof errorData.message === 'string') {
-        // Check for duplicate code error
         if (errorData.message.includes('duplicate') && 
             errorData.message.toLowerCase().includes('code')) {
           errorMessage = 'This book code is already registered by another book. Please use a different code.';
-        }
-        // Check for duplicate ISBN error
-        else if (errorData.message.includes('duplicate') && 
-                 errorData.message.toLowerCase().includes('isbn')) {
+        } else if (errorData.message.includes('duplicate') && 
+                   errorData.message.toLowerCase().includes('isbn')) {
           errorMessage = 'This ISBN is already registered by another book. Please use a different ISBN.';
-        }
-        else if (Array.isArray(errorData.message)) {
+        } else if (Array.isArray(errorData.message)) {
           errorMessage = errorData.message.join(", ");
-        }
-        else {
+        } else {
           errorMessage = errorData.message;
         }
-      }
-      else if (Array.isArray(errorData.message)) {
+      } else if (Array.isArray(errorData.message)) {
         errorMessage = errorData.message.join(", ");
       }
     } catch {
@@ -157,6 +195,7 @@ export const updateBook = async (
 
 /**
  * Delete a book by ID
+ * DELETE /books/{id}
  */
 export const deleteBook = async (id: string): Promise<void> => {
   const response = await fetch(`${API_URL}/books/${id}`, {
@@ -171,7 +210,6 @@ export const deleteBook = async (id: string): Promise<void> => {
 
     try {
       const errorData = await response.json();
-
       if (Array.isArray(errorData.message)) {
         errorMessage = errorData.message.join(", ");
       } else if (errorData.message) {
@@ -183,4 +221,43 @@ export const deleteBook = async (id: string): Promise<void> => {
 
     throw new ApiError(errorMessage, response.status);
   }
+};
+
+/**
+ * Update book activation status
+ * PATCH /books/{id}/status
+ */
+export const updateBookStatus = async (
+  id: string,
+  data: { isActive: boolean }
+): Promise<Book> => {
+  const response = await fetch(`${API_URL}/books/${id}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Failed to update book status. Status: ${response.status}`;
+    let errorDetails = null;
+
+    try {
+      const errorData = await response.json();
+      errorDetails = errorData;
+      if (errorData.message && typeof errorData.message === 'string') {
+        errorMessage = errorData.message;
+      } else if (Array.isArray(errorData.message)) {
+        errorMessage = errorData.message.join(", ");
+      }
+    } catch {
+      // Keep the default error message
+    }
+
+    throw new ApiError(errorMessage, response.status, errorDetails);
+  }
+
+  const result: Book = await response.json();
+  return result;
 };

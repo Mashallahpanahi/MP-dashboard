@@ -54,7 +54,7 @@ const BookDeleteModal = ({
             {book.name}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            Code: {book.code} | ISBN: {book.isbn}
+            Code: {book.code || 'N/A'} | Level: {book.level || 'N/A'}
           </p>
         </div>
 

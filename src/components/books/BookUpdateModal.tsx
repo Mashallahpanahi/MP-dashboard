@@ -22,6 +22,16 @@ const BookUpdateModal = ({
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Level options for datalist
+  const levelOptions = [
+    "A1 - Beginner",
+    "A2 - Elementary",
+    "B1 - Intermediate",
+    "B2 - Upper Intermediate",
+    "C1 - Advanced",
+    "C2 - Proficiency"
+  ];
+
   // Reset form when book changes
   useEffect(() => {
     if (book) {
@@ -39,6 +49,7 @@ const BookUpdateModal = ({
         totalLessons: book.totalLessons,
         totalHours: book.totalHours,
         passingScore: book.passingScore,
+        levelOrder: book.levelOrder,
         isActive: book.isActive,
       });
       setError("");
@@ -55,7 +66,6 @@ const BookUpdateModal = ({
   ) => {
     const { name, value, type } = e.target;
 
-    // Handle number inputs
     if (type === "number") {
       setFormData((prev) => ({
         ...prev,
@@ -93,25 +103,19 @@ const BookUpdateModal = ({
         const currentValue = formData[key];
         const originalValue = book[key as keyof Book];
 
-        // Handle number comparison
         if (typeof currentValue === 'number' && typeof originalValue === 'number') {
           if (currentValue !== originalValue) {
             changedData[key] = currentValue;
           }
-        } 
-        // Handle boolean comparison
-        else if (typeof currentValue === 'boolean' && typeof originalValue === 'boolean') {
+        } else if (typeof currentValue === 'boolean' && typeof originalValue === 'boolean') {
           if (currentValue !== originalValue) {
             changedData[key] = currentValue;
           }
-        }
-        // Handle string comparison
-        else if (currentValue !== originalValue) {
+        } else if (currentValue !== originalValue) {
           changedData[key] = currentValue;
         }
       });
 
-      // If nothing changed, show message and close
       if (Object.keys(changedData).length === 0) {
         setSuccess("No changes made.");
         setTimeout(() => {
@@ -126,7 +130,6 @@ const BookUpdateModal = ({
 
       setSuccess("Book updated successfully!");
 
-      // Close modal after 1.5 seconds
       setTimeout(() => {
         onClose();
         setFormData({});
@@ -201,54 +204,115 @@ const BookUpdateModal = ({
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Basic Information */}
+          {/* Required Information */}
           <div className="mb-6">
             <h4 className="mb-3 text-sm font-semibold text-gray-700">
-              Basic Information
+              Required Information <span className="text-red-500">*</span>
             </h4>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Code */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Code *
-                </label>
-                <input
-                  name="code"
-                  value={formData.code || ""}
-                  onChange={handleChange}
-                  placeholder="ENG-101"
-                  required
-                  disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-
-              {/* Name */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Name *
+                  Book Name *
                 </label>
                 <input
                   name="name"
                   value={formData.name || ""}
                   onChange={handleChange}
-                  placeholder="English Grammar in Use"
                   required
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
-
-              {/* Category */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Category *
+                  Level Order *
+                </label>
+                <input
+                  name="levelOrder"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.levelOrder || ""}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading || isSubmitting}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Duration (Weeks) *
+                </label>
+                <input
+                  name="durationWeeks"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.durationWeeks || ""}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading || isSubmitting}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Passing Score (%) *
+                </label>
+                <input
+                  name="passingScore"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.passingScore || ""}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading || isSubmitting}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Optional Information */}
+          <div className="mb-6 border-t border-gray-200 pt-6">
+            <h4 className="mb-3 text-sm font-semibold text-gray-700">
+              Optional Information
+            </h4>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Code
+                </label>
+                <input
+                  name="code"
+                  value={formData.code || ""}
+                  onChange={handleChange}
+                  disabled={isLoading || isSubmitting}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  ISBN
+                </label>
+                <input
+                  name="isbn"
+                  value={formData.isbn || ""}
+                  onChange={handleChange}
+                  disabled={isLoading || isSubmitting}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Category
                 </label>
                 <select
                   name="category"
                   value={formData.category || ""}
                   onChange={handleChange}
-                  required
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -267,107 +331,57 @@ const BookUpdateModal = ({
                   <option value="Other">Other</option>
                 </select>
               </div>
-
-              {/* Level */}
+              {/* Level - Optional with Datalist (Type + Select) */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Level *
+                  Level
                 </label>
-                <select
+                <input
                   name="level"
+                  type="text"
                   value={formData.level || ""}
                   onChange={handleChange}
-                  required
+                  placeholder="Type or select level (optional)"
+                  list="level-options-update"
                   disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Select level</option>
-                  <option value="A1">A1 - Beginner</option>
-                  <option value="A2">A2 - Elementary</option>
-                  <option value="B1">B1 - Intermediate</option>
-                  <option value="B2">B2 - Upper Intermediate</option>
-                  <option value="C1">C1 - Advanced</option>
-                  <option value="C2">C2 - Proficiency</option>
-                </select>
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <datalist id="level-options-update">
+                  {levelOptions.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-gray-500">
+                  Type any value or select from dropdown
+                </p>
               </div>
-
-              {/* Author */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Author *
+                  Author
                 </label>
                 <input
                   name="author"
                   value={formData.author || ""}
                   onChange={handleChange}
-                  placeholder="Raymond Murphy"
-                  required
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
-
-              {/* Publisher */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Publisher *
+                  Publisher
                 </label>
                 <input
                   name="publisher"
                   value={formData.publisher || ""}
                   onChange={handleChange}
-                  placeholder="Cambridge University Press"
-                  required
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
-
-              {/* ISBN */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  ISBN *
-                </label>
-                <input
-                  name="isbn"
-                  value={formData.isbn || ""}
-                  onChange={handleChange}
-                  placeholder="978-0-521-67580-2"
-                  required
-                  disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Description *
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description || ""}
-                  onChange={handleChange}
-                  rows={2}
-                  placeholder="A comprehensive grammar book for intermediate learners."
-                  required
-                  disabled={isLoading || isSubmitting}
-                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing & Duration */}
-          <div className="mb-6 border-t border-gray-200 pt-6">
-            <h4 className="mb-3 text-sm font-semibold text-gray-700">
-              Pricing & Duration
-            </h4>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {/* Book Price */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Price ($) *
+                  Price ($)
                 </label>
                 <input
                   name="bookPrice"
@@ -376,83 +390,51 @@ const BookUpdateModal = ({
                   min="0"
                   value={formData.bookPrice ?? ""}
                   onChange={handleChange}
-                  placeholder="29.99"
-                  required
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
-
-              {/* Duration Weeks */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Duration (Weeks) *
-                </label>
-                <input
-                  name="durationWeeks"
-                  type="number"
-                  min="0"
-                  value={formData.durationWeeks ?? ""}
-                  onChange={handleChange}
-                  placeholder="8"
-                  required
-                  disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </div>
-
-              {/* Total Lessons */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Total Lessons *
+                  Total Lessons
                 </label>
                 <input
                   name="totalLessons"
                   type="number"
                   min="0"
+                  step="1"
                   value={formData.totalLessons ?? ""}
                   onChange={handleChange}
-                  placeholder="24"
-                  required
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
-
-              {/* Total Hours */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Total Hours *
+                  Total Hours
                 </label>
                 <input
                   name="totalHours"
                   type="number"
                   min="0"
+                  step="0.5"
                   value={formData.totalHours ?? ""}
                   onChange={handleChange}
-                  placeholder="36"
-                  required
                   disabled={isLoading || isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
-
-              {/* Passing Score */}
-              <div>
+              <div className="md:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Passing Score (%) *
+                  Description
                 </label>
-                <input
-                  name="passingScore"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.passingScore ?? ""}
+                <textarea
+                  name="description"
+                  value={formData.description || ""}
                   onChange={handleChange}
-                  placeholder="60"
-                  required
+                  rows={2}
                   disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
             </div>
@@ -473,7 +455,7 @@ const BookUpdateModal = ({
                   }))
                 }
                 disabled={isLoading || isSubmitting}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm font-medium text-gray-700">
                 Book is active
