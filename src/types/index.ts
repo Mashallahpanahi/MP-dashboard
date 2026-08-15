@@ -5,3 +5,4 @@ export * from './student';
 export * from './studentPayment';
 export * from './teacherPayroll';
 export * from './expense';
+export * from './class'
