@@ -1,3 +1,4 @@
+// src/pages/Teachers/TeacherRegister.tsx
 import { FormEvent, useState } from "react";
 import {
   createTeacher,
@@ -13,11 +14,11 @@ const TeacherRegister = () => {
     lastName: "",
     gender: "",
     phone: "",
-    email: "",
-    address: "",
+    email: "", // Optional - can be empty
+    address: "", // Optional - can be empty
     salaryType: "",
     salaryAmount: 0,
-    feePercentage: 40,
+    feePercentage: 0, // Default to 0
     hireDate: "",
     isActive: true,
   });
@@ -29,7 +30,7 @@ const TeacherRegister = () => {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
+    >
   ) => {
     const { name, value } = e.target;
 
@@ -37,7 +38,7 @@ const TeacherRegister = () => {
       ...previous,
       [name]:
         name === "salaryAmount" || name === "feePercentage"
-          ? Number(value)
+          ? value === "" ? 0 : Number(value)
           : value,
     }));
   };
@@ -50,18 +51,36 @@ const TeacherRegister = () => {
     setError("");
 
     try {
-      await createTeacher(formData);
+      // Prepare data for submission
+      const submitData = { ...formData };
+
+      // If salary type is Fixed, set feePercentage to 0
+      if (submitData.salaryType === "Fixed") {
+        submitData.feePercentage = 0;
+      }
+      // If salary type is PerStudent, set salaryAmount to 0
+      else if (submitData.salaryType === "PerStudent") {
+        submitData.salaryAmount = 0;
+      }
+
+      // Remove empty optional fields
+      if (!submitData.email) {
+        delete submitData.email;
+      }
+      if (!submitData.address) {
+        delete submitData.address;
+      }
+
+      await createTeacher(submitData);
 
       setSuccess("Teacher registered successfully.");
 
-      // Wait 1.5 seconds so the user can see the success message
       setTimeout(() => {
         navigate("/teachers/all");
       }, 1500);
     } catch (error) {
       console.error("Failed to create teacher:", error);
 
-      // Handle ApiError with better messages
       if (error instanceof ApiError) {
         setError(error.message);
       } else if (error instanceof Error) {
@@ -73,6 +92,9 @@ const TeacherRegister = () => {
       setLoading(false);
     }
   };
+
+  // Get current salary type for conditional rendering
+  const currentSalaryType = formData.salaryType;
 
   return (
     <div className="p-6">
@@ -121,7 +143,7 @@ const TeacherRegister = () => {
                 </p>
                 {(error.includes("phone number") || error.includes("email address")) && (
                   <p className="mt-1 text-sm text-red-600">
-                    Please check the phone number and email address you entered.
+                    Please check the phone number you entered.
                   </p>
                 )}
               </div>
@@ -129,7 +151,7 @@ const TeacherRegister = () => {
           </div>
         )}
 
-        {/* Form - rest of the form remains the same */}
+        {/* Form */}
         <form
           onSubmit={handleSubmit}
           className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
@@ -147,7 +169,7 @@ const TeacherRegister = () => {
                   htmlFor="firstName"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  First Name
+                  First Name <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -168,7 +190,7 @@ const TeacherRegister = () => {
                   htmlFor="lastName"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  Last Name
+                  Last Name <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -189,7 +211,7 @@ const TeacherRegister = () => {
                   htmlFor="gender"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  Gender
+                  Gender <span className="text-red-500">*</span>
                 </label>
 
                 <select
@@ -212,7 +234,7 @@ const TeacherRegister = () => {
                   htmlFor="phone"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  Phone *
+                  Phone <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -230,13 +252,13 @@ const TeacherRegister = () => {
                 </p>
               </div>
 
-              {/* Email */}
+              {/* Email - Optional */}
               <div>
                 <label
                   htmlFor="email"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  Email *
+                  Email
                 </label>
 
                 <input
@@ -245,12 +267,11 @@ const TeacherRegister = () => {
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="teacher@example.com"
-                  required
+                  placeholder="teacher@example.com (optional)"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Email address must be unique in the system
+                  Optional - Can be left empty
                 </p>
               </div>
 
@@ -260,7 +281,7 @@ const TeacherRegister = () => {
                   htmlFor="hireDate"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  Hire Date
+                  Hire Date <span className="text-red-500">*</span>
                 </label>
 
                 <input
@@ -274,7 +295,7 @@ const TeacherRegister = () => {
                 />
               </div>
 
-              {/* Address */}
+              {/* Address - Optional */}
               <div className="md:col-span-2">
                 <label
                   htmlFor="address"
@@ -288,11 +309,13 @@ const TeacherRegister = () => {
                   name="address"
                   value={formData.address}
                   onChange={handleChange}
-                  placeholder="Enter teacher address"
+                  placeholder="Enter teacher address (optional)"
                   rows={3}
-                  required
                   className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional - Can be left empty
+                </p>
               </div>
             </div>
           </div>
@@ -310,7 +333,7 @@ const TeacherRegister = () => {
                   htmlFor="salaryType"
                   className="mb-2 block text-sm font-medium text-gray-700"
                 >
-                  Salary Type
+                  Salary Type <span className="text-red-500">*</span>
                 </label>
 
                 <select
@@ -323,54 +346,78 @@ const TeacherRegister = () => {
                 >
                   <option value="">Select salary type</option>
                   <option value="Fixed">Fixed</option>
-                  <option value="Percentage">Percentage</option>
+                  <option value="PerStudent">Per Student</option>
                 </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select "Fixed" for monthly salary or "Per Student" for percentage-based
+                </p>
               </div>
 
-              {/* Salary Amount */}
-              <div>
-                <label
-                  htmlFor="salaryAmount"
-                  className="mb-2 block text-sm font-medium text-gray-700"
-                >
-                  Salary Amount
-                </label>
+              {/* Salary Amount - Show only if Fixed is selected */}
+              {currentSalaryType === "Fixed" && (
+                <div>
+                  <label
+                    htmlFor="salaryAmount"
+                    className="mb-2 block text-sm font-medium text-gray-700"
+                  >
+                    Salary Amount <span className="text-red-500">*</span>
+                  </label>
 
-                <input
-                  id="salaryAmount"
-                  name="salaryAmount"
-                  type="number"
-                  min="0"
-                  value={formData.salaryAmount}
-                  onChange={handleChange}
-                  placeholder="4000"
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
+                  <input
+                    id="salaryAmount"
+                    name="salaryAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.salaryAmount === 0 ? "" : formData.salaryAmount}
+                    onChange={handleChange}
+                    placeholder="Enter fixed salary amount"
+                    required={currentSalaryType === "Fixed"}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Fixed salary amount per month
+                  </p>
+                </div>
+              )}
 
-              {/* Fee Percentage */}
-              <div>
-                <label
-                  htmlFor="feePercentage"
-                  className="mb-2 block text-sm font-medium text-gray-700"
-                >
-                  Fee Percentage (%)
-                </label>
+              {/* Fee Percentage - Show only if PerStudent is selected */}
+              {currentSalaryType === "PerStudent" && (
+                <div>
+                  <label
+                    htmlFor="feePercentage"
+                    className="mb-2 block text-sm font-medium text-gray-700"
+                  >
+                    Fee Percentage (%) <span className="text-red-500">*</span>
+                  </label>
 
-                <input
-                  id="feePercentage"
-                  name="feePercentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.feePercentage}
-                  onChange={handleChange}
-                  placeholder="40"
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
+                  <input
+                    id="feePercentage"
+                    name="feePercentage"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formData.feePercentage === 0 ? "" : formData.feePercentage}
+                    onChange={handleChange}
+                    placeholder="Enter percentage"
+                    required={currentSalaryType === "PerStudent"}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Percentage of student fee
+                  </p>
+                </div>
+              )}
+
+              {/* Info message when no salary type selected */}
+              {!currentSalaryType && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500 italic">
+                    Please select a salary type to configure salary details
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -414,7 +461,7 @@ const TeacherRegister = () => {
                   address: "",
                   salaryType: "",
                   salaryAmount: 0,
-                  feePercentage: 40,
+                  feePercentage: 0,
                   hireDate: "",
                   isActive: true,
                 })
