@@ -3,7 +3,11 @@ import { useState, useEffect } from "react";
 import { getPaymentMethod, createPaymentMethod } from "@/api/settingsApi";
 import type { PaymentMethod } from "@/types/settings";
 
-const PaymentMethodCard = () => {
+interface PaymentMethodCardProps {
+  onPaymentMethodChange?: () => void;
+}
+
+const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -30,14 +34,13 @@ const PaymentMethodCard = () => {
       const data = await getPaymentMethod();
       setPaymentMethod(data);
       setSelectedMethod(data.paymentMethod);
-      setIsConfigured(true); // Method exists, so it's configured
+      setIsConfigured(true);
     } catch (error) {
       console.error("Failed to fetch payment method:", error);
-      // If 404, it means no payment method exists yet
       if (error instanceof Error && error.message.includes("404")) {
         setPaymentMethod(null);
         setSelectedMethod("");
-        setIsConfigured(false); // No method configured
+        setIsConfigured(false);
       } else {
         setError("Failed to load payment method");
       }
@@ -57,13 +60,16 @@ const PaymentMethodCard = () => {
       setError("");
       setSuccess("");
 
-      // Create new payment method (only POST, no PATCH)
       const created = await createPaymentMethod({ paymentMethod: selectedMethod as any });
       setPaymentMethod(created);
-      setIsConfigured(true); // Now it's configured
+      setIsConfigured(true);
       setSuccess("Payment method configured successfully!");
 
-      // Clear success message after 3 seconds
+      // Notify parent component about the change
+      if (onPaymentMethodChange) {
+        onPaymentMethodChange();
+      }
+
       setTimeout(() => setSuccess(""), 3000);
     } catch (error) {
       console.error("Failed to save payment method:", error);

@@ -8,3 +8,4 @@ export * from './expense';
 export * from './class'
 export * from './settings';
 export * from './monthlyFee';
+export * from './bookFee';
