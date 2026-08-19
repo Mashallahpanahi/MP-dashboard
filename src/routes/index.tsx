@@ -34,6 +34,7 @@ import OtherExpensesPage from "@/pages/Payment/OtherExpenses";
 
 // Note pages
 import Notes from "@/pages/Notes/Notes";
+import SettingPage from "@/pages/settings/SettingsPage";
 
 const AppRoutes = () => (
   <BrowserRouter>
@@ -74,7 +75,7 @@ const AppRoutes = () => (
           <Route path="/notes" element={<Notes />} />
           
           {/* Settings */}
-          <Route path="/settings" element={<div>Settings</div>} />
+          <Route path="/settings" element={<SettingPage></SettingPage>} />
         </Route>
       </Route>
     </Routes>

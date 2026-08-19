@@ -195,7 +195,6 @@ const AllClasses = () => {
       )}
 
       {/* Classes Table */}
-     // src/pages/Classes/AllClasses.tsx (Only the table part - rest remains the same)
 
 {/* Classes Table */}
 {classes.length > 0 && (
