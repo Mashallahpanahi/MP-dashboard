@@ -1,5 +1,6 @@
 // src/pages/Settings/SettingsPage.tsx
 import PaymentMethodCard from "@/components/settings/SelectPaymentMethodCard";
+import MonthlyFeeCard from "@/components/settings/MonthlyFeeCard";
 
 const SettingsPage = () => {
   return (
@@ -17,13 +18,10 @@ const SettingsPage = () => {
         {/* Payment Method Card */}
         <PaymentMethodCard />
 
+        {/* Monthly Fees Card */}
+        <MonthlyFeeCard />
+
         {/* More cards will be added here later */}
-        {/* 
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">Coming Soon</h3>
-          <p className="mt-1 text-sm text-gray-500">More settings will be available soon.</p>
-        </div>
-        */}
       </div>
     </div>
   );

@@ -7,3 +7,4 @@ export * from './teacherPayroll';
 export * from './expense';
 export * from './class'
 export * from './settings';
+export * from './monthlyFee';
