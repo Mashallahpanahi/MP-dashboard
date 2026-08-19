@@ -19,6 +19,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 /**
  * Get all students
+ * GET /students
  */
 export const getStudents = async (): Promise<Student[]> => {
   const response = await fetch(`${API_URL}/students`, {
@@ -41,6 +42,7 @@ export const getStudents = async (): Promise<Student[]> => {
 
 /**
  * Get a single student by ID
+ * GET /students/{id}
  */
 export const getStudentById = async (id: string): Promise<Student> => {
   const response = await fetch(`${API_URL}/students/${id}`, {
@@ -62,17 +64,16 @@ export const getStudentById = async (id: string): Promise<Student> => {
 };
 
 /**
- * Create a new student
+ * Create a new student with image upload
+ * POST /students
+ * Uses FormData for file upload
  */
 export const createStudent = async (
-  student: CreateStudentData
+  data: FormData
 ): Promise<Student> => {
   const response = await fetch(`${API_URL}/students`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(student),
+    body: data, // FormData for file upload - DO NOT set Content-Type header
   });
 
   if (!response.ok) {
@@ -90,6 +91,10 @@ export const createStudent = async (
         } else if (errorData.message.includes('duplicate') && 
                    errorData.message.toLowerCase().includes('phone')) {
           errorMessage = 'This phone number is already registered. Please use a different phone number.';
+        } else if (errorData.message.toLowerCase().includes('phone')) {
+          errorMessage = 'Phone number must start with 07 and be 10 digits.';
+        } else if (errorData.message.toLowerCase().includes('image')) {
+          errorMessage = 'Student image is required. Please upload a valid image file (jpg, jpeg, png).';
         } else if (Array.isArray(errorData.message)) {
           errorMessage = errorData.message.join(", ");
         } else {
@@ -105,12 +110,13 @@ export const createStudent = async (
     throw new ApiError(errorMessage, response.status, errorDetails);
   }
 
-  const data: Student = await response.json();
-  return data;
+  const result: Student = await response.json();
+  return result;
 };
 
 /**
  * Update a student by ID
+ * PATCH /students/{id}
  */
 export const updateStudent = async (
   id: string,
@@ -160,6 +166,7 @@ export const updateStudent = async (
 
 /**
  * Delete a student by ID
+ * DELETE /students/{id}
  */
 export const deleteStudent = async (id: string): Promise<void> => {
   const response = await fetch(`${API_URL}/students/${id}`, {
@@ -190,6 +197,7 @@ export const deleteStudent = async (id: string): Promise<void> => {
 
 /**
  * Search students by name, phone, or studentNumber
+ * GET /students/search
  */
 export const searchStudents = async (query: string): Promise<Student[]> => {
   const response = await fetch(`${API_URL}/students/search?q=${encodeURIComponent(query)}`, {
@@ -216,6 +224,7 @@ export const searchStudents = async (query: string): Promise<Student[]> => {
 
 /**
  * Get all enrollments of a student
+ * GET /students/{studentId}/enrollments
  */
 export const getStudentEnrollments = async (studentId: string): Promise<StudentEnrollment[]> => {
   const response = await fetch(`${API_URL}/students/${studentId}/enrollments`, {
@@ -238,6 +247,7 @@ export const getStudentEnrollments = async (studentId: string): Promise<StudentE
 
 /**
  * Enroll a student in a new course (first registration)
+ * POST /students/enroll
  */
 export const enrollStudent = async (
   enrollment: CreateEnrollmentData
@@ -282,6 +292,7 @@ export const enrollStudent = async (
 
 /**
  * Update an enrollment
+ * PATCH /students/enrollments/{enrollmentId}
  */
 export const updateEnrollment = async (
   enrollmentId: string,
@@ -329,6 +340,7 @@ export const updateEnrollment = async (
 
 /**
  * Get info for level-up (previous enrollment, eligibility, next book)
+ * GET /students/{studentId}/level-up-info
  */
 export const getLevelUpInfo = async (studentId: string): Promise<LevelUpInfo> => {
   const response = await fetch(`${API_URL}/students/${studentId}/level-up-info`, {
@@ -351,6 +363,7 @@ export const getLevelUpInfo = async (studentId: string): Promise<LevelUpInfo> =>
 
 /**
  * Level up a student (automatically finds the next book)
+ * POST /students/level-up
  */
 export const levelUpStudent = async (studentId: string): Promise<LevelUpResponse> => {
   const response = await fetch(`${API_URL}/students/level-up`, {
