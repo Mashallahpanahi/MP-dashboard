@@ -4,6 +4,7 @@ import { getStudents, deleteStudent, getStudentById, updateStudent } from "@/api
 import type { Student, UpdateStudentData } from "@/types/student";
 import { StudentDetailModal, StudentUpdateModal, StudentDeleteModal } from "@/components/students";
 import StudentEnrollmentsModal from "@/components/students/StudentEnrollmentsModal";
+import StudentEditModal from "@/components/students/StudentEditModal";
 import { useNavigate } from "react-router-dom";
 
 const AllStudents = () => {
@@ -18,8 +19,6 @@ const AllStudents = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Update state
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [studentToUpdate, setStudentToUpdate] = useState<Student | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
 
   // Detail state
@@ -30,6 +29,10 @@ const AllStudents = () => {
   // Enrollments state
   const [showEnrollmentsModal, setShowEnrollmentsModal] = useState(false);
   const [studentForEnrollments, setStudentForEnrollments] = useState<Student | null>(null);
+
+  // Edit Modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [studentForEdit, setStudentForEdit] = useState<Student | null>(null);
 
   const fetchStudents = async () => {
     try {
@@ -81,35 +84,24 @@ const AllStudents = () => {
     setStudentToDelete(null);
   };
 
-  // Update handlers
-  const handleUpdateClick = async (student: Student) => {
+  // Update handler - for the edit modal
+  const handleUpdateStudent = async (id: string, data: UpdateStudentData) => {
     try {
       setUpdateLoading(true);
-      const studentData = await getStudentById(student.id);
-      setStudentToUpdate(studentData);
-      setShowUpdateModal(true);
-    } catch (error) {
-      console.error("Failed to fetch student for update:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load student data"
+      const updatedStudent = await updateStudent(id, data);
+      setStudents((prev) =>
+        prev.map((student) =>
+          student.id === updatedStudent.id ? updatedStudent : student
+        )
       );
+      setShowEditModal(false);
+      setStudentForEdit(null);
+    } catch (error) {
+      console.error("Failed to update student:", error);
+      throw error;
     } finally {
       setUpdateLoading(false);
     }
-  };
-
-  const handleUpdateStudent = async (id: string, data: UpdateStudentData) => {
-    const updatedStudent = await updateStudent(id, data);
-    setStudents((prev) =>
-      prev.map((student) =>
-        student.id === updatedStudent.id ? updatedStudent : student
-      )
-    );
-  };
-
-  const handleCloseUpdate = () => {
-    setShowUpdateModal(false);
-    setStudentToUpdate(null);
   };
 
   // Detail handlers
@@ -134,7 +126,7 @@ const AllStudents = () => {
     setStudentToView(null);
   };
 
-  // Enrollments handlers - Combined
+  // Enrollments handlers
   const handleViewEnrollments = (student: Student) => {
     setStudentForEnrollments(student);
     setShowEnrollmentsModal(true);
@@ -143,6 +135,17 @@ const AllStudents = () => {
   const handleCloseEnrollments = () => {
     setShowEnrollmentsModal(false);
     setStudentForEnrollments(null);
+  };
+
+  // Edit handlers - NEW
+  const handleEditClick = (student: Student) => {
+    setStudentForEdit(student);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEdit = () => {
+    setShowEditModal(false);
+    setStudentForEdit(null);
   };
 
   const handleAddStudent = () => {
@@ -292,8 +295,9 @@ const AllStudents = () => {
                         >
                           View
                         </button>
+                        {/* ✅ Edit button - opens StudentEditModal */}
                         <button
-                          onClick={() => handleUpdateClick(student)}
+                          onClick={() => handleEditClick(student)}
                           className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
                         >
                           Edit
@@ -328,13 +332,13 @@ const AllStudents = () => {
         onClose={handleCloseDetail}
       />
 
-      {/* Update Modal */}
-      <StudentUpdateModal
-        isOpen={showUpdateModal}
-        student={studentToUpdate}
-        onClose={handleCloseUpdate}
+      {/* ✅ Edit Modal - NEW */}
+      <StudentEditModal
+        isOpen={showEditModal}
+        student={studentForEdit}
+        onClose={handleCloseEdit}
         onUpdate={handleUpdateStudent}
-        isLoading={updateLoading || detailLoading}
+        isLoading={updateLoading}
       />
 
       {/* Delete Modal */}
@@ -346,7 +350,7 @@ const AllStudents = () => {
         isLoading={deleteLoading}
       />
 
-      {/* Enrollments Modal - Combined */}
+      {/* Enrollments Modal */}
       <StudentEnrollmentsModal
         isOpen={showEnrollmentsModal}
         studentId={studentForEnrollments?.id || null}
