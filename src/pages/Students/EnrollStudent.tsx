@@ -1,9 +1,11 @@
 // src/pages/Students/EnrollStudent.tsx
 import { FormEvent, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { enrollStudent, getStudentById, type CreateEnrollmentData } from "@/api/studentApi";
+import { createEnrollmentWithPayment, type CreateEnrollmentWithPaymentData } from "@/api/studentEnrollmentApi";
+import { getStudentById } from "@/api/studentApi";
 import { getTeachers, type Teacher } from "@/api/teacherApi";
 import { getBooks, type Book } from "@/api/bookApi";
+import { getClasses, type Class } from "@/api/classApi";
 
 const EnrollStudent = () => {
   const navigate = useNavigate();
@@ -16,32 +18,42 @@ const EnrollStudent = () => {
   // Data for dropdowns
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  const [formData, setFormData] = useState<CreateEnrollmentData>({
+  const [formData, setFormData] = useState<Partial<CreateEnrollmentWithPaymentData>>({
     studentId: studentId || "",
-    teacherId: "",
     bookId: "",
-    timetable: "",
-    tuitionFee: 0,
+    classId: "",
+    teacherId: "",
+    startDate: "",
+    endDate: "",
+    status: "Studying",
+    result: "In Progress",
+    fee: 0,
     discount: 0,
     finalFee: 0,
-    startDate: "",
-    expectedEndDate: "",
-    remarks: "",
+    date: "",
+    paymentStatus: "Pending",
+    score: undefined,
+    scoreDate: "",
+    scoreTime: "",
+    scoreNotes: "",
   });
 
-  // Fetch teachers and books for dropdowns
+  // Fetch data for dropdowns
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoadingData(true);
-        const [teachersData, booksData] = await Promise.all([
+        const [teachersData, booksData, classesData] = await Promise.all([
           getTeachers(),
           getBooks(),
+          getClasses(),
         ]);
-        setTeachers(teachersData);
-        setBooks(booksData);
+        setTeachers(teachersData.filter(t => t.isActive));
+        setBooks(booksData.filter(b => b.isActive));
+        setClasses(classesData);
 
         // Fetch student name
         if (studentId) {
@@ -69,23 +81,32 @@ const EnrollStudent = () => {
     setFormData((prev) => ({
       ...prev,
       [name]:
-        type === "number" || name === "tuitionFee" || 
-        name === "discount" || name === "finalFee"
-          ? parseFloat(value) || 0
+        type === "number" || name === "fee" || name === "discount" || name === "finalFee" || name === "score"
+          ? value === "" ? 0 : parseFloat(value)
           : value,
     }));
   };
 
-  // Auto-calculate final fee when tuition fee or discount changes
+  // Auto-calculate final fee when fee or discount changes
   useEffect(() => {
-    const tuition = formData.tuitionFee || 0;
+    const fee = formData.fee || 0;
     const discount = formData.discount || 0;
-    const finalFee = tuition - discount;
+    const finalFee = fee - discount;
     setFormData((prev) => ({
       ...prev,
       finalFee: finalFee > 0 ? finalFee : 0,
     }));
-  }, [formData.tuitionFee, formData.discount]);
+  }, [formData.fee, formData.discount]);
+
+  // Set date to today when not set
+  useEffect(() => {
+    if (!formData.date) {
+      setFormData((prev) => ({
+        ...prev,
+        date: new Date().toISOString().split('T')[0],
+      }));
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -95,18 +116,18 @@ const EnrollStudent = () => {
 
     try {
       // Validate required fields
-      if (!formData.teacherId) {
-        setError("Please select a teacher");
-        setLoading(false);
-        return;
-      }
       if (!formData.bookId) {
         setError("Please select a book");
         setLoading(false);
         return;
       }
-      if (!formData.timetable) {
-        setError("Please enter timetable");
+      if (!formData.classId) {
+        setError("Please select a class");
+        setLoading(false);
+        return;
+      }
+      if (!formData.teacherId) {
+        setError("Please select a teacher");
         setLoading(false);
         return;
       }
@@ -115,13 +136,44 @@ const EnrollStudent = () => {
         setLoading(false);
         return;
       }
-      if (!formData.expectedEndDate) {
-        setError("Please select expected end date");
+      if (!formData.endDate) {
+        setError("Please select end date");
+        setLoading(false);
+        return;
+      }
+      if (!formData.fee || formData.fee <= 0) {
+        setError("Please enter a valid fee amount");
+        setLoading(false);
+        return;
+      }
+      if (!formData.date) {
+        setError("Please select payment date");
         setLoading(false);
         return;
       }
 
-      await enrollStudent(formData);
+      // Prepare data for submission
+      const submitData: CreateEnrollmentWithPaymentData = {
+        studentId: formData.studentId!,
+        bookId: formData.bookId,
+        classId: formData.classId,
+        teacherId: formData.teacherId,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        status: formData.status as 'Studying' | 'Completed' | 'Dropped' | 'Pending',
+        result: formData.result as 'Passed' | 'Failed' | 'Pending' | 'In Progress',
+        fee: formData.fee,
+        discount: formData.discount || 0,
+        finalFee: formData.finalFee || formData.fee,
+        date: formData.date,
+        paymentStatus: formData.paymentStatus as 'Paid' | 'Pending' | 'Partially Paid' | 'Overdue',
+        score: formData.score || undefined,
+        scoreDate: formData.scoreDate || undefined,
+        scoreTime: formData.scoreTime || undefined,
+        scoreNotes: formData.scoreNotes || undefined,
+      };
+
+      await createEnrollmentWithPayment(submitData);
       setSuccess("Student enrolled successfully!");
       setTimeout(() => {
         navigate("/students/all");
@@ -154,7 +206,7 @@ const EnrollStudent = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Enroll Student</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Enroll {studentName || 'Student'} in a new course
+            Enroll {studentName || 'Student'} in a new course with payment
           </p>
         </div>
 
@@ -183,29 +235,6 @@ const EnrollStudent = () => {
               Course Selection
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* Teacher */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Teacher *
-                </label>
-                <select
-                  name="teacherId"
-                  value={formData.teacherId}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Select teacher</option>
-                  {teachers
-                    .filter((teacher) => teacher.isActive)
-                    .map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.firstName} {teacher.lastName}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
               {/* Book */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -213,49 +242,96 @@ const EnrollStudent = () => {
                 </label>
                 <select
                   name="bookId"
-                  value={formData.bookId}
+                  value={formData.bookId || ""}
                   onChange={handleChange}
                   required
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="">Select book</option>
-                  {books
-                    .filter((book) => book.isActive)
-                    .map((book) => (
-                      <option key={book.id} value={book.id}>
-                        {book.name} ({book.code}) - Level {book.level}
-                      </option>
-                    ))}
+                  {books.map((book) => (
+                    <option key={book.id} value={book.id}>
+                      {book.name} ({book.code}) - Level {book.level}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {/* Timetable */}
+              {/* Class */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Timetable *
+                  Class *
                 </label>
-                <input
-                  name="timetable"
-                  value={formData.timetable}
+                <select
+                  name="classId"
+                  value={formData.classId || ""}
                   onChange={handleChange}
-                  placeholder="Mon 10:00-12:00"
                   required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">Select class</option>
+                  {classes.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name} - {classItem.block}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Remarks */}
+              {/* Teacher */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Remarks
+                  Teacher *
                 </label>
-                <input
-                  name="remarks"
-                  value={formData.remarks || ""}
+                <select
+                  name="teacherId"
+                  value={formData.teacherId || ""}
                   onChange={handleChange}
-                  placeholder="Additional remarks (optional)"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">Select teacher</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.firstName} {teacher.lastName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={formData.status || "Studying"}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="Studying">Studying</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Dropped">Dropped</option>
+                </select>
+              </div>
+
+              {/* Result */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Result
+                </label>
+                <select
+                  name="result"
+                  value={formData.result || "In Progress"}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="In Progress">In Progress</option>
+                  <option value="Passed">Passed</option>
+                  <option value="Failed">Failed</option>
+                  <option value="Pending">Pending</option>
+                </select>
               </div>
             </div>
           </div>
@@ -266,7 +342,6 @@ const EnrollStudent = () => {
               Course Dates
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* Start Date */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Start Date *
@@ -274,22 +349,20 @@ const EnrollStudent = () => {
                 <input
                   name="startDate"
                   type="date"
-                  value={formData.startDate}
+                  value={formData.startDate || ""}
                   onChange={handleChange}
                   required
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
-
-              {/* Expected End Date */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Expected End Date *
+                  End Date *
                 </label>
                 <input
-                  name="expectedEndDate"
+                  name="endDate"
                   type="date"
-                  value={formData.expectedEndDate}
+                  value={formData.endDate || ""}
                   onChange={handleChange}
                   required
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -298,31 +371,28 @@ const EnrollStudent = () => {
             </div>
           </div>
 
-          {/* Fee Information */}
+          {/* Payment Information */}
           <div className="mb-8 border-t border-gray-200 pt-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Fee Information
+              Payment Information
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-              {/* Tuition Fee */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Tuition Fee ($) *
+                  Fee ($) *
                 </label>
                 <input
-                  name="tuitionFee"
+                  name="fee"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.tuitionFee || ""}
+                  value={formData.fee || ""}
                   onChange={handleChange}
-                  placeholder="100"
+                  placeholder="1000"
                   required
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
-
-              {/* Discount */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Discount ($)
@@ -334,12 +404,10 @@ const EnrollStudent = () => {
                   step="0.01"
                   value={formData.discount || ""}
                   onChange={handleChange}
-                  placeholder="10"
+                  placeholder="100"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
-
-              {/* Final Fee - Auto Calculated */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Final Fee ($)
@@ -351,8 +419,99 @@ const EnrollStudent = () => {
                   className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-700"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Auto-calculated: Tuition - Discount
+                  Auto-calculated: Fee - Discount
                 </p>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Payment Date *
+                </label>
+                <input
+                  name="date"
+                  type="date"
+                  value={formData.date || ""}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Payment Status
+                </label>
+                <select
+                  name="paymentStatus"
+                  value={formData.paymentStatus || "Pending"}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="Paid">Paid</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                  <option value="Overdue">Overdue</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Score Information (Optional) */}
+          <div className="mb-8 border-t border-gray-200 pt-8">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              Score Information <span className="text-sm font-normal text-gray-500">(Optional)</span>
+            </h2>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Score
+                </label>
+                <input
+                  name="score"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.score || ""}
+                  onChange={handleChange}
+                  placeholder="85.5"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Score Date
+                </label>
+                <input
+                  name="scoreDate"
+                  type="date"
+                  value={formData.scoreDate || ""}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Score Time
+                </label>
+                <input
+                  name="scoreTime"
+                  type="time"
+                  value={formData.scoreTime || ""}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Score Notes
+                </label>
+                <textarea
+                  name="scoreNotes"
+                  value={formData.scoreNotes || ""}
+                  onChange={handleChange}
+                  rows={2}
+                  placeholder="Additional notes about the score (optional)"
+                  className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
               </div>
             </div>
           </div>

@@ -9,3 +9,4 @@ export * from './class'
 export * from './settings';
 export * from './monthlyFee';
 export * from './bookFee';
+export * from './studentEnrollment';
