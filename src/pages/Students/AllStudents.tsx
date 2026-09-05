@@ -6,6 +6,15 @@ import { StudentDetailModal, StudentDeleteModal, StudentEnrollmentsModal } from 
 import StudentEditModal from "@/components/students/StudentEditModal";
 import { useNavigate } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+// Helper function to get full image URL
+const getImageUrl = (imagePath: string | null | undefined) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http')) return imagePath;
+  return `${API_URL}${imagePath}`;
+};
+
 const AllStudents = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
@@ -227,10 +236,29 @@ const AllStudents = () => {
                   <tr key={student.id} className="transition hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
-                          {student.firstName.charAt(0)}
-                          {student.lastName?.charAt(0) || ''}
-                        </div>
+                        {/* ✅ Fixed: Show image if available */}
+                        {student.image ? (
+                          <img
+                            src={getImageUrl(student.image)}
+                            alt={`${student.firstName} ${student.lastName}`}
+                            className="h-10 w-10 rounded-full object-cover"
+                            onError={(e) => {
+                              // If image fails to load, show initials
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm';
+                                fallback.textContent = `${student.firstName.charAt(0)}${student.lastName?.charAt(0) || ''}`;
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
+                            {student.firstName.charAt(0)}{student.lastName?.charAt(0) || ''}
+                          </div>
+                        )}
                         <div>
                           <p className="font-semibold text-gray-900">
                             {student.firstName} {student.lastName || ''}

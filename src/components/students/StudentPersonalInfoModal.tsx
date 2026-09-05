@@ -37,6 +37,15 @@ const StudentPersonalInfoModal = ({
 
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | null | undefined) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http')) return imagePath;
+    return `${API_URL}${imagePath}`;
+  };
+
   useEffect(() => {
     if (isOpen && studentId) {
       fetchStudentData();
@@ -167,11 +176,11 @@ const StudentPersonalInfoModal = ({
         }
       }
 
-      // ✅ Prepare data - Use FormData if there's an image, otherwise use JSON
+      // Prepare data - Use FormData if there's an image, otherwise use JSON
       let response;
       
       if (imageFile) {
-        // ✅ Use FormData for update with image
+        // Use FormData for update with image
         const submitData = new FormData();
         submitData.append('firstName', formData.firstName.trim());
         submitData.append('lastName', formData.lastName.trim());
@@ -197,7 +206,7 @@ const StudentPersonalInfoModal = ({
 
         response = await updateStudent(studentId, submitData);
       } else {
-        // ✅ Use JSON for update without image
+        // Use JSON for update without image
         const submitData: any = {
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
@@ -387,12 +396,17 @@ const StudentPersonalInfoModal = ({
                     </button>
                   )}
                 </div>
+                {/* ✅ FIXED: Display image with full URL */}
                 {imagePreview && (
                   <div className="mt-3">
                     <img
-                      src={imagePreview}
+                      src={getImageUrl(imagePreview) || imagePreview}
                       alt="Student preview"
                       className="h-20 w-20 rounded-lg object-cover border border-gray-200"
+                      onError={(e) => {
+                        // If image fails to load, hide it
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
                   </div>
                 )}
