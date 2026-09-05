@@ -118,17 +118,34 @@ export const createStudent = async (
  * Update a student by ID
  * PATCH /students/{id}
  */
+// src/api/studentApi.ts - Update the updateStudent function
+
+/**
+ * ✅ FIXED: Update a student by ID - Supports both FormData (with image) and JSON
+ * PATCH /students/{id}
+ */
 export const updateStudent = async (
   id: string,
-  student: UpdateStudentData
+  data: FormData | UpdateStudentData
 ): Promise<Student> => {
+  const isFormData = data instanceof FormData;
+  
+  console.log('🔵 updateStudent called with ID:', id);
+  console.log('🔵 isFormData:', isFormData);
+
+  // ✅ For FormData, DON'T set Content-Type header (browser sets it with boundary)
+  const headers: HeadersInit = {};
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const response = await fetch(`${API_URL}/students/${id}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(student),
+    headers: headers,
+    body: isFormData ? data : JSON.stringify(data),
   });
+
+  console.log('🟡 Response status:', response.status);
 
   if (!response.ok) {
     let errorMessage = `Failed to update student. Status: ${response.status}`;
@@ -137,14 +154,14 @@ export const updateStudent = async (
     try {
       const errorData = await response.json();
       errorDetails = errorData;
+      console.log('🔴 Error response:', errorData);
 
       if (errorData.message && typeof errorData.message === 'string') {
         if (errorData.message.includes('duplicate') && 
-            errorData.message.toLowerCase().includes('studentnumber')) {
-          errorMessage = 'This student number is already registered by another student. Please use a different number.';
-        } else if (errorData.message.includes('duplicate') && 
-                   errorData.message.toLowerCase().includes('phone')) {
+            errorData.message.toLowerCase().includes('phone')) {
           errorMessage = 'This phone number is already registered by another student. Please use a different phone number.';
+        } else if (errorData.message.includes('not found')) {
+          errorMessage = 'Student not found. Please refresh and try again.';
         } else if (Array.isArray(errorData.message)) {
           errorMessage = errorData.message.join(", ");
         } else {
@@ -160,10 +177,10 @@ export const updateStudent = async (
     throw new ApiError(errorMessage, response.status, errorDetails);
   }
 
-  const data: Student = await response.json();
-  return data;
+  const updatedStudent: Student = await response.json();
+  console.log('🟢 Update successful:', updatedStudent);
+  return updatedStudent;
 };
-
 /**
  * Delete a student by ID
  * DELETE /students/{id}

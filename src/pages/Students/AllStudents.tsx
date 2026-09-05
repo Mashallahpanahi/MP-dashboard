@@ -1,9 +1,8 @@
 // src/pages/Students/AllStudents.tsx
 import { useEffect, useState } from "react";
-import { getStudents, deleteStudent, getStudentById, updateStudent } from "@/api/studentApi";
-import type { Student, UpdateStudentData } from "@/types/student";
-import { StudentDetailModal, StudentUpdateModal, StudentDeleteModal } from "@/components/students";
-import StudentEnrollmentsModal from "@/components/students/StudentEnrollmentsModal";
+import { getStudents, deleteStudent, getStudentById } from "@/api/studentApi";
+import type { Student } from "@/types/student";
+import { StudentDetailModal, StudentDeleteModal, StudentEnrollmentsModal } from "@/components/students";
 import StudentEditModal from "@/components/students/StudentEditModal";
 import { useNavigate } from "react-router-dom";
 
@@ -18,21 +17,18 @@ const AllStudents = () => {
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Update state
-  const [updateLoading, setUpdateLoading] = useState(false);
-
   // Detail state
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [studentToView, setStudentToView] = useState<Student | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Enrollments state
-  const [showEnrollmentsModal, setShowEnrollmentsModal] = useState(false);
-  const [studentForEnrollments, setStudentForEnrollments] = useState<Student | null>(null);
-
   // Edit Modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [studentForEdit, setStudentForEdit] = useState<Student | null>(null);
+
+  // Enrollments state
+  const [showEnrollmentsModal, setShowEnrollmentsModal] = useState(false);
+  const [studentForEnrollments, setStudentForEnrollments] = useState<Student | null>(null);
 
   const fetchStudents = async () => {
     try {
@@ -84,26 +80,6 @@ const AllStudents = () => {
     setStudentToDelete(null);
   };
 
-  // Update handler - for the edit modal
-  const handleUpdateStudent = async (id: string, data: UpdateStudentData) => {
-    try {
-      setUpdateLoading(true);
-      const updatedStudent = await updateStudent(id, data);
-      setStudents((prev) =>
-        prev.map((student) =>
-          student.id === updatedStudent.id ? updatedStudent : student
-        )
-      );
-      setShowEditModal(false);
-      setStudentForEdit(null);
-    } catch (error) {
-      console.error("Failed to update student:", error);
-      throw error;
-    } finally {
-      setUpdateLoading(false);
-    }
-  };
-
   // Detail handlers
   const handleViewClick = async (student: Student) => {
     try {
@@ -126,6 +102,22 @@ const AllStudents = () => {
     setStudentToView(null);
   };
 
+  // Edit handlers
+  const handleEditClick = (student: Student) => {
+    setStudentForEdit(student);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEdit = () => {
+    setShowEditModal(false);
+    setStudentForEdit(null);
+  };
+
+  // ✅ Refresh callback
+  const handleStudentUpdated = () => {
+    fetchStudents();
+  };
+
   // Enrollments handlers
   const handleViewEnrollments = (student: Student) => {
     setStudentForEnrollments(student);
@@ -135,17 +127,6 @@ const AllStudents = () => {
   const handleCloseEnrollments = () => {
     setShowEnrollmentsModal(false);
     setStudentForEnrollments(null);
-  };
-
-  // Edit handlers - NEW
-  const handleEditClick = (student: Student) => {
-    setStudentForEdit(student);
-    setShowEditModal(true);
-  };
-
-  const handleCloseEdit = () => {
-    setShowEditModal(false);
-    setStudentForEdit(null);
   };
 
   const handleAddStudent = () => {
@@ -228,9 +209,6 @@ const AllStudents = () => {
                     Student
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Student ID
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Contact
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -258,15 +236,10 @@ const AllStudents = () => {
                             {student.firstName} {student.lastName || ''}
                           </p>
                           <p className="mt-1 text-xs text-gray-500">
-                            {student.address || 'No address'}
+                            {student.studentNumber || 'No ID'}
                           </p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-gray-900">
-                        {student.studentNumber || 'N/A'}
-                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-900">{student.phone || 'N/A'}</p>
@@ -295,7 +268,6 @@ const AllStudents = () => {
                         >
                           View
                         </button>
-                        {/* ✅ Edit button - opens StudentEditModal */}
                         <button
                           onClick={() => handleEditClick(student)}
                           className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
@@ -332,13 +304,13 @@ const AllStudents = () => {
         onClose={handleCloseDetail}
       />
 
-      {/* ✅ Edit Modal - NEW */}
+      {/* ✅ Edit Modal */}
       <StudentEditModal
         isOpen={showEditModal}
         student={studentForEdit}
         onClose={handleCloseEdit}
-        onUpdate={handleUpdateStudent}
-        isLoading={updateLoading}
+        onUpdate={handleStudentUpdated}
+        isLoading={false}
       />
 
       {/* Delete Modal */}
