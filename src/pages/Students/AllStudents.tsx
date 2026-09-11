@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { getStudents, deleteStudent, getStudentById } from "@/api/studentApi";
 import type { Student } from "@/types/student";
-import { StudentDetailModal, StudentDeleteModal, StudentEnrollmentsModal } from "@/components/students";
+import { StudentDetailModal, StudentDeleteModal, StudentEnrollmentsModal, StudentScoresModal } from "@/components/students";
 import StudentEditModal from "@/components/students/StudentEditModal";
 import { useNavigate } from "react-router-dom";
 
@@ -38,6 +38,10 @@ const AllStudents = () => {
   // Enrollments state
   const [showEnrollmentsModal, setShowEnrollmentsModal] = useState(false);
   const [studentForEnrollments, setStudentForEnrollments] = useState<Student | null>(null);
+
+  // ✅ Scores state
+  const [showScoresModal, setShowScoresModal] = useState(false);
+  const [studentForScores, setStudentForScores] = useState<Student | null>(null);
 
   const fetchStudents = async () => {
     try {
@@ -138,6 +142,17 @@ const AllStudents = () => {
     setStudentForEnrollments(null);
   };
 
+  // ✅ Scores handlers
+  const handleViewScores = (student: Student) => {
+    setStudentForScores(student);
+    setShowScoresModal(true);
+  };
+
+  const handleCloseScores = () => {
+    setShowScoresModal(false);
+    setStudentForScores(null);
+  };
+
   const handleAddStudent = () => {
     navigate("/students/register");
   };
@@ -236,14 +251,12 @@ const AllStudents = () => {
                   <tr key={student.id} className="transition hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        {/* ✅ Fixed: Show image if available */}
                         {student.image ? (
                           <img
                             src={getImageUrl(student.image)}
                             alt={`${student.firstName} ${student.lastName}`}
                             className="h-10 w-10 rounded-full object-cover"
                             onError={(e) => {
-                              // If image fails to load, show initials
                               e.currentTarget.style.display = 'none';
                               const parent = e.currentTarget.parentElement;
                               if (parent) {
@@ -308,6 +321,13 @@ const AllStudents = () => {
                         >
                           Enrollments
                         </button>
+                        {/* ✅ Scores Button */}
+                        <button
+                          onClick={() => handleViewScores(student)}
+                          className="inline-flex items-center rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-600 transition hover:bg-green-100"
+                        >
+                          Scores
+                        </button>
                         <button
                           onClick={() => handleDeleteClick(student)}
                           disabled={deleteLoading === student.id}
@@ -357,6 +377,14 @@ const AllStudents = () => {
         studentName={`${studentForEnrollments?.firstName || ''} ${studentForEnrollments?.lastName || ''}`}
         student={studentForEnrollments}
         onClose={handleCloseEnrollments}
+      />
+
+      {/* ✅ Scores Modal */}
+      <StudentScoresModal
+        isOpen={showScoresModal}
+        studentId={studentForScores?.id || null}
+        studentName={`${studentForScores?.firstName || ''} ${studentForScores?.lastName || ''}`}
+        onClose={handleCloseScores}
       />
     </div>
   );
