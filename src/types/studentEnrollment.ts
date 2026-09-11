@@ -8,6 +8,7 @@ export interface StudentEnrollment {
   teacherId: string;
   startDate: string;
   endDate: string;
+  time: string | null; // ✅ Added time field
   status: 'Studying' | 'Completed' | 'Dropped' | 'Pending';
   result: 'Passed' | 'Failed' | 'Pending' | 'In Progress';
   fee: number;
@@ -55,6 +56,7 @@ export interface CreateEnrollmentWithPaymentData {
   teacherId: string;
   startDate: string;
   endDate: string;
+  time?: string; // ✅ Added time field (optional)
   status?: 'Studying' | 'Completed' | 'Dropped' | 'Pending';
   result?: 'Passed' | 'Failed' | 'Pending' | 'In Progress';
   fee: number;
@@ -75,6 +77,7 @@ export interface UpdateEnrollmentData {
   teacherId?: string;
   startDate?: string;
   endDate?: string;
+  time?: string; // ✅ Added time field
   status?: 'Studying' | 'Completed' | 'Dropped' | 'Pending';
   result?: 'Passed' | 'Failed' | 'Pending' | 'In Progress';
 }
@@ -102,6 +105,7 @@ export interface UpdateBothData {
   teacherId?: string;
   startDate?: string;
   endDate?: string;
+  time?: string; // ✅ Added time field
   status?: 'Studying' | 'Completed' | 'Dropped' | 'Pending';
   result?: 'Passed' | 'Failed' | 'Pending' | 'In Progress';
   // Payment fields

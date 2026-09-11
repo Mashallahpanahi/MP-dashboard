@@ -37,7 +37,7 @@ const StudentEnrollmentModal = ({
     return newDate.toISOString().split('T')[0];
   };
 
-  // Form state
+  // ✅ Form state with time field
   const [formData, setFormData] = useState<Partial<CreateEnrollmentWithPaymentData>>({
     studentId: student?.id || "",
     bookId: "",
@@ -45,6 +45,7 @@ const StudentEnrollmentModal = ({
     teacherId: "",
     startDate: "",
     endDate: "",
+    time: "", // ✅ Added time field
     status: "Studying",
     result: "In Progress",
     fee: 0,
@@ -67,6 +68,7 @@ const StudentEnrollmentModal = ({
         endDate: oneMonthLater,
         date: today,
         paymentStatus: "Paid",
+        time: "",
       }));
       // Clear previous messages
       setSuccess("");
@@ -152,6 +154,12 @@ const StudentEnrollmentModal = ({
         setSaving(false);
         return;
       }
+      // ✅ Time is optional but recommended
+      // if (!formData.time) {
+      //   setError("Please enter time");
+      //   setSaving(false);
+      //   return;
+      // }
       if (!formData.fee || formData.fee <= 0) {
         setError("Please enter a valid fee amount");
         setSaving(false);
@@ -171,6 +179,7 @@ const StudentEnrollmentModal = ({
         teacherId: formData.teacherId,
         startDate: formData.startDate,
         endDate: formData.endDate,
+        time: formData.time || "", // ✅ Include time
         status: formData.status as 'Studying' | 'Completed' | 'Dropped' | 'Pending',
         result: formData.result as 'Passed' | 'Failed' | 'Pending' | 'In Progress',
         fee: formData.fee,
@@ -179,6 +188,8 @@ const StudentEnrollmentModal = ({
         date: formData.date,
         paymentStatus: formData.paymentStatus as 'Paid' | 'Pending' | 'Partially Paid' | 'Overdue',
       };
+
+      console.log('📤 Enrolling with data:', submitData);
 
       const response = await createEnrollmentWithPayment(submitData);
       
@@ -228,6 +239,7 @@ const StudentEnrollmentModal = ({
       teacherId: "",
       startDate: today,
       endDate: oneMonthLater,
+      time: "",
       status: "Studying",
       result: "In Progress",
       fee: 0,
@@ -387,10 +399,10 @@ const StudentEnrollmentModal = ({
               </div>
             </div>
 
-            {/* Dates */}
+            {/* ✅ Dates and Time */}
             <div className="mb-6 border-t border-gray-200 pt-6">
-              <h4 className="mb-3 font-semibold text-gray-900">Course Dates</h4>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <h4 className="mb-3 font-semibold text-gray-900">Course Schedule</h4>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">
                     Start Date <span className="text-red-500">*</span>
@@ -421,6 +433,23 @@ const StudentEnrollmentModal = ({
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     Default: One month from today
+                  </p>
+                </div>
+                {/* ✅ Time Input */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Time
+                  </label>
+                  <input
+                    type="text"
+                    name="time"
+                    value={formData.time || ""}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 4-6 PM"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    e.g., 4-6 PM, 10-12 AM
                   </p>
                 </div>
               </div>
@@ -512,7 +541,7 @@ const StudentEnrollmentModal = ({
               </div>
             </div>
 
-            {/* ✅ MESSAGE DISPLAY AREA - Near the buttons */}
+            {/* MESSAGE DISPLAY AREA - Near the buttons */}
             <div className="mb-4">
               {/* Success Message */}
               {success && (
