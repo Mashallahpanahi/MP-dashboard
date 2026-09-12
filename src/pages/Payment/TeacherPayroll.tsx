@@ -18,7 +18,6 @@ import type {
 } from "@/types/teacherPayroll";
 import {  
   TeacherPayrollCreateModal,
-  TeacherPayrollAddPaymentModal,
   TeacherPayrollHistoryModal  // ✅ Add this
 } from "@/components/teacher-payroll";
 
@@ -451,16 +450,6 @@ const TeacherPayrollPage = () => {
         isLoading={createLoading}
         prefillData={prefillData}
       />
-
-      {/* Add Payment Modal */}
-      <TeacherPayrollAddPaymentModal
-        isOpen={showAddPaymentModal}
-        payroll={payrollToAddPayment}
-        onClose={handleCloseAddPayment}
-        onAddPayment={handleAddPayment}
-        isLoading={addPaymentLoading}
-      />
-
       {/* ✅ History Modal */}
       <TeacherPayrollHistoryModal
         isOpen={showHistoryModal}
