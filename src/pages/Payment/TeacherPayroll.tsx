@@ -16,9 +16,7 @@ import type {
   AddPaymentData,
   UnpaidSalaryRecord
 } from "@/types/teacherPayroll";
-import { 
-  TeacherPayrollDeleteModal, 
-  TeacherPayrollUpdateModal, 
+import {  
   TeacherPayrollCreateModal,
   TeacherPayrollAddPaymentModal,
   TeacherPayrollHistoryModal  // ✅ Add this
@@ -444,24 +442,6 @@ const TeacherPayrollPage = () => {
           </div>
         </div>
       )}
-
-      {/* Delete Modal */}
-      <TeacherPayrollDeleteModal
-        isOpen={showDeleteModal}
-        payroll={payrollToDelete}
-        onClose={handleCancelDelete}
-        onConfirm={handleConfirmDelete}
-        isLoading={deleteLoading}
-      />
-
-      {/* Update Modal */}
-      <TeacherPayrollUpdateModal
-        isOpen={showUpdateModal}
-        payroll={payrollToUpdate}
-        onClose={handleCloseUpdate}
-        onUpdate={handleUpdatePayroll}
-        isLoading={updateLoading}
-      />
 
       {/* Create/Pay Salary Modal */}
       <TeacherPayrollCreateModal
