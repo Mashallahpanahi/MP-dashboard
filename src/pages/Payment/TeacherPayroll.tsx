@@ -5,14 +5,29 @@ import {
   deleteTeacherPayroll,
   getTeacherPayrollById,
   updateTeacherPayroll,
-  generateTeacherPayroll
+  createTeacherPayroll,
+  addPaymentToPayroll,
+  getUnpaidSalaries
 } from "@/api/teacherPayrollApi";
-import type { TeacherPayroll, UpdateTeacherPayrollData, GeneratePayrollDto } from "@/types/teacherPayroll";
-import { TeacherPayrollDeleteModal, TeacherPayrollUpdateModal, TeacherPayrollGenerateModal } from "@/components/teacher-payroll";
+import type { 
+  TeacherPayroll, 
+  UpdateTeacherPayrollData, 
+  CreateTeacherPayrollData, 
+  AddPaymentData,
+  UnpaidSalaryRecord
+} from "@/types/teacherPayroll";
+import { 
+  TeacherPayrollDeleteModal, 
+  TeacherPayrollUpdateModal, 
+  TeacherPayrollCreateModal,
+  TeacherPayrollAddPaymentModal
+} from "@/components/teacher-payroll";
 
 const TeacherPayrollPage = () => {
   const [payrolls, setPayrolls] = useState<TeacherPayroll[]>([]);
+  const [unpaidRecords, setUnpaidRecords] = useState<UnpaidSalaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingUnpaid, setLoadingUnpaid] = useState(true);
   const [error, setError] = useState("");
 
   // Delete state
@@ -25,16 +40,27 @@ const TeacherPayrollPage = () => {
   const [payrollToUpdate, setPayrollToUpdate] = useState<TeacherPayroll | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
 
-  // Generate state
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [generateLoading, setGenerateLoading] = useState(false);
+  // Create state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+
+  // Add Payment state
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [payrollToAddPayment, setPayrollToAddPayment] = useState<TeacherPayroll | null>(null);
+  const [addPaymentLoading, setAddPaymentLoading] = useState(false);
+
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Pre-fill data for create modal when paying from unpaid record
+  const [prefillData, setPrefillData] = useState<CreateTeacherPayrollData | null>(null);
 
   const fetchPayrolls = async () => {
     try {
       setLoading(true);
       setError("");
       const data = await getTeacherPayrolls();
-      setPayrolls(data);
+      setPayrolls(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch teacher payrolls:", error);
       setError(
@@ -45,8 +71,21 @@ const TeacherPayrollPage = () => {
     }
   };
 
+  const fetchUnpaidSalaries = async () => {
+    try {
+      setLoadingUnpaid(true);
+      const data = await getUnpaidSalaries();
+      setUnpaidRecords(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to fetch unpaid salaries:", error);
+    } finally {
+      setLoadingUnpaid(false);
+    }
+  };
+
   useEffect(() => {
     fetchPayrolls();
+    fetchUnpaidSalaries();
   }, []);
 
   // Delete handlers
@@ -64,6 +103,7 @@ const TeacherPayrollPage = () => {
       setPayrolls((prev) => prev.filter((p) => p.id !== payrollToDelete.id));
       setShowDeleteModal(false);
       setPayrollToDelete(null);
+      fetchUnpaidSalaries();
     } catch (error) {
       console.error("Failed to delete payroll:", error);
       setError(
@@ -103,6 +143,7 @@ const TeacherPayrollPage = () => {
         p.id === updatedPayroll.id ? updatedPayroll : p
       )
     );
+    fetchUnpaidSalaries();
   };
 
   const handleCloseUpdate = () => {
@@ -110,73 +151,150 @@ const TeacherPayrollPage = () => {
     setPayrollToUpdate(null);
   };
 
-  // Generate handlers
-  const handleGenerateClick = () => {
-    setShowGenerateModal(true);
+  // Create handlers
+  const handleCreateClick = () => {
+    setPrefillData(null);
+    setShowCreateModal(true);
   };
 
-  const handleGeneratePayroll = async (data: GeneratePayrollDto) => {
+  // Handle paying salary for a specific unpaid record
+ // src/pages/Payment/TeacherPayroll.tsx - Update the handlePayForMonth function
+
+  // src/pages/Payment/TeacherPayroll.tsx
+// Replace ONLY the handlePayForMonth function
+
+  // ✅ Handle paying salary for a specific unpaid record
+  const handlePayForMonth = (record: UnpaidSalaryRecord) => {
+    // Convert month name to number
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthNumber = monthNames.indexOf(record.month) + 1;
+
+    // ✅ Get base salary from record (handles both string and number)
+    const baseSalary = typeof record.salaryAmount === 'string' 
+      ? parseFloat(record.salaryAmount) 
+      : record.salaryAmount;
+
+    console.log('📤 Prefilling for:', {
+      teacher: `${record.firstName} ${record.lastName}`,
+      month: record.month,
+      monthNumber,
+      year: record.year,
+      baseSalary,
+    });
+
+    setPrefillData({
+      teacherId: record.teacherId,
+      month: monthNumber,
+      year: record.year,
+      baseSalary: baseSalary,
+      paidAmount: baseSalary,       // ✅ Auto-fill full amount
+      remainingSalary: 0,           // ✅ 0 since fully paid
+      date: new Date().toISOString().split('T')[0],
+      status: 'Completed',           // ✅ Auto-set to Completed
+      notes: `Salary for ${record.month} ${record.year}`,
+    });
+    setShowCreateModal(true);
+  };
+
+
+  const handleCreatePayroll = async (data: CreateTeacherPayrollData) => {
     try {
-      setGenerateLoading(true);
-      const newPayroll = await generateTeacherPayroll(data);
+      setCreateLoading(true);
+      const newPayroll = await createTeacherPayroll(data);
       setPayrolls((prev) => [newPayroll, ...prev]);
-      setShowGenerateModal(false);
+      setShowCreateModal(false);
+      setPrefillData(null);
+      fetchUnpaidSalaries();
     } catch (error) {
-      console.error("Failed to generate payroll:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to generate payroll"
-      );
+      console.error("Failed to create payroll:", error);
       throw error;
     } finally {
-      setGenerateLoading(false);
+      setCreateLoading(false);
     }
   };
 
-  const handleCloseGenerate = () => {
-    setShowGenerateModal(false);
+  const handleCloseCreate = () => {
+    setShowCreateModal(false);
+    setPrefillData(null);
   };
 
-  // Helper function to format currency
-  const formatCurrency = (amount: number): string => {
-    return `$${amount.toFixed(2)}`;
+  // Add Payment handlers
+  const handleAddPaymentClick = (payroll: TeacherPayroll) => {
+    setPayrollToAddPayment(payroll);
+    setShowAddPaymentModal(true);
   };
 
-  // Helper function to get status badge color
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      Paid: 'bg-green-100 text-green-700',
-      Pending: 'bg-yellow-100 text-yellow-700',
-      Overdue: 'bg-red-100 text-red-700'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-700';
+  const handleAddPayment = async (id: string, data: AddPaymentData) => {
+    try {
+      setAddPaymentLoading(true);
+      const updatedPayroll = await addPaymentToPayroll(id, data);
+      setPayrolls((prev) =>
+        prev.map((p) =>
+          p.id === updatedPayroll.id ? updatedPayroll : p
+        )
+      );
+      setShowAddPaymentModal(false);
+      setPayrollToAddPayment(null);
+    } catch (error) {
+      console.error("Failed to add payment:", error);
+      throw error;
+    } finally {
+      setAddPaymentLoading(false);
+    }
   };
 
-  // Helper function to get status dot color
-  const getStatusDotColor = (status: string) => {
-    const colors: Record<string, string> = {
-      Paid: 'bg-green-500',
-      Pending: 'bg-yellow-500',
-      Overdue: 'bg-red-500'
-    };
-    return colors[status] || 'bg-gray-500';
+  const handleCloseAddPayment = () => {
+    setShowAddPaymentModal(false);
+    setPayrollToAddPayment(null);
   };
 
-  // Helper function to get payment method badge
-  const getPaymentMethodColor = (method: string) => {
-    const colors: Record<string, string> = {
-      Cash: 'bg-blue-100 text-blue-700',
-      Bank: 'bg-purple-100 text-purple-700',
-      Cheque: 'bg-pink-100 text-pink-700'
-    };
-    return colors[method] || 'bg-gray-100 text-gray-700';
+  // Helper functions
+  const formatCurrency = (amount: number | string | null | undefined): string => {
+    if (amount === null || amount === undefined || amount === '') return '$0.00';
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    if (isNaN(numAmount)) return '$0.00';
+    return `$${numAmount.toFixed(2)}`;
   };
 
-  if (loading) {
+  const safeNumber = (value: number | string | null | undefined): number => {
+    if (value === null || value === undefined || value === '') return 0;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return isNaN(num) ? 0 : num;
+  };
+
+  const formatDate = (date: string) => {
+    if (!date) return 'N/A';
+    try {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
+  // Filter unpaid records by search
+  const filteredUnpaidRecords = unpaidRecords.filter((record) => {
+    if (searchTerm === "") return true;
+    return (
+      record.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.month.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.year.toString().includes(searchTerm)
+    );
+  });
+
+  if (loadingUnpaid) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
-          <p className="mt-4 text-sm text-gray-500">Loading payroll records...</p>
+          <p className="mt-4 text-sm text-gray-500">Loading unpaid salaries...</p>
         </div>
       </div>
     );
@@ -189,43 +307,19 @@ const TeacherPayrollPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Teacher Payroll</h1>
           <p className="mt-1 text-sm text-gray-500">
-            View and manage all teacher payroll records
+            Teachers who haven't received their salary
           </p>
         </div>
         <button
-          onClick={handleGenerateClick}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+          onClick={fetchUnpaidSalaries}
+          disabled={loadingUnpaid}
+          className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Generate Payroll
+          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
         </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Total Records</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {payrolls.length}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Total Salary</p>
-          <p className="text-2xl font-bold text-blue-600">
-            {formatCurrency(payrolls.reduce((sum, p) => sum + p.netSalary, 0))}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Paid</p>
-          <p className="text-2xl font-bold text-green-600">
-            {formatCurrency(payrolls.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.netSalary, 0))}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Pending</p>
-          <p className="text-2xl font-bold text-yellow-600">
-            {formatCurrency(payrolls.filter(p => p.status !== 'Paid').reduce((sum, p) => sum + p.netSalary, 0))}
-          </p>
-        </div>
       </div>
 
       {/* Error */}
@@ -235,125 +329,96 @@ const TeacherPayrollPage = () => {
         </div>
       )}
 
+      {/* Search Bar */}
+      <div className="mb-4">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by name, month, or year..."
+          className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+
       {/* Empty State */}
-      {payrolls.length === 0 && (
+      {filteredUnpaidRecords.length === 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">No Payroll Records Found</h3>
+          <div className="mb-4 text-4xl">✅</div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {unpaidRecords.length === 0 
+              ? "All Teachers Are Paid!" 
+              : "No Results Match Your Search"}
+          </h3>
           <p className="mt-2 text-sm text-gray-500">
-            There are no teacher payroll records yet.
+            {unpaidRecords.length === 0 
+              ? "All active teachers have received their salaries for all months."
+              : "Try adjusting your search criteria."}
           </p>
-          <button
-            onClick={handleGenerateClick}
-            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Generate First Payroll
-          </button>
         </div>
       )}
 
-      {/* Payroll Table */}
-      {payrolls.length > 0 && (
+      {/* Unpaid Records Table */}
+      {filteredUnpaidRecords.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr className="border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Teacher
+                    Teacher Name
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Month
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Base Salary
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Bonus
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Deductions
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Net Salary
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Method
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Actions
+                    Action
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {payrolls.map((payroll) => (
-                  <tr key={payroll.id} className="transition hover:bg-gray-50">
+                {filteredUnpaidRecords.map((record, index) => (
+                  <tr
+                    key={`${record.teacherId}-${record.monthKey}-${index}`}
+                    className="transition hover:bg-gray-50"
+                  >
+                    {/* Teacher Name */}
                     <td className="px-6 py-4">
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {payroll.teacher.firstName} {payroll.teacher.lastName}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {payroll.teacher.email}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                          <span className="text-sm font-bold text-red-700">
+                            {record.firstName?.charAt(0)}
+                            {record.lastName?.charAt(0)}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            {record.firstName} {record.lastName}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {record.email}
+                          </p>
+                        </div>
                       </div>
                     </td>
+
+                    {/* Month */}
                     <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-gray-900">
-                        {new Date(payroll.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
+                        {record.month} {record.year}
                       </span>
                     </td>
+
+                    {/* Action */}
                     <td className="px-6 py-4">
-                      <span className="font-semibold text-gray-900">
-                        {formatCurrency(payroll.baseSalary)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-green-600">
-                        {formatCurrency(payroll.bonus || 0)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-red-600">
-                        {formatCurrency(payroll.deductions || 0)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-blue-600">
-                        {formatCurrency(payroll.netSalary)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {payroll.paymentMethod && (
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getPaymentMethodColor(payroll.paymentMethod)}`}>
-                          {payroll.paymentMethod}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(payroll.status)}`}>
-                        <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${getStatusDotColor(payroll.status)}`} />
-                        {payroll.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleUpdateClick(payroll)}
-                          className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(payroll)}
-                          disabled={deleteLoading}
-                          className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handlePayForMonth(record)}
+                        className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
+                      >
+                        <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Pay Salary
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -381,12 +446,22 @@ const TeacherPayrollPage = () => {
         isLoading={updateLoading}
       />
 
-      {/* Generate Modal */}
-      <TeacherPayrollGenerateModal
-        isOpen={showGenerateModal}
-        onClose={handleCloseGenerate}
-        onGenerate={handleGeneratePayroll}
-        isLoading={generateLoading}
+      {/* Create/Pay Salary Modal */}
+      <TeacherPayrollCreateModal
+        isOpen={showCreateModal}
+        onClose={handleCloseCreate}
+        onCreate={handleCreatePayroll}
+        isLoading={createLoading}
+        prefillData={prefillData}
+      />
+
+      {/* Add Payment Modal */}
+      <TeacherPayrollAddPaymentModal
+        isOpen={showAddPaymentModal}
+        payroll={payrollToAddPayment}
+        onClose={handleCloseAddPayment}
+        onAddPayment={handleAddPayment}
+        isLoading={addPaymentLoading}
       />
     </div>
   );

@@ -18,8 +18,17 @@ const TeacherPayrollDeleteModal = ({
 }: TeacherPayrollDeleteModalProps) => {
   if (!isOpen || !payroll) return null;
 
-  const formatCurrency = (amount: number): string => {
-    return `$${amount.toFixed(2)}`;
+  // ✅ Safe number conversion
+  const safeNumber = (value: number | string | null | undefined): number => {
+    if (value === null || value === undefined || value === '') return 0;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return isNaN(num) ? 0 : num;
+  };
+
+  // ✅ Safe currency formatter
+  const formatCurrency = (amount: number | string | null | undefined): string => {
+    const num = safeNumber(amount);
+    return `$${num.toFixed(2)}`;
   };
 
   return (
@@ -27,22 +36,10 @@ const TeacherPayrollDeleteModal = ({
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <svg
-              className="h-6 w-6 text-red-600"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
+            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
               Delete Payroll Record
@@ -55,13 +52,13 @@ const TeacherPayrollDeleteModal = ({
 
         <div className="mb-6 rounded-lg bg-gray-50 p-4">
           <p className="text-sm font-medium text-gray-900">
-            {payroll.teacher.firstName} {payroll.teacher.lastName}
+            {payroll.teacher?.firstName} {payroll.teacher?.lastName}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            Month: {new Date(payroll.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            Base Salary: {formatCurrency(payroll.baseSalary)} | Paid: {formatCurrency(payroll.paidAmount)}
           </p>
           <p className="text-sm text-gray-500">
-            Net Salary: {formatCurrency(payroll.netSalary)} | Status: {payroll.status}
+            Remaining: {formatCurrency(payroll.remainingSalary)} | Status: {payroll.status}
           </p>
         </div>
 

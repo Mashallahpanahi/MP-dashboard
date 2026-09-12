@@ -22,10 +22,6 @@ import AddBook from "@/pages/Books/AddBook";
 import AllClasses from "@/pages/Classes/AllClasses";
 import AddClass from "@/pages/Classes/AddClass";
 
-// Payment pages - Student Payments
-import StudentPaymentPage from "@/pages/Payment/StudentPayment";
-import AddStudentPayment from "@/pages/Payment/AddStudentPayment";
-
 // Payment pages - Teacher Payroll
 import TeacherPayrollPage from "@/pages/Payment/TeacherPayroll";
 
@@ -60,10 +56,6 @@ const AppRoutes = () => (
           {/* Book Routes */}
           <Route path="/books/all" element={<AllBooks />} />
           <Route path="/books/add" element={<AddBook />} />
-          
-          {/* Payment Routes - Student Payments */}
-          <Route path="/payment/students" element={<StudentPaymentPage />} />
-          <Route path="/payment/students/add" element={<AddStudentPayment />} />
           
           {/* Payment Routes - Teacher Payroll */}
           <Route path="/payment/teacher" element={<TeacherPayrollPage />} />

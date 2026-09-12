@@ -125,18 +125,7 @@ const Sidebar = () => {
       icon: <FaMoneyBillWave />,
       menuId: "payment",
       subItems: [
-        // Student Payments
-        {
-          path: "/payment/students",
-          label: "Student Payments",
-          icon: <FaCreditCard />,
-        },
-        // Add Student Payment
-        {
-          path: "/payment/students/add",
-          label: "Add Payment",
-          icon: <FaUserPlus />,
-        },
+      
         // Teacher Payroll
         {
           path: "/payment/teacher",

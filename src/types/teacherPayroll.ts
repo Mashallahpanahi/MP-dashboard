@@ -11,22 +11,19 @@ export interface TeacherPayroll {
     phone: string;
     email: string;
     address: string;
-    salaryType: 'Fixed' | 'Percentage';
+    salaryType: 'Fixed' | 'PerStudent';
     salaryAmount: number;
     feePercentage: number;
     hireDate: string;
     isActive: boolean;
   };
-  month: string; // Format: YYYY-MM
-  year: number;
+  month: number;        // ✅ Added: Month number (1-12)
+  year: number;         // ✅ Added: Year
   baseSalary: number;
-  bonus: number;
-  deductions: number;
-  netSalary: number;
-  paymentDate: string;
-  paymentMethod: 'Cash' | 'Bank' | 'Cheque';
-  bankAccount: string;
-  status: 'Paid' | 'Pending' | 'Overdue';
+  paidAmount: number;
+  remainingSalary: number;
+  date: string;
+  status: 'Completed' | 'Not Completed';
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -34,27 +31,35 @@ export interface TeacherPayroll {
 
 export interface CreateTeacherPayrollData {
   teacherId: string;
-  month: string; // Format: YYYY-MM
-  year: number;
+  month: number;              // ✅ Added: Month number (1-12)
+  year: number;               // ✅ Added: Year
   baseSalary: number;
-  bonus?: number;
-  deductions?: number;
-  netSalary: number;
-  paymentDate?: string;
-  paymentMethod?: 'Cash' | 'Bank' | 'Cheque';
-  bankAccount?: string;
-  status?: 'Paid' | 'Pending' | 'Overdue';
+  paidAmount?: number;
+  remainingSalary?: number;
+  date?: string;
+  status?: 'Completed' | 'Not Completed';
   notes?: string;
 }
 
-export interface UpdateTeacherPayrollData extends Partial<CreateTeacherPayrollData> {
-  id?: string;
+export interface UpdateTeacherPayrollData {
+  teacherId?: string;
+  month?: number;             // ✅ Added
+  year?: number;              // ✅ Added
+  baseSalary?: number;
+  paidAmount?: number;
+  remainingSalary?: number;
+  date?: string;
+  status?: 'Completed' | 'Not Completed';
+  notes?: string;
 }
 
-export interface GeneratePayrollDto {
-  teacherId: string;
-  month: string; // Format: YYYY-MM
-  year: number;
+export interface TeacherPayrollSummary {
+  totalBaseSalary: number;
+  totalPaidAmount: number;
+  totalRemainingSalary: number;
+  totalRecords: number;
+  completedCount: number;
+  notCompletedCount: number;
 }
 
 export interface Teacher {
@@ -63,8 +68,30 @@ export interface Teacher {
   lastName: string;
   email: string;
   phone: string;
-  salaryType: 'Fixed' | 'Percentage';
+  salaryType: 'Fixed' | 'PerStudent';
   salaryAmount: number;
   feePercentage: number;
   isActive: boolean;
+}
+
+export interface AddPaymentData {
+  amount: number;
+  date?: string;
+  notes?: string;
+}
+
+export interface UnpaidSalaryRecord {
+  teacherId: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  salaryType: string;
+  salaryAmount: number | string;
+  feePercentage: number | string;
+  hireDate: string;
+  month: string;
+  year: number;
+  monthKey: string;
+  message: string;
 }
