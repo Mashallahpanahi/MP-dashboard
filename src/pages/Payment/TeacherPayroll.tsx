@@ -20,7 +20,8 @@ import {
   TeacherPayrollDeleteModal, 
   TeacherPayrollUpdateModal, 
   TeacherPayrollCreateModal,
-  TeacherPayrollAddPaymentModal
+  TeacherPayrollAddPaymentModal,
+  TeacherPayrollHistoryModal  // ✅ Add this
 } from "@/components/teacher-payroll";
 
 const TeacherPayrollPage = () => {
@@ -48,6 +49,9 @@ const TeacherPayrollPage = () => {
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const [payrollToAddPayment, setPayrollToAddPayment] = useState<TeacherPayroll | null>(null);
   const [addPaymentLoading, setAddPaymentLoading] = useState(false);
+
+  // ✅ History state
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
@@ -158,21 +162,13 @@ const TeacherPayrollPage = () => {
   };
 
   // Handle paying salary for a specific unpaid record
- // src/pages/Payment/TeacherPayroll.tsx - Update the handlePayForMonth function
-
-  // src/pages/Payment/TeacherPayroll.tsx
-// Replace ONLY the handlePayForMonth function
-
-  // ✅ Handle paying salary for a specific unpaid record
   const handlePayForMonth = (record: UnpaidSalaryRecord) => {
-    // Convert month name to number
     const monthNames = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
     const monthNumber = monthNames.indexOf(record.month) + 1;
 
-    // ✅ Get base salary from record (handles both string and number)
     const baseSalary = typeof record.salaryAmount === 'string' 
       ? parseFloat(record.salaryAmount) 
       : record.salaryAmount;
@@ -190,15 +186,14 @@ const TeacherPayrollPage = () => {
       month: monthNumber,
       year: record.year,
       baseSalary: baseSalary,
-      paidAmount: baseSalary,       // ✅ Auto-fill full amount
-      remainingSalary: 0,           // ✅ 0 since fully paid
+      paidAmount: baseSalary,
+      remainingSalary: 0,
       date: new Date().toISOString().split('T')[0],
-      status: 'Completed',           // ✅ Auto-set to Completed
+      status: 'Completed',
       notes: `Salary for ${record.month} ${record.year}`,
     });
     setShowCreateModal(true);
   };
-
 
   const handleCreatePayroll = async (data: CreateTeacherPayrollData) => {
     try {
@@ -249,6 +244,15 @@ const TeacherPayrollPage = () => {
   const handleCloseAddPayment = () => {
     setShowAddPaymentModal(false);
     setPayrollToAddPayment(null);
+  };
+
+  // ✅ History handlers
+  const handleHistoryClick = () => {
+    setShowHistoryModal(true);
+  };
+
+  const handleCloseHistory = () => {
+    setShowHistoryModal(false);
   };
 
   // Helper functions
@@ -310,16 +314,29 @@ const TeacherPayrollPage = () => {
             Teachers who haven't received their salary
           </p>
         </div>
-        <button
-          onClick={fetchUnpaidSalaries}
-          disabled={loadingUnpaid}
-          className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {/* ✅ See History of Payment button */}
+          <button
+            onClick={handleHistoryClick}
+            className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            See History of Payment
+          </button>
+          {/* Refresh button */}
+          <button
+            onClick={fetchUnpaidSalaries}
+            disabled={loadingUnpaid}
+            className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Error */}
@@ -462,6 +479,12 @@ const TeacherPayrollPage = () => {
         onClose={handleCloseAddPayment}
         onAddPayment={handleAddPayment}
         isLoading={addPaymentLoading}
+      />
+
+      {/* ✅ History Modal */}
+      <TeacherPayrollHistoryModal
+        isOpen={showHistoryModal}
+        onClose={handleCloseHistory}
       />
     </div>
   );

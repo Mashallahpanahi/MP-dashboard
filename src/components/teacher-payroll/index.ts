@@ -3,3 +3,5 @@ export { default as TeacherPayrollDeleteModal } from './TeacherPayrollDeleteModa
 export { default as TeacherPayrollUpdateModal } from './TeacherPayrollUpdateModal';
 export { default as TeacherPayrollCreateModal } from './TeacherPayrollCreateModal';
 export { default as TeacherPayrollAddPaymentModal } from './TeacherPayrollAddPaymentModal';
+export { default as TeacherPayrollHistoryModal } from './TeacherPayrollHistoryModal';
+export { default as TeacherPayrollHistoryEditModal } from './TeacherPayrollHistoryEditModal'; 
