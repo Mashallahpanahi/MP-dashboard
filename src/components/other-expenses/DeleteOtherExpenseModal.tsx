@@ -1,48 +1,39 @@
-// src/components/expenses/ExpenseDeleteModal.tsx
-import type { Expense } from "@/types/expense";
+// src/components/other-expenses/DeleteOtherExpenseModal.tsx
+import type { OtherExpense } from "@/types/otherExpense";
 
-interface ExpenseDeleteModalProps {
+interface DeleteOtherExpenseModalProps {
   isOpen: boolean;
-  expense: Expense | null;
+  expense: OtherExpense | null;
   onClose: () => void;
   onConfirm: () => Promise<void>;
   isLoading?: boolean;
 }
 
-const ExpenseDeleteModal = ({
+const DeleteOtherExpenseModal = ({
   isOpen,
   expense,
   onClose,
   onConfirm,
   isLoading = false,
-}: ExpenseDeleteModalProps) => {
+}: DeleteOtherExpenseModalProps) => {
   if (!isOpen || !expense) return null;
 
-  const formatCurrency = (amount: number): string => {
-    return `$${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number | string | null | undefined): string => {
+    if (amount === null || amount === undefined || amount === "") return "$0.00";
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(num)) return "$0.00";
+    return `$${num.toFixed(2)}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <svg
-              className="h-6 w-6 text-red-600"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
+            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
               Delete Expense
@@ -58,10 +49,7 @@ const ExpenseDeleteModal = ({
             {expense.description}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            Category: {expense.category.name} | Amount: {formatCurrency(expense.amount)}
-          </p>
-          <p className="text-sm text-gray-500">
-            Vendor: {expense.vendor} | Status: {expense.status}
+            Amount: {formatCurrency(expense.amount)} | Date: {expense.date}
           </p>
         </div>
 
@@ -92,4 +80,4 @@ const ExpenseDeleteModal = ({
   );
 };
 
-export default ExpenseDeleteModal;
+export default DeleteOtherExpenseModal;

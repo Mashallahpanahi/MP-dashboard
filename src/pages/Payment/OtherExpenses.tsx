@@ -1,67 +1,134 @@
 // src/pages/Payment/OtherExpenses.tsx
 import { useEffect, useState } from "react";
-import { 
-  getExpenses, 
-  deleteExpense,
-  getExpenseById,
-  updateExpense,
-  getExpenseCategories
-} from "@/api/expenseApi";
-import type { Expense, UpdateExpenseData, ExpenseCategory } from "@/types/expense";
-import { ExpenseDeleteModal, ExpenseUpdateModal, ExpenseAddModal, CategoryManager } from "@/components/expenses";
+import {
+  getExpenseHistory,
+  getTotalLastMonth,
+  deleteOtherExpense,
+  getOtherExpenseById,
+} from "@/api/otherExpenseApi";
+import type {
+  OtherExpense,
+  LastMonthTotal,
+} from "@/types/otherExpense";
+import {
+  AddOtherExpenseModal,
+  UpdateOtherExpenseModal,
+  DeleteOtherExpenseModal,
+} from "@/components/other-expenses";
 
 const OtherExpensesPage = () => {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  const [expenses, setExpenses] = useState<OtherExpense[]>([]);
+  const [lastMonthTotal, setLastMonthTotal] = useState<LastMonthTotal | null>(null);
+  const [totalForRange, setTotalForRange] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingTotal, setLoadingTotal] = useState(true);
   const [error, setError] = useState("");
+
+  // ✅ Default date range: last 1 month
+  const getDefaultDates = () => {
+    const today = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(today.getMonth() - 1);
+
+    return {
+      fromDate: oneMonthAgo.toISOString().split("T")[0],
+      toDate: today.toISOString().split("T")[0],
+    };
+  };
+
+  const defaultDates = getDefaultDates();
+  const [fromDate, setFromDate] = useState(defaultDates.fromDate);
+  const [toDate, setToDate] = useState(defaultDates.toDate);
 
   // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [expenseToDelete, setExpenseToDelete] = useState<OtherExpense | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Update state
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [expenseToUpdate, setExpenseToUpdate] = useState<Expense | null>(null);
+  const [expenseToUpdate, setExpenseToUpdate] = useState<OtherExpense | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
 
   // Add state
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addLoading, setAddLoading] = useState(false);
 
-  const fetchExpenses = async () => {
+  // ✅ Safe number conversion
+  const safeNumber = (value: number | string | null | undefined): number => {
+    if (value === null || value === undefined || value === "") return 0;
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    return isNaN(num) ? 0 : num;
+  };
+
+  const formatCurrency = (amount: number | string | null | undefined): string => {
+    const num = safeNumber(amount);
+    return `$${num.toFixed(2)}`;
+  };
+
+  const formatDate = (date: string): string => {
+    if (!date) return "N/A";
+    try {
+      return new Date(date).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return "Invalid date";
+    }
+  };
+
+  // ✅ Fetch expenses by date range
+  const fetchExpenses = async (from: string, to: string) => {
     try {
       setLoading(true);
       setError("");
-      const data = await getExpenses();
-      setExpenses(data);
+
+      const result = await getExpenseHistory(from, to);
+      setExpenses(Array.isArray(result.expenses) ? result.expenses : []);
+      setTotalForRange(safeNumber(result.totalExpenses));
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
       setError(
         error instanceof Error ? error.message : "Failed to fetch expenses"
       );
+      setExpenses([]);
+      setTotalForRange(0);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCategories = async () => {
+  // ✅ Fetch last month total
+  const fetchLastMonthTotal = async () => {
     try {
-      const data = await getExpenseCategories();
-      setCategories(data);
+      setLoadingTotal(true);
+      const data = await getTotalLastMonth();
+      setLastMonthTotal(data);
     } catch (error) {
-      console.error("Failed to fetch categories:", error);
+      console.error("Failed to fetch last month total:", error);
+    } finally {
+      setLoadingTotal(false);
     }
   };
 
+  // Initial fetch
   useEffect(() => {
-    fetchExpenses();
-    fetchCategories();
+    fetchExpenses(fromDate, toDate);
+    fetchLastMonthTotal();
   }, []);
 
+  // Handle date range change
+  const handleDateRangeSearch = () => {
+    if (fromDate > toDate) {
+      setError("From date must be before To date");
+      return;
+    }
+    fetchExpenses(fromDate, toDate);
+  };
+
   // Delete handlers
-  const handleDeleteClick = (expense: Expense) => {
+  const handleDeleteClick = (expense: OtherExpense) => {
     setExpenseToDelete(expense);
     setShowDeleteModal(true);
   };
@@ -71,10 +138,13 @@ const OtherExpensesPage = () => {
 
     try {
       setDeleteLoading(true);
-      await deleteExpense(expenseToDelete.id);
+      await deleteOtherExpense(expenseToDelete.id);
       setExpenses((prev) => prev.filter((e) => e.id !== expenseToDelete.id));
       setShowDeleteModal(false);
       setExpenseToDelete(null);
+      // Refresh totals
+      fetchExpenses(fromDate, toDate);
+      fetchLastMonthTotal();
     } catch (error) {
       console.error("Failed to delete expense:", error);
       setError(
@@ -91,10 +161,10 @@ const OtherExpensesPage = () => {
   };
 
   // Update handlers
-  const handleUpdateClick = async (expense: Expense) => {
+  const handleUpdateClick = async (expense: OtherExpense) => {
     try {
       setUpdateLoading(true);
-      const expenseData = await getExpenseById(expense.id);
+      const expenseData = await getOtherExpenseById(expense.id);
       setExpenseToUpdate(expenseData);
       setShowUpdateModal(true);
     } catch (error) {
@@ -107,13 +177,9 @@ const OtherExpensesPage = () => {
     }
   };
 
-  const handleUpdateExpense = async (id: string, data: UpdateExpenseData) => {
-    const updatedExpense = await updateExpense(id, data);
-    setExpenses((prev) =>
-      prev.map((e) =>
-        e.id === updatedExpense.id ? updatedExpense : e
-      )
-    );
+  const handleUpdateSuccess = () => {
+    fetchExpenses(fromDate, toDate);
+    fetchLastMonthTotal();
   };
 
   const handleCloseUpdate = () => {
@@ -126,63 +192,13 @@ const OtherExpensesPage = () => {
     setShowAddModal(true);
   };
 
-  const handleAddExpense = async (data: any) => {
-    try {
-      setAddLoading(true);
-      const newExpense = await createExpense(data);
-      setExpenses((prev) => [newExpense, ...prev]);
-      setShowAddModal(false);
-    } catch (error) {
-      console.error("Failed to add expense:", error);
-      throw error;
-    } finally {
-      setAddLoading(false);
-    }
+  const handleAddSuccess = () => {
+    fetchExpenses(fromDate, toDate);
+    fetchLastMonthTotal();
   };
 
   const handleCloseAdd = () => {
     setShowAddModal(false);
-  };
-
-  const handleCategoryChange = async () => {
-    await fetchCategories();
-    await fetchExpenses();
-  };
-
-  // Helper function to format currency
-  const formatCurrency = (amount: number): string => {
-    return `$${amount.toFixed(2)}`;
-  };
-
-  // Helper function to get status badge color
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      Paid: 'bg-green-100 text-green-700',
-      Pending: 'bg-yellow-100 text-yellow-700',
-      Approved: 'bg-blue-100 text-blue-700'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-700';
-  };
-
-  // Helper function to get status dot color
-  const getStatusDotColor = (status: string) => {
-    const colors: Record<string, string> = {
-      Paid: 'bg-green-500',
-      Pending: 'bg-yellow-500',
-      Approved: 'bg-blue-500'
-    };
-    return colors[status] || 'bg-gray-500';
-  };
-
-  // Helper function to get payment method badge
-  const getPaymentMethodColor = (method: string) => {
-    const colors: Record<string, string> = {
-      Cash: 'bg-blue-100 text-blue-700',
-      Bank: 'bg-purple-100 text-purple-700',
-      Online: 'bg-indigo-100 text-indigo-700',
-      Cheque: 'bg-pink-100 text-pink-700'
-    };
-    return colors[method] || 'bg-gray-100 text-gray-700';
   };
 
   if (loading) {
@@ -203,42 +219,92 @@ const OtherExpensesPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Other Expenses</h1>
           <p className="mt-1 text-sm text-gray-500">
-            View and manage all expenses in the system
+            Track and manage all other expenses
           </p>
         </div>
         <button
           onClick={handleAddClick}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+          className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
         >
+          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
           Add New Expense
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Total Expenses</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {expenses.length}
-          </p>
+      {/* ✅ Last Month Total Card */}
+      <div className="mb-6">
+        <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                Total Expenses for {lastMonthTotal?.month || "Last Month"} {lastMonthTotal?.year || ""} (preview month)
+              </p>
+              {loadingTotal ? (
+                <div className="mt-2 h-8 w-32 animate-pulse rounded bg-gray-200" />
+              ) : (
+                <p className="mt-2 text-3xl font-bold text-blue-700">
+                  {formatCurrency(lastMonthTotal?.totalExpenses || 0)}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                {lastMonthTotal?.count || 0} expense(s) in this period
+              </p>
+            </div>
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+              <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Total Amount</p>
-          <p className="text-2xl font-bold text-red-600">
-            {formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Paid</p>
-          <p className="text-2xl font-bold text-green-600">
-            {formatCurrency(expenses.filter(e => e.status === 'Paid').reduce((sum, e) => sum + e.amount, 0))}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Pending</p>
-          <p className="text-2xl font-bold text-yellow-600">
-            {formatCurrency(expenses.filter(e => e.status !== 'Paid').reduce((sum, e) => sum + e.amount, 0))}
-          </p>
+      </div>
+
+      {/* ✅ Date Range Filter */}
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-3 text-sm font-semibold text-gray-700">
+          Filter by Date Range
+        </h3>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              From Date
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
+              To Date
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <button
+            onClick={handleDateRangeSearch}
+            disabled={loading}
+            className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Search
+          </button>
+          <div className="ml-auto rounded-lg bg-gray-50 px-4 py-2 border border-gray-200">
+            <p className="text-xs text-gray-600">Total in Range</p>
+            <p className="text-lg font-bold text-gray-900">
+              {formatCurrency(totalForRange)}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -249,15 +315,15 @@ const OtherExpensesPage = () => {
         </div>
       )}
 
-      {/* Category Manager */}
-      <CategoryManager onCategoryChange={handleCategoryChange} />
-
       {/* Empty State */}
-      {expenses.length === 0 && (
+      {expenses.length === 0 && !loading && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">No Expenses Found</h3>
+          <div className="mb-4 text-4xl">💸</div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            No Expenses Found
+          </h3>
           <p className="mt-2 text-sm text-gray-500">
-            There are no expenses registered yet.
+            No expenses between {formatDate(fromDate)} and {formatDate(toDate)}
           </p>
           <button
             onClick={handleAddClick}
@@ -276,25 +342,13 @@ const OtherExpensesPage = () => {
               <thead className="bg-gray-50">
                 <tr className="border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Category
+                    Date
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Description
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Vendor
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Amount
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Method
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Date
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Actions
@@ -305,24 +359,14 @@ const OtherExpensesPage = () => {
                 {expenses.map((expense) => (
                   <tr key={expense.id} className="transition hover:bg-gray-50">
                     <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
-                        {expense.category.name}
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatDate(expense.date)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {expense.description}
-                        </p>
-                        {expense.receiptNumber && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            Receipt: {expense.receiptNumber}
-                          </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {expense.vendor}
+                      <p className="text-sm text-gray-900">
+                        {expense.description}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-bold text-red-600">
@@ -330,25 +374,14 @@ const OtherExpensesPage = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getPaymentMethodColor(expense.paymentMethod)}`}>
-                        {expense.paymentMethod}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(expense.status)}`}>
-                        <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${getStatusDotColor(expense.status)}`} />
-                        {expense.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {new Date(expense.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleUpdateClick(expense)}
                           className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
                         >
+                          <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
                           Edit
                         </button>
                         <button
@@ -356,6 +389,9 @@ const OtherExpensesPage = () => {
                           disabled={deleteLoading}
                           className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
+                          <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                           Delete
                         </button>
                       </div>
@@ -368,32 +404,26 @@ const OtherExpensesPage = () => {
         </div>
       )}
 
-      {/* Delete Modal */}
-      <ExpenseDeleteModal
+      {/* Modals */}
+      <AddOtherExpenseModal
+        isOpen={showAddModal}
+        onClose={handleCloseAdd}
+        onSuccess={handleAddSuccess}
+      />
+
+      <UpdateOtherExpenseModal
+        isOpen={showUpdateModal}
+        expense={expenseToUpdate}
+        onClose={handleCloseUpdate}
+        onSuccess={handleUpdateSuccess}
+      />
+
+      <DeleteOtherExpenseModal
         isOpen={showDeleteModal}
         expense={expenseToDelete}
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
         isLoading={deleteLoading}
-      />
-
-      {/* Update Modal */}
-      <ExpenseUpdateModal
-        isOpen={showUpdateModal}
-        expense={expenseToUpdate}
-        categories={categories}
-        onClose={handleCloseUpdate}
-        onUpdate={handleUpdateExpense}
-        isLoading={updateLoading}
-      />
-
-      {/* Add Modal */}
-      <ExpenseAddModal
-        isOpen={showAddModal}
-        categories={categories}
-        onClose={handleCloseAdd}
-        onAdd={handleAddExpense}
-        isLoading={addLoading}
       />
     </div>
   );

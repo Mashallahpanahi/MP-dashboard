@@ -10,3 +10,4 @@ export * from './settings';
 export * from './monthlyFee';
 export * from './bookFee';
 export * from './studentEnrollment';
+export * from './otherExpense';
