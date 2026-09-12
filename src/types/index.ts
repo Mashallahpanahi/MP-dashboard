@@ -11,3 +11,4 @@ export * from './monthlyFee';
 export * from './bookFee';
 export * from './studentEnrollment';
 export * from './otherExpense';
+export * from './dashboard';
