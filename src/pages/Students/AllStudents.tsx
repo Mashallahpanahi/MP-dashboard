@@ -1,8 +1,21 @@
 // src/pages/Students/AllStudents.tsx
-import { useEffect, useState } from "react";
-import { getStudents, deleteStudent, getStudentById } from "@/api/studentApi";
+import { useEffect, useState, useCallback } from "react";
+import {
+  getStudents,
+  deleteStudent,
+  getStudentById,
+  getPaginatedStudents,
+  getUnenrolledStudents,
+  searchStudentsByName,
+  searchStudentByNumber,
+} from "@/api/studentApi";
 import type { Student } from "@/types/student";
-import { StudentDetailModal, StudentDeleteModal, StudentEnrollmentsModal, StudentScoresModal } from "@/components/students";
+import {
+  StudentDetailModal,
+  StudentDeleteModal,
+  StudentEnrollmentsModal,
+  StudentScoresModal,
+} from "@/components/students";
 import StudentEditModal from "@/components/students/StudentEditModal";
 import { useNavigate } from "react-router-dom";
 
@@ -11,15 +24,39 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 // Helper function to get full image URL
 const getImageUrl = (imagePath: string | null | undefined) => {
   if (!imagePath) return null;
-  if (imagePath.startsWith('http')) return imagePath;
+  if (imagePath.startsWith("http")) return imagePath;
   return `${API_URL}${imagePath}`;
 };
+
+// View mode type
+type ViewMode = "paginated" | "unenrolled" | "search-name" | "search-number";
+
+// Search type
+type SearchType = "name" | "studentNumber";
 
 const AllStudents = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // ============================================
+  // FILTER & SEARCH STATE
+  // ============================================
+  const [viewMode, setViewMode] = useState<ViewMode>("paginated");
+  const [searchType, setSearchType] = useState<SearchType>("name");
+  const [searchName, setSearchName] = useState("");
+  const [searchNumber, setSearchNumber] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [useDateFilter, setUseDateFilter] = useState(false);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -37,31 +74,261 @@ const AllStudents = () => {
 
   // Enrollments state
   const [showEnrollmentsModal, setShowEnrollmentsModal] = useState(false);
-  const [studentForEnrollments, setStudentForEnrollments] = useState<Student | null>(null);
+  const [studentForEnrollments, setStudentForEnrollments] =
+    useState<Student | null>(null);
 
-  // ✅ Scores state
+  // Scores state
   const [showScoresModal, setShowScoresModal] = useState(false);
-  const [studentForScores, setStudentForScores] = useState<Student | null>(null);
+  const [studentForScores, setStudentForScores] = useState<Student | null>(
+    null
+  );
 
-  const fetchStudents = async () => {
+  // ============================================
+  // DATA FETCHING
+  // ============================================
+
+  /**
+   * Fetch paginated students (default view)
+   */
+  const fetchPaginatedStudents = useCallback(
+    async (page: number = 1, limit: number = pageSize) => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getPaginatedStudents(
+          page,
+          limit,
+          useDateFilter ? fromDate : undefined,
+          useDateFilter ? toDate : undefined
+        );
+
+        if (response.success) {
+          setStudents(response.data);
+          setCurrentPage(response.pagination.page);
+          setTotalPages(response.pagination.totalPages);
+          setTotalCount(response.pagination.total);
+          setViewMode("paginated");
+        }
+      } catch (error) {
+        console.error("Failed to fetch paginated students:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to fetch students"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [pageSize, useDateFilter, fromDate, toDate]
+  );
+
+  /**
+   * Fetch all unenrolled students
+   */
+  const fetchUnenrolledStudents = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const data = await getStudents();
-      setStudents(data);
+
+      const response = await getUnenrolledStudents(
+        useDateFilter ? fromDate : undefined,
+        useDateFilter ? toDate : undefined
+      );
+
+      if (response.success) {
+        setStudents(response.data);
+        setTotalCount(response.count);
+        setTotalPages(1);
+        setCurrentPage(1);
+        setViewMode("unenrolled");
+      }
     } catch (error) {
-      console.error("Failed to fetch students:", error);
+      console.error("Failed to fetch unenrolled students:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to fetch students"
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch unenrolled students"
       );
     } finally {
       setLoading(false);
     }
+  }, [useDateFilter, fromDate, toDate]);
+
+  /**
+   * Search students by name (fuzzy search)
+   */
+  const handleSearchByName = useCallback(
+    async (name: string) => {
+      try {
+        setLoading(true);
+        setError("");
+        setSearchName(name);
+        setSearchNumber("");
+
+        const response = await searchStudentsByName(name);
+
+        if (response.success) {
+          // Handle single or array response
+          const results = Array.isArray(response.data)
+            ? response.data
+            : [response.data].filter(Boolean);
+
+          setStudents(results);
+          setTotalCount(results.length);
+          setTotalPages(1);
+          setCurrentPage(1);
+          setViewMode("search-name");
+        }
+      } catch (error) {
+        console.error("Failed to search students by name:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to search students"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  /**
+   * Search student by student number
+   */
+  const handleSearchByNumber = useCallback(
+    async (studentNumber: string) => {
+      try {
+        setLoading(true);
+        setError("");
+        setSearchNumber(studentNumber);
+        setSearchName("");
+
+        const response = await searchStudentByNumber(studentNumber);
+
+        if (response.success) {
+          // Handle single or array response
+          const results = Array.isArray(response.data)
+            ? response.data
+            : [response.data].filter(Boolean);
+
+          setStudents(results);
+          setTotalCount(results.length);
+          setTotalPages(1);
+          setCurrentPage(1);
+          setViewMode("search-number");
+        }
+      } catch (error) {
+        console.error("Failed to search student by number:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to search student by number"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  /**
+   * Main search handler - routes to correct search based on type
+   */
+  const handleSearch = useCallback(async () => {
+    const trimmedInput = searchInput.trim();
+
+    if (!trimmedInput) {
+      // If search is empty, go back to paginated view
+      fetchPaginatedStudents(1);
+      return;
+    }
+
+    if (searchType === "name") {
+      await handleSearchByName(trimmedInput);
+    } else {
+      await handleSearchByNumber(trimmedInput);
+    }
+  }, [searchInput, searchType, handleSearchByName, handleSearchByNumber, fetchPaginatedStudents]);
+
+  // Initial fetch - use paginated by default
+  useEffect(() => {
+    fetchPaginatedStudents(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ============================================
+  // HANDLERS
+  // ============================================
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      fetchPaginatedStudents(newPage);
+    }
   };
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
+  // Handle page size change
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    fetchPaginatedStudents(1, newSize);
+  };
+
+  // Handle search button click
+  const handleSearchClick = () => {
+    handleSearch();
+  };
+
+  // Handle search input key press (Enter)
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
+
+  // Handle search type change
+  const handleSearchTypeChange = (newType: SearchType) => {
+    setSearchType(newType);
+    setSearchInput("");
+  };
+
+  // Handle clear search
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setSearchName("");
+    setSearchNumber("");
+    fetchPaginatedStudents(1);
+  };
+
+  // Handle "Show All Students" button
+  const handleShowAllStudents = () => {
+    setViewMode("paginated");
+    setSearchInput("");
+    setSearchName("");
+    setSearchNumber("");
+    fetchPaginatedStudents(1);
+  };
+
+  // Handle "Show Unenrolled" button
+  const handleShowUnenrolled = () => {
+    fetchUnenrolledStudents();
+  };
+
+  // Handle date filter toggle
+  const handleDateFilterToggle = (checked: boolean) => {
+    setUseDateFilter(checked);
+    if (!checked) {
+      setFromDate("");
+      setToDate("");
+    }
+  };
+
+  // Handle apply date filter
+  const handleApplyDateFilter = () => {
+    if (viewMode === "unenrolled") {
+      fetchUnenrolledStudents();
+    } else {
+      fetchPaginatedStudents(1);
+    }
+  };
 
   // Delete handlers
   const handleDeleteClick = (student: Student) => {
@@ -75,7 +342,10 @@ const AllStudents = () => {
     try {
       setDeleteLoading(true);
       await deleteStudent(studentToDelete.id);
-      setStudents((prev) => prev.filter((student) => student.id !== studentToDelete.id));
+      setStudents((prev) =>
+        prev.filter((student) => student.id !== studentToDelete.id)
+      );
+      setTotalCount((prev) => prev - 1);
       setShowDeleteModal(false);
       setStudentToDelete(null);
     } catch (error) {
@@ -103,7 +373,9 @@ const AllStudents = () => {
     } catch (error) {
       console.error("Failed to fetch student details:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to load student details"
+        error instanceof Error
+          ? error.message
+          : "Failed to load student details"
       );
     } finally {
       setDetailLoading(false);
@@ -126,9 +398,17 @@ const AllStudents = () => {
     setStudentForEdit(null);
   };
 
-  // ✅ Refresh callback
+  // Refresh callback
   const handleStudentUpdated = () => {
-    fetchStudents();
+    if (viewMode === "paginated") {
+      fetchPaginatedStudents(currentPage);
+    } else if (viewMode === "unenrolled") {
+      fetchUnenrolledStudents();
+    } else if (viewMode === "search-name") {
+      handleSearchByName(searchName);
+    } else if (viewMode === "search-number") {
+      handleSearchByNumber(searchNumber);
+    }
   };
 
   // Enrollments handlers
@@ -142,7 +422,7 @@ const AllStudents = () => {
     setStudentForEnrollments(null);
   };
 
-  // ✅ Scores handlers
+  // Scores handlers
   const handleViewScores = (student: Student) => {
     setStudentForScores(student);
     setShowScoresModal(true);
@@ -159,18 +439,138 @@ const AllStudents = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Active':
-        return 'bg-green-100 text-green-700';
-      case 'Inactive':
-        return 'bg-gray-100 text-gray-700';
-      case 'Graduated':
-        return 'bg-blue-100 text-blue-700';
+      case "Active":
+        return "bg-green-100 text-green-700";
+      case "Inactive":
+        return "bg-gray-100 text-gray-700";
+      case "Graduated":
+        return "bg-blue-100 text-blue-700";
       default:
-        return 'bg-gray-100 text-gray-700';
+        return "bg-gray-100 text-gray-700";
     }
   };
 
-  if (loading) {
+  // ============================================
+  // PAGINATION RENDER
+  // ============================================
+  const renderPagination = () => {
+    if (viewMode !== "paginated" || totalPages <= 1) return null;
+
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-200 bg-gray-50 px-6 py-4 sm:flex-row">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <span>Showing</span>
+          <select
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+            className="rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+          <span>
+            of <strong>{totalCount}</strong> students
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {/* First Page */}
+          <button
+            onClick={() => handlePageChange(1)}
+            disabled={currentPage === 1}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            First
+          </button>
+
+          {/* Previous */}
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ←
+          </button>
+
+          {/* Page Numbers */}
+          {startPage > 1 && (
+            <>
+              <button
+                onClick={() => handlePageChange(1)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+              >
+                1
+              </button>
+              {startPage > 2 && <span className="px-2 text-gray-500">...</span>}
+            </>
+          )}
+
+          {pages.map((page) => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                currentPage === page
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+
+          {endPage < totalPages && (
+            <>
+              {endPage < totalPages - 1 && (
+                <span className="px-2 text-gray-500">...</span>
+              )}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+
+          {/* Next */}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            →
+          </button>
+
+          {/* Last Page */}
+          <button
+            onClick={() => handlePageChange(totalPages)}
+            disabled={currentPage === totalPages}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Last
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && students.length === 0) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
@@ -183,7 +583,9 @@ const AllStudents = () => {
 
   return (
     <div className="p-6">
-      {/* Header */}
+      {/* ============================================ */}
+      {/* HEADER */}
+      {/* ============================================ */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">All Students</h1>
@@ -191,12 +593,188 @@ const AllStudents = () => {
             View and manage all students in the system
           </p>
         </div>
-        <button
-          onClick={handleAddStudent}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
-          Add New Student
-        </button>
+
+        {/* Header Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search Type Selector */}
+          <select
+            value={searchType}
+            onChange={(e) => handleSearchTypeChange(e.target.value as SearchType)}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="name">By Name</option>
+            <option value="studentNumber">By Student No.</option>
+          </select>
+
+          {/* Search Input */}
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+              placeholder={
+                searchType === "name"
+                  ? "Search by name..."
+                  : "Search by student no..."
+              }
+              className="w-48 rounded-lg border border-gray-300 py-2.5 pl-4 pr-10 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:w-56"
+            />
+            {searchInput && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-2 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Search Button */}
+          <button
+            onClick={handleSearchClick}
+            disabled={loading}
+            className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading &&
+            (viewMode === "search-name" || viewMode === "search-number")
+              ? "Searching..."
+              : "Search"}
+          </button>
+
+          {/* Add New Student */}
+          <button
+            onClick={handleAddStudent}
+            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            + Add New Student
+          </button>
+        </div>
+      </div>
+
+      {/* ============================================ */}
+      {/* FILTER BAR */}
+      {/* ============================================ */}
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          {/* Left: Date Filter */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {/* Date Filter Checkbox */}
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={useDateFilter}
+                onChange={(e) => handleDateFilterToggle(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Filter by date
+              </span>
+            </label>
+
+            {/* Date Inputs (shown when checkbox is checked) */}
+            {useDateFilter && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-500">
+                    From:
+                  </label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-500">
+                    To:
+                  </label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <button
+                  onClick={handleApplyDateFilter}
+                  disabled={loading}
+                  className="rounded-lg bg-gray-800 px-3 py-2 text-xs font-medium text-white transition hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Right: View Mode Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleShowAllStudents}
+              disabled={loading}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                viewMode === "paginated"
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Show All Students
+            </button>
+
+            <button
+              onClick={handleShowUnenrolled}
+              disabled={loading}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                viewMode === "unenrolled"
+                  ? "bg-orange-600 text-white"
+                  : "border border-orange-300 text-orange-600 hover:bg-orange-50"
+              }`}
+            >
+              All Unenrolled
+            </button>
+
+            {/* Search Badges */}
+            {viewMode === "search-name" && searchName && (
+              <span className="rounded-full bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700">
+                🔍 Name: "{searchName}"
+              </span>
+            )}
+
+            {viewMode === "search-number" && searchNumber && (
+              <span className="rounded-full bg-purple-100 px-3 py-1.5 text-xs font-medium text-purple-700">
+                🔍 Student No: "{searchNumber}"
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Active Filter Info */}
+        {useDateFilter && (fromDate || toDate) && (
+          <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3">
+            <span className="text-xs text-gray-500">Active filters:</span>
+            {fromDate && (
+              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                From: {fromDate}
+              </span>
+            )}
+            {toDate && (
+              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                To: {toDate}
+              </span>
+            )}
+            <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
+              {viewMode === "paginated"
+                ? "Paginated"
+                : viewMode === "unenrolled"
+                ? "Unenrolled"
+                : viewMode === "search-name"
+                ? "Search by Name"
+                : "Search by Student No."}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Error */}
@@ -206,19 +784,84 @@ const AllStudents = () => {
         </div>
       )}
 
+      {/* Results Count */}
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {viewMode === "paginated" && (
+            <>
+              Showing <strong>{students.length}</strong> of{" "}
+              <strong>{totalCount}</strong> students
+              {totalPages > 1 && (
+                <span className="ml-2 text-gray-400">
+                  (Page {currentPage} of {totalPages})
+                </span>
+              )}
+            </>
+          )}
+          {viewMode === "unenrolled" && (
+            <>
+              Found <strong>{students.length}</strong> unenrolled student
+              {students.length !== 1 ? "s" : ""}
+            </>
+          )}
+          {viewMode === "search-name" && (
+            <>
+              Found <strong>{students.length}</strong> result
+              {students.length !== 1 ? "s" : ""} for name "{searchName}"
+            </>
+          )}
+          {viewMode === "search-number" && (
+            <>
+              Found <strong>{students.length}</strong> result
+              {students.length !== 1 ? "s" : ""} for student number "
+              {searchNumber}"
+            </>
+          )}
+        </p>
+
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600" />
+            Loading...
+          </div>
+        )}
+      </div>
+
       {/* Empty State */}
-      {students.length === 0 && (
+      {students.length === 0 && !loading && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">No Students Found</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {viewMode === "unenrolled"
+              ? "No Unenrolled Students"
+              : viewMode === "search-name" || viewMode === "search-number"
+              ? "No Results Found"
+              : "No Students Found"}
+          </h3>
           <p className="mt-2 text-sm text-gray-500">
-            There are no students registered yet.
+            {viewMode === "unenrolled"
+              ? "All students are currently enrolled in courses."
+              : viewMode === "search-name"
+              ? `No students found matching name "${searchName}". Try a different name.`
+              : viewMode === "search-number"
+              ? `No student found with number "${searchNumber}". Try a different number.`
+              : "There are no students registered yet."}
           </p>
-          <button
-            onClick={handleAddStudent}
-            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Add Your First Student
-          </button>
+          {(viewMode === "search-name" || viewMode === "search-number") && (
+            <button
+              onClick={handleClearSearch}
+              className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Clear Search
+            </button>
+          )}
+          {viewMode === "paginated" && (
+            <button
+              onClick={handleAddStudent}
+              className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Add Your First Student
+            </button>
+          )}
         </div>
       )}
 
@@ -253,40 +896,46 @@ const AllStudents = () => {
                       <div className="flex items-center gap-3">
                         {student.image ? (
                           <img
-                            src={getImageUrl(student.image)}
+                            src={getImageUrl(student.image) || ""}
                             alt={`${student.firstName} ${student.lastName}`}
                             className="h-10 w-10 rounded-full object-cover"
                             onError={(e) => {
-                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.style.display = "none";
                               const parent = e.currentTarget.parentElement;
                               if (parent) {
-                                const fallback = document.createElement('div');
-                                fallback.className = 'flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm';
-                                fallback.textContent = `${student.firstName.charAt(0)}${student.lastName?.charAt(0) || ''}`;
+                                const fallback = document.createElement("div");
+                                fallback.className =
+                                  "flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm";
+                                fallback.textContent = `${
+                                  student.firstName.charAt(0)
+                                }${student.lastName?.charAt(0) || ""}`;
                                 parent.appendChild(fallback);
                               }
                             }}
                           />
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
-                            {student.firstName.charAt(0)}{student.lastName?.charAt(0) || ''}
+                            {student.firstName.charAt(0)}
+                            {student.lastName?.charAt(0) || ""}
                           </div>
                         )}
                         <div>
                           <p className="font-semibold text-gray-900">
-                            {student.firstName} {student.lastName || ''}
+                            {student.firstName} {student.lastName || ""}
                           </p>
                           <p className="mt-1 text-xs text-gray-500">
-                            {student.studentNumber || 'No ID'}
+                            {student.studentNumber || "No ID"}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">{student.phone || 'N/A'}</p>
-                      {student.parentPhone && (
+                      <p className="text-sm text-gray-900">
+                        {student.phone || "N/A"}
+                      </p>
+                      {student.fatherPhone && (
                         <p className="mt-1 text-xs text-gray-500">
-                          Parent: {student.parentPhone}
+                          Parent: {student.fatherPhone}
                         </p>
                       )}
                     </td>
@@ -296,7 +945,11 @@ const AllStudents = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(student.status)}`}>
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
+                          student.status
+                        )}`}
+                      >
                         <span className="mr-2 h-2 w-2 rounded-full bg-current" />
                         {student.status}
                       </span>
@@ -321,7 +974,6 @@ const AllStudents = () => {
                         >
                           Enrollments
                         </button>
-                        {/* ✅ Scores Button */}
                         <button
                           onClick={() => handleViewScores(student)}
                           className="inline-flex items-center rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-600 transition hover:bg-green-100"
@@ -330,10 +982,10 @@ const AllStudents = () => {
                         </button>
                         <button
                           onClick={() => handleDeleteClick(student)}
-                          disabled={deleteLoading === student.id}
+                          disabled={deleteLoading}
                           className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {deleteLoading === student.id ? "Deleting..." : "Delete"}
+                          {deleteLoading ? "Deleting..." : "Delete"}
                         </button>
                       </div>
                     </td>
@@ -342,8 +994,15 @@ const AllStudents = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {renderPagination()}
         </div>
       )}
+
+      {/* ============================================ */}
+      {/* MODALS */}
+      {/* ============================================ */}
 
       {/* Detail Modal */}
       <StudentDetailModal
@@ -352,7 +1011,7 @@ const AllStudents = () => {
         onClose={handleCloseDetail}
       />
 
-      {/* ✅ Edit Modal */}
+      {/* Edit Modal */}
       <StudentEditModal
         isOpen={showEditModal}
         student={studentForEdit}
@@ -374,16 +1033,20 @@ const AllStudents = () => {
       <StudentEnrollmentsModal
         isOpen={showEnrollmentsModal}
         studentId={studentForEnrollments?.id || null}
-        studentName={`${studentForEnrollments?.firstName || ''} ${studentForEnrollments?.lastName || ''}`}
+        studentName={`${studentForEnrollments?.firstName || ""} ${
+          studentForEnrollments?.lastName || ""
+        }`}
         student={studentForEnrollments}
         onClose={handleCloseEnrollments}
       />
 
-      {/* ✅ Scores Modal */}
+      {/* Scores Modal */}
       <StudentScoresModal
         isOpen={showScoresModal}
         studentId={studentForScores?.id || null}
-        studentName={`${studentForScores?.firstName || ''} ${studentForScores?.lastName || ''}`}
+        studentName={`${studentForScores?.firstName || ""} ${
+          studentForScores?.lastName || ""
+        }`}
         onClose={handleCloseScores}
       />
     </div>
