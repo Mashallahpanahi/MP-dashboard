@@ -10,6 +10,116 @@ import type {
 } from "@/types/studentEnrollment";
 import { ApiError } from "./teacherApi";
 
+
+// ============================================
+// ENROLLMENT & PAYMENT HISTORY
+// ============================================
+
+export interface EnrollmentHistoryRecord {
+  enrollmentId: string;
+  studentId: string;
+  studentNumber: string;
+  studentName: string;
+  studentLastName: string;
+  teacherId: string;
+  teacherName: string;
+  teacherLastName: string;
+  bookId: string;
+  bookName: string;
+  bookLevelOrder: number;
+  classId: string;
+  className: string;
+  classBlock: string;
+  time: string;
+  startDate: string;
+  endDate: string;
+  enrollmentStatus: string;
+  result: string;
+  fee: string | number;
+  discount: string | number;
+  finalFee: string | number;
+  paymentDate: string;
+  paymentStatus: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EnrollmentHistorySummary {
+  totalEnrollments: number;
+  totalAmount: number;
+  paidCount: number;
+  pendingCount: number;
+}
+
+export interface EnrollmentHistoryStudent {
+  id: string;
+  studentNumber: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  image: string | null;
+  fatherName: string | null;
+  fatherPhone: string | null;
+  gender: string;
+  status: string;
+  notes: string | null;
+}
+
+export interface EnrollmentHistoryResponse {
+  success: boolean;
+  message: string;
+  count: number;
+  data: {
+    student: EnrollmentHistoryStudent;
+    summary: EnrollmentHistorySummary;
+    history: EnrollmentHistoryRecord[];
+  };
+}
+
+/**
+ * Get student enrollment & payment history
+ * GET /student-enrollment-payment/history/student/{studentId}
+ *
+ * @param studentId - Student UUID
+ */
+export const getStudentEnrollmentHistory = async (
+  studentId: string
+): Promise<EnrollmentHistoryResponse> => {
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+  const response = await fetch(
+    `${API_URL}/student-enrollment-payment/history/student/${studentId}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    let errorMessage = `Failed to fetch enrollment history. Status: ${response.status}`;
+
+    try {
+      const errorData = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch {
+      // Keep default error message
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+};
+
+
+
+
+
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 /**

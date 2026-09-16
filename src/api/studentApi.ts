@@ -13,6 +13,107 @@ import { ApiError } from "./teacherApi";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+// ============================================
+// FILTERED STUDENTS (Advanced Filter)
+// ============================================
+
+export interface FilteredStudentEnrollment {
+  id: string;
+  teacher: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    salaryType: string;
+  };
+  book: {
+    id: string;
+    name: string;
+    levelOrder: number;
+    bookPrice: string;
+  };
+  classId: string;
+  time: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  result: string;
+  payment: {
+    id: string;
+    fee: string;
+    discount: string;
+    finalFee: string;
+    status: string;
+    date: string;
+  } | null;
+}
+
+export interface FilteredStudent {
+  student: Student;
+  enrollments: FilteredStudentEnrollment[];
+}
+
+export interface FilteredStudentsResponse {
+  success: boolean;
+  message: string;
+  data: FilteredStudent[];
+  count: number;
+  filters: {
+    teacherId: string | null;
+    bookId: string | null;
+    time: string | null;
+    fromDate: string | null;
+    toDate: string | null;
+  };
+}
+
+export interface FilterStudentsParams {
+  teacherId?: string;
+  bookId?: string;
+  time?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
+/**
+ * Filter students with optional filters (teacher, book, time, date range)
+ * GET /filter-search-student/filter
+ *
+ * All filters are OPTIONAL. Only students with enrollments will be returned.
+ *
+ * @param params - Filter parameters (all optional)
+ */
+export const getFilteredStudents = async (
+  params: FilterStudentsParams
+): Promise<FilteredStudentsResponse> => {
+  const query = new URLSearchParams();
+  if (params.teacherId) query.append("teacherId", params.teacherId);
+  if (params.bookId) query.append("bookId", params.bookId);
+  if (params.time) query.append("time", params.time);
+  if (params.fromDate) query.append("fromDate", params.fromDate);
+  if (params.toDate) query.append("toDate", params.toDate);
+
+  const queryString = query.toString();
+  const url = queryString
+    ? `${API_URL}/filter-search-student/filter?${queryString}`
+    : `${API_URL}/filter-search-student/filter`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const { message, details } = await extractErrorMessage(
+      response,
+      `Failed to filter students. Status: ${response.status}`
+    );
+    throw new ApiError(message, response.status, details);
+  }
+
+  return response.json();
+};
 
 export interface SearchStudentResponse {
   success: boolean;

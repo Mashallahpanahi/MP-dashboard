@@ -1,4 +1,5 @@
 // src/pages/Students/AllStudents.tsx
+
 import { useEffect, useState, useCallback } from "react";
 import {
   getStudents,
@@ -8,6 +9,8 @@ import {
   getUnenrolledStudents,
   searchStudentsByName,
   searchStudentByNumber,
+  getFilteredStudents,
+  type FilteredStudent,
 } from "@/api/studentApi";
 import type { Student } from "@/types/student";
 import {
@@ -17,7 +20,11 @@ import {
   StudentScoresModal,
 } from "@/components/students";
 import StudentEditModal from "@/components/students/StudentEditModal";
+import MoreFilterModal, {
+  type MoreFilterValues,
+} from "@/components/students/MoreFilterModal";
 import { useNavigate } from "react-router-dom";
+
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -29,7 +36,12 @@ const getImageUrl = (imagePath: string | null | undefined) => {
 };
 
 // View mode type
-type ViewMode = "paginated" | "unenrolled" | "search-name" | "search-number";
+type ViewMode =
+  | "paginated"
+  | "unenrolled"
+  | "search-name"
+  | "search-number"
+  | "filtered";
 
 // Search type
 type SearchType = "name" | "studentNumber";
@@ -37,6 +49,9 @@ type SearchType = "name" | "studentNumber";
 const AllStudents = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<FilteredStudent[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -51,6 +66,10 @@ const AllStudents = () => {
   const [useDateFilter, setUseDateFilter] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+
+  // More Filter state
+  const [showMoreFilter, setShowMoreFilter] = useState(false);
+  const [moreFilters, setMoreFilters] = useState<MoreFilterValues>({});
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -95,6 +114,7 @@ const AllStudents = () => {
       try {
         setLoading(true);
         setError("");
+        setFilteredStudents([]);
 
         const response = await getPaginatedStudents(
           page,
@@ -129,6 +149,7 @@ const AllStudents = () => {
     try {
       setLoading(true);
       setError("");
+      setFilteredStudents([]);
 
       const response = await getUnenrolledStudents(
         useDateFilter ? fromDate : undefined,
@@ -157,71 +178,99 @@ const AllStudents = () => {
   /**
    * Search students by name (fuzzy search)
    */
-  const handleSearchByName = useCallback(
-    async (name: string) => {
-      try {
-        setLoading(true);
-        setError("");
-        setSearchName(name);
-        setSearchNumber("");
+  const handleSearchByName = useCallback(async (name: string) => {
+    try {
+      setLoading(true);
+      setError("");
+      setSearchName(name);
+      setSearchNumber("");
+      setFilteredStudents([]);
 
-        const response = await searchStudentsByName(name);
+      const response = await searchStudentsByName(name);
 
-        if (response.success) {
-          // Handle single or array response
-          const results = Array.isArray(response.data)
-            ? response.data
-            : [response.data].filter(Boolean);
+      if (response.success) {
+        const results = Array.isArray(response.data)
+          ? response.data
+          : [response.data].filter(Boolean);
 
-          setStudents(results);
-          setTotalCount(results.length);
-          setTotalPages(1);
-          setCurrentPage(1);
-          setViewMode("search-name");
-        }
-      } catch (error) {
-        console.error("Failed to search students by name:", error);
-        setError(
-          error instanceof Error ? error.message : "Failed to search students"
-        );
-      } finally {
-        setLoading(false);
+        setStudents(results);
+        setTotalCount(results.length);
+        setTotalPages(1);
+        setCurrentPage(1);
+        setViewMode("search-name");
       }
-    },
-    []
-  );
+    } catch (error) {
+      console.error("Failed to search students by name:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to search students"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   /**
    * Search student by student number
    */
-  const handleSearchByNumber = useCallback(
-    async (studentNumber: string) => {
+  const handleSearchByNumber = useCallback(async (studentNumber: string) => {
+    try {
+      setLoading(true);
+      setError("");
+      setSearchNumber(studentNumber);
+      setSearchName("");
+      setFilteredStudents([]);
+
+      const response = await searchStudentByNumber(studentNumber);
+
+      if (response.success) {
+        const results = Array.isArray(response.data)
+          ? response.data
+          : [response.data].filter(Boolean);
+
+        setStudents(results);
+        setTotalCount(results.length);
+        setTotalPages(1);
+        setCurrentPage(1);
+        setViewMode("search-number");
+      }
+    } catch (error) {
+      console.error("Failed to search student by number:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to search student by number"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Apply advanced filters (teacher, book, time, date range)
+   */
+  const handleApplyMoreFilters = useCallback(
+    async (filters: MoreFilterValues) => {
       try {
         setLoading(true);
         setError("");
-        setSearchNumber(studentNumber);
-        setSearchName("");
+        setMoreFilters(filters);
+        setShowMoreFilter(false);
 
-        const response = await searchStudentByNumber(studentNumber);
+        const response = await getFilteredStudents(filters);
 
         if (response.success) {
-          // Handle single or array response
-          const results = Array.isArray(response.data)
-            ? response.data
-            : [response.data].filter(Boolean);
-
-          setStudents(results);
-          setTotalCount(results.length);
+          setFilteredStudents(response.data);
+          // Also set students array (extract student from each) for modals
+          setStudents(response.data.map((item) => item.student));
+          setTotalCount(response.count);
           setTotalPages(1);
           setCurrentPage(1);
-          setViewMode("search-number");
+          setViewMode("filtered");
         }
       } catch (error) {
-        console.error("Failed to search student by number:", error);
+        console.error("Failed to apply filters:", error);
         setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to search student by number"
+          error instanceof Error ? error.message : "Failed to apply filters"
         );
       } finally {
         setLoading(false);
@@ -231,13 +280,12 @@ const AllStudents = () => {
   );
 
   /**
-   * Main search handler - routes to correct search based on type
+   * Main search handler
    */
   const handleSearch = useCallback(async () => {
     const trimmedInput = searchInput.trim();
 
     if (!trimmedInput) {
-      // If search is empty, go back to paginated view
       fetchPaginatedStudents(1);
       return;
     }
@@ -247,9 +295,15 @@ const AllStudents = () => {
     } else {
       await handleSearchByNumber(trimmedInput);
     }
-  }, [searchInput, searchType, handleSearchByName, handleSearchByNumber, fetchPaginatedStudents]);
+  }, [
+    searchInput,
+    searchType,
+    handleSearchByName,
+    handleSearchByNumber,
+    fetchPaginatedStudents,
+  ]);
 
-  // Initial fetch - use paginated by default
+  // Initial fetch
   useEffect(() => {
     fetchPaginatedStudents(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -259,60 +313,69 @@ const AllStudents = () => {
   // HANDLERS
   // ============================================
 
-  // Handle page change
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       fetchPaginatedStudents(newPage);
     }
   };
 
-  // Handle page size change
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
     fetchPaginatedStudents(1, newSize);
   };
 
-  // Handle search button click
   const handleSearchClick = () => {
     handleSearch();
   };
 
-  // Handle search input key press (Enter)
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleSearch();
     }
   };
 
-  // Handle search type change
   const handleSearchTypeChange = (newType: SearchType) => {
     setSearchType(newType);
     setSearchInput("");
   };
 
-  // Handle clear search
   const handleClearSearch = () => {
     setSearchInput("");
     setSearchName("");
     setSearchNumber("");
+    setMoreFilters({});
     fetchPaginatedStudents(1);
   };
 
-  // Handle "Show All Students" button
   const handleShowAllStudents = () => {
     setViewMode("paginated");
     setSearchInput("");
     setSearchName("");
     setSearchNumber("");
+    setMoreFilters({});
     fetchPaginatedStudents(1);
   };
 
-  // Handle "Show Unenrolled" button
   const handleShowUnenrolled = () => {
     fetchUnenrolledStudents();
   };
 
-  // Handle date filter toggle
+  const handleOpenMoreFilter = () => {
+    setShowMoreFilter(true);
+  };
+
+  const handleCloseMoreFilter = () => {
+    setShowMoreFilter(false);
+  };
+
+  // Check if any advanced filters are active
+  const hasActiveMoreFilters =
+    moreFilters.teacherId ||
+    moreFilters.bookId ||
+    moreFilters.time ||
+    moreFilters.fromDate ||
+    moreFilters.toDate;
+
   const handleDateFilterToggle = (checked: boolean) => {
     setUseDateFilter(checked);
     if (!checked) {
@@ -321,7 +384,6 @@ const AllStudents = () => {
     }
   };
 
-  // Handle apply date filter
   const handleApplyDateFilter = () => {
     if (viewMode === "unenrolled") {
       fetchUnenrolledStudents();
@@ -344,6 +406,9 @@ const AllStudents = () => {
       await deleteStudent(studentToDelete.id);
       setStudents((prev) =>
         prev.filter((student) => student.id !== studentToDelete.id)
+      );
+      setFilteredStudents((prev) =>
+        prev.filter((item) => item.student.id !== studentToDelete.id)
       );
       setTotalCount((prev) => prev - 1);
       setShowDeleteModal(false);
@@ -387,7 +452,6 @@ const AllStudents = () => {
     setStudentToView(null);
   };
 
-  // Edit handlers
   const handleEditClick = (student: Student) => {
     setStudentForEdit(student);
     setShowEditModal(true);
@@ -398,7 +462,6 @@ const AllStudents = () => {
     setStudentForEdit(null);
   };
 
-  // Refresh callback
   const handleStudentUpdated = () => {
     if (viewMode === "paginated") {
       fetchPaginatedStudents(currentPage);
@@ -408,10 +471,11 @@ const AllStudents = () => {
       handleSearchByName(searchName);
     } else if (viewMode === "search-number") {
       handleSearchByNumber(searchNumber);
+    } else if (viewMode === "filtered") {
+      handleApplyMoreFilters(moreFilters);
     }
   };
 
-  // Enrollments handlers
   const handleViewEnrollments = (student: Student) => {
     setStudentForEnrollments(student);
     setShowEnrollmentsModal(true);
@@ -422,7 +486,6 @@ const AllStudents = () => {
     setStudentForEnrollments(null);
   };
 
-  // Scores handlers
   const handleViewScores = (student: Student) => {
     setStudentForScores(student);
     setShowScoresModal(true);
@@ -489,7 +552,6 @@ const AllStudents = () => {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* First Page */}
           <button
             onClick={() => handlePageChange(1)}
             disabled={currentPage === 1}
@@ -497,8 +559,6 @@ const AllStudents = () => {
           >
             First
           </button>
-
-          {/* Previous */}
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
@@ -507,7 +567,6 @@ const AllStudents = () => {
             ←
           </button>
 
-          {/* Page Numbers */}
           {startPage > 1 && (
             <>
               <button
@@ -548,7 +607,6 @@ const AllStudents = () => {
             </>
           )}
 
-          {/* Next */}
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
@@ -556,8 +614,6 @@ const AllStudents = () => {
           >
             →
           </button>
-
-          {/* Last Page */}
           <button
             onClick={() => handlePageChange(totalPages)}
             disabled={currentPage === totalPages}
@@ -570,7 +626,7 @@ const AllStudents = () => {
     );
   };
 
-  if (loading && students.length === 0) {
+  if (loading && students.length === 0 && filteredStudents.length === 0) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
@@ -594,12 +650,13 @@ const AllStudents = () => {
           </p>
         </div>
 
-        {/* Header Actions */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Search Type Selector */}
           <select
             value={searchType}
-            onChange={(e) => handleSearchTypeChange(e.target.value as SearchType)}
+            onChange={(e) =>
+              handleSearchTypeChange(e.target.value as SearchType)
+            }
             className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           >
             <option value="name">By Name</option>
@@ -631,7 +688,6 @@ const AllStudents = () => {
             )}
           </div>
 
-          {/* Search Button */}
           <button
             onClick={handleSearchClick}
             disabled={loading}
@@ -643,7 +699,6 @@ const AllStudents = () => {
               : "Search"}
           </button>
 
-          {/* Add New Student */}
           <button
             onClick={handleAddStudent}
             className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
@@ -660,7 +715,6 @@ const AllStudents = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: Date Filter */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            {/* Date Filter Checkbox */}
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -673,7 +727,6 @@ const AllStudents = () => {
               </span>
             </label>
 
-            {/* Date Inputs (shown when checkbox is checked) */}
             {useDateFilter && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-2">
@@ -735,7 +788,25 @@ const AllStudents = () => {
               All Unenrolled
             </button>
 
-            {/* Search Badges */}
+            {/* MORE FILTER BUTTON */}
+            <button
+              onClick={handleOpenMoreFilter}
+              disabled={loading}
+              className={`relative rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                hasActiveMoreFilters
+                  ? "bg-purple-600 text-white"
+                  : "border border-purple-300 text-purple-600 hover:bg-purple-50"
+              }`}
+            >
+              ⚙ More Filter
+              {hasActiveMoreFilters && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                  !
+                </span>
+              )}
+            </button>
+
+            {/* Active filter chips */}
             {viewMode === "search-name" && searchName && (
               <span className="rounded-full bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700">
                 🔍 Name: "{searchName}"
@@ -750,29 +821,46 @@ const AllStudents = () => {
           </div>
         </div>
 
-        {/* Active Filter Info */}
-        {useDateFilter && (fromDate || toDate) && (
-          <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3">
-            <span className="text-xs text-gray-500">Active filters:</span>
-            {fromDate && (
-              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                From: {fromDate}
-              </span>
-            )}
-            {toDate && (
-              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                To: {toDate}
-              </span>
-            )}
-            <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
-              {viewMode === "paginated"
-                ? "Paginated"
-                : viewMode === "unenrolled"
-                ? "Unenrolled"
-                : viewMode === "search-name"
-                ? "Search by Name"
-                : "Search by Student No."}
+        {/* Active Advanced Filters Display */}
+        {hasActiveMoreFilters && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+            <span className="text-xs font-medium text-gray-500">
+              Active filters:
             </span>
+            {moreFilters.teacherId && (
+              <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-700">
+                Teacher filtered
+              </span>
+            )}
+            {moreFilters.bookId && (
+              <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-700">
+                Book filtered
+              </span>
+            )}
+            {moreFilters.time && (
+              <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-700">
+                Time: {moreFilters.time}
+              </span>
+            )}
+            {moreFilters.fromDate && (
+              <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-700">
+                From: {moreFilters.fromDate}
+              </span>
+            )}
+            {moreFilters.toDate && (
+              <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-700">
+                To: {moreFilters.toDate}
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setMoreFilters({});
+                fetchPaginatedStudents(1);
+              }}
+              className="ml-1 text-xs font-medium text-red-600 hover:underline"
+            >
+              Clear
+            </button>
           </div>
         )}
       </div>
@@ -817,6 +905,12 @@ const AllStudents = () => {
               {searchNumber}"
             </>
           )}
+          {viewMode === "filtered" && (
+            <>
+              Found <strong>{filteredStudents.length}</strong> student
+              {filteredStudents.length !== 1 ? "s" : ""} matching filters
+            </>
+          )}
         </p>
 
         {loading && (
@@ -835,6 +929,8 @@ const AllStudents = () => {
               ? "No Unenrolled Students"
               : viewMode === "search-name" || viewMode === "search-number"
               ? "No Results Found"
+              : viewMode === "filtered"
+              ? "No Students Match Filters"
               : "No Students Found"}
           </h3>
           <p className="mt-2 text-sm text-gray-500">
@@ -844,14 +940,18 @@ const AllStudents = () => {
               ? `No students found matching name "${searchName}". Try a different name.`
               : viewMode === "search-number"
               ? `No student found with number "${searchNumber}". Try a different number.`
+              : viewMode === "filtered"
+              ? "No students match the selected filters. Try removing some filters."
               : "There are no students registered yet."}
           </p>
-          {(viewMode === "search-name" || viewMode === "search-number") && (
+          {(viewMode === "search-name" ||
+            viewMode === "search-number" ||
+            viewMode === "filtered") && (
             <button
               onClick={handleClearSearch}
               className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              Clear Search
+              Clear Filters
             </button>
           )}
           {viewMode === "paginated" && (
@@ -884,118 +984,172 @@ const AllStudents = () => {
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Status
                   </th>
+                  {viewMode === "filtered" && (
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Matched Enrollments
+                    </th>
+                  )}
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {students.map((student) => (
-                  <tr key={student.id} className="transition hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {student.image ? (
-                          <img
-                            src={getImageUrl(student.image) || ""}
-                            alt={`${student.firstName} ${student.lastName}`}
-                            className="h-10 w-10 rounded-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const fallback = document.createElement("div");
-                                fallback.className =
-                                  "flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm";
-                                fallback.textContent = `${
-                                  student.firstName.charAt(0)
-                                }${student.lastName?.charAt(0) || ""}`;
-                                parent.appendChild(fallback);
-                              }
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
-                            {student.firstName.charAt(0)}
-                            {student.lastName?.charAt(0) || ""}
+                {students.map((student) => {
+                  // Find matching filtered enrollment data
+                  const filteredItem =
+                    viewMode === "filtered"
+                      ? filteredStudents.find(
+                          (f) => f.student.id === student.id
+                        )
+                      : null;
+
+                  return (
+                    <tr
+                      key={student.id}
+                      className="transition hover:bg-gray-50"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {student.image ? (
+                            <img
+                              src={getImageUrl(student.image) || ""}
+                              alt={`${student.firstName} ${student.lastName}`}
+                              className="h-10 w-10 rounded-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  const fallback =
+                                    document.createElement("div");
+                                  fallback.className =
+                                    "flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm";
+                                  fallback.textContent = `${
+                                    student.firstName.charAt(0)
+                                  }${student.lastName?.charAt(0) || ""}`;
+                                  parent.appendChild(fallback);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
+                              {student.firstName.charAt(0)}
+                              {student.lastName?.charAt(0) || ""}
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {student.firstName} {student.lastName || ""}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {student.studentNumber || "No ID"}
+                            </p>
                           </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {student.firstName} {student.lastName || ""}
-                          </p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {student.studentNumber || "No ID"}
-                          </p>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">
-                        {student.phone || "N/A"}
-                      </p>
-                      {student.fatherPhone && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          Parent: {student.fatherPhone}
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-gray-900">
+                          {student.phone || "N/A"}
                         </p>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                        {student.gender}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
-                          student.status
-                        )}`}
-                      >
-                        <span className="mr-2 h-2 w-2 rounded-full bg-current" />
-                        {student.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() => handleViewClick(student)}
-                          className="inline-flex items-center rounded-lg bg-purple-50 px-3 py-2 text-sm font-medium text-purple-600 transition hover:bg-purple-100"
+                        {student.fatherPhone && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Parent: {student.fatherPhone}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+                          {student.gender}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
+                            student.status
+                          )}`}
                         >
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleEditClick(student)}
-                          className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleViewEnrollments(student)}
-                          className="inline-flex items-center rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-100"
-                        >
-                          Enrollments
-                        </button>
-                        <button
-                          onClick={() => handleViewScores(student)}
-                          className="inline-flex items-center rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-600 transition hover:bg-green-100"
-                        >
-                          Scores
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(student)}
-                          disabled={deleteLoading}
-                          className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {deleteLoading ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <span className="mr-2 h-2 w-2 rounded-full bg-current" />
+                          {student.status}
+                        </span>
+                      </td>
+
+                      {/* Show matched enrollments when filtered */}
+                      {viewMode === "filtered" && (
+  <td className="px-6 py-4">
+    {(() => {
+      const enrollments = filteredItem?.enrollments ?? [];
+      if (enrollments.length === 0) {
+        return <span className="text-xs text-gray-400">—</span>;
+      }
+      return (
+        <div className="space-y-1">
+          {enrollments.slice(0, 2).map((enr) => (
+            <div
+              key={enr.id}
+              className="rounded bg-purple-50 px-2 py-1 text-xs"
+            >
+              <p className="font-medium text-purple-700">
+                {enr.book?.name || "N/A"}
+              </p>
+              <p className="text-purple-500">
+                {enr.teacher?.firstName || ""}{" "}
+                {enr.teacher?.lastName || ""} • {enr.time || "No time"}
+              </p>
+            </div>
+          ))}
+          {enrollments.length > 2 && (
+            <p className="text-xs text-gray-500">
+              +{enrollments.length - 2} more
+            </p>
+          )}
+        </div>
+      );
+    })()}
+  </td>
+)}
+
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => handleViewClick(student)}
+                            className="inline-flex items-center rounded-lg bg-purple-50 px-3 py-2 text-sm font-medium text-purple-600 transition hover:bg-purple-100"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleEditClick(student)}
+                            className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleViewEnrollments(student)}
+                            className="inline-flex items-center rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-100"
+                          >
+                            Enrollments
+                          </button>
+                          <button
+                            onClick={() => handleViewScores(student)}
+                            className="inline-flex items-center rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-600 transition hover:bg-green-100"
+                          >
+                            Scores
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(student)}
+                            disabled={deleteLoading}
+                            className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {deleteLoading ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination */}
           {renderPagination()}
         </div>
       )}
@@ -1004,14 +1158,12 @@ const AllStudents = () => {
       {/* MODALS */}
       {/* ============================================ */}
 
-      {/* Detail Modal */}
       <StudentDetailModal
         isOpen={showDetailModal}
         student={studentToView}
         onClose={handleCloseDetail}
       />
 
-      {/* Edit Modal */}
       <StudentEditModal
         isOpen={showEditModal}
         student={studentForEdit}
@@ -1020,7 +1172,6 @@ const AllStudents = () => {
         isLoading={false}
       />
 
-      {/* Delete Modal */}
       <StudentDeleteModal
         isOpen={showDeleteModal}
         student={studentToDelete}
@@ -1029,7 +1180,6 @@ const AllStudents = () => {
         isLoading={deleteLoading}
       />
 
-      {/* Enrollments Modal */}
       <StudentEnrollmentsModal
         isOpen={showEnrollmentsModal}
         studentId={studentForEnrollments?.id || null}
@@ -1040,7 +1190,6 @@ const AllStudents = () => {
         onClose={handleCloseEnrollments}
       />
 
-      {/* Scores Modal */}
       <StudentScoresModal
         isOpen={showScoresModal}
         studentId={studentForScores?.id || null}
@@ -1048,6 +1197,17 @@ const AllStudents = () => {
           studentForScores?.lastName || ""
         }`}
         onClose={handleCloseScores}
+      />
+
+      {/* ============================================ */}
+      {/* MORE FILTER MODAL */}
+      {/* ============================================ */}
+      <MoreFilterModal
+        isOpen={showMoreFilter}
+        onClose={handleCloseMoreFilter}
+        onApply={handleApplyMoreFilters}
+        initialValues={moreFilters}
+        loading={loading}
       />
     </div>
   );
