@@ -90,13 +90,13 @@ const ScoreUpdateModal = ({
 
     try {
       // Validate scores
-      if (formData.midtermScore !== undefined && (formData.midtermScore < 0 || formData.midtermScore > 50)) {
+      if (formData.midtermScore !== undefined && (formData.midtermScore < 0 || formData.midtermScore > 100)) {
         setError("Midterm score must be between 0 and 50");
         setSaving(false);
         return;
       }
 
-      if (formData.finalScore !== undefined && (formData.finalScore < 0 || formData.finalScore > 50)) {
+      if (formData.finalScore !== undefined && (formData.finalScore < 0 || formData.finalScore > 100)) {
         setError("Final score must be between 0 and 50");
         setSaving(false);
         return;
@@ -201,7 +201,7 @@ const ScoreUpdateModal = ({
                 value={formData.midtermScore ?? ""}
                 onChange={handleInputChange}
                 min="0"
-                max="50"
+                max="100"
                 step="0.01"
                 placeholder="0-50"
                 disabled={saving}
@@ -220,7 +220,7 @@ const ScoreUpdateModal = ({
                 value={formData.finalScore ?? ""}
                 onChange={handleInputChange}
                 min="0"
-                max="50"
+                max="100"
                 step="0.01"
                 placeholder="0-50"
                 disabled={saving}
