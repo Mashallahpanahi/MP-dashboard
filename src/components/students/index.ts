@@ -10,3 +10,4 @@ export { default as StudentScoresModal } from './StudentScoresModal';
 export { default as ScoreUpdateModal } from './ScoreUpdateModal';
 export { default as ScoreAddModal } from './ScoreAddModal';
 export {default as MoreFilterModal} from './MoreFilterModal';
+export {default as EnrollmentHistoryModal} from './EnrollmentHistoryModal';

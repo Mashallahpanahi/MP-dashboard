@@ -11,6 +11,20 @@ import type {
 import { ApiError } from "./teacherApi";
 
 
+
+// SCORE
+// ============================================
+
+export interface EnrollmentScore {
+  id: string;
+  midtermScore: string | number | null;
+  finalScore: string | number | null;
+  totalScore: string | number | null;
+  scoreDate: string | null;
+  scoreTime: string | null;
+  scoreNotes: string | null;
+}
+
 // ============================================
 // ENROLLMENT & PAYMENT HISTORY
 // ============================================
@@ -40,6 +54,7 @@ export interface EnrollmentHistoryRecord {
   finalFee: string | number;
   paymentDate: string;
   paymentStatus: string;
+  score: EnrollmentScore | null; // ✅ NEW
   createdAt: string;
   updatedAt: string;
 }
@@ -49,6 +64,8 @@ export interface EnrollmentHistorySummary {
   totalAmount: number;
   paidCount: number;
   pendingCount: number;
+  scoredCount: number;         // ✅ NEW
+  averageTotalScore: number;   // ✅ NEW
 }
 
 export interface EnrollmentHistoryStudent {

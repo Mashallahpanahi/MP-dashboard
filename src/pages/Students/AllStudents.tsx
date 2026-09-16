@@ -23,8 +23,9 @@ import StudentEditModal from "@/components/students/StudentEditModal";
 import MoreFilterModal, {
   type MoreFilterValues,
 } from "@/components/students/MoreFilterModal";
+// ✅ NEW: Enrollment History modal
+import EnrollmentHistoryModal from "@/components/students/EnrollmentHistoryModal";
 import { useNavigate } from "react-router-dom";
-
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -99,6 +100,12 @@ const AllStudents = () => {
   // Scores state
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [studentForScores, setStudentForScores] = useState<Student | null>(
+    null
+  );
+
+  // ✅ NEW: History state
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [studentForHistory, setStudentForHistory] = useState<Student | null>(
     null
   );
 
@@ -494,6 +501,17 @@ const AllStudents = () => {
   const handleCloseScores = () => {
     setShowScoresModal(false);
     setStudentForScores(null);
+  };
+
+  // ✅ NEW: History handlers
+  const handleViewHistory = (student: Student) => {
+    setStudentForHistory(student);
+    setShowHistoryModal(true);
+  };
+
+  const handleCloseHistory = () => {
+    setShowHistoryModal(false);
+    setStudentForHistory(null);
   };
 
   const handleAddStudent = () => {
@@ -1075,38 +1093,44 @@ const AllStudents = () => {
 
                       {/* Show matched enrollments when filtered */}
                       {viewMode === "filtered" && (
-  <td className="px-6 py-4">
-    {(() => {
-      const enrollments = filteredItem?.enrollments ?? [];
-      if (enrollments.length === 0) {
-        return <span className="text-xs text-gray-400">—</span>;
-      }
-      return (
-        <div className="space-y-1">
-          {enrollments.slice(0, 2).map((enr) => (
-            <div
-              key={enr.id}
-              className="rounded bg-purple-50 px-2 py-1 text-xs"
-            >
-              <p className="font-medium text-purple-700">
-                {enr.book?.name || "N/A"}
-              </p>
-              <p className="text-purple-500">
-                {enr.teacher?.firstName || ""}{" "}
-                {enr.teacher?.lastName || ""} • {enr.time || "No time"}
-              </p>
-            </div>
-          ))}
-          {enrollments.length > 2 && (
-            <p className="text-xs text-gray-500">
-              +{enrollments.length - 2} more
-            </p>
-          )}
-        </div>
-      );
-    })()}
-  </td>
-)}
+                        <td className="px-6 py-4">
+                          {(() => {
+                            const enrollments =
+                              filteredItem?.enrollments ?? [];
+                            if (enrollments.length === 0) {
+                              return (
+                                <span className="text-xs text-gray-400">
+                                  —
+                                </span>
+                              );
+                            }
+                            return (
+                              <div className="space-y-1">
+                                {enrollments.slice(0, 2).map((enr) => (
+                                  <div
+                                    key={enr.id}
+                                    className="rounded bg-purple-50 px-2 py-1 text-xs"
+                                  >
+                                    <p className="font-medium text-purple-700">
+                                      {enr.book?.name || "N/A"}
+                                    </p>
+                                    <p className="text-purple-500">
+                                      {enr.teacher?.firstName || ""}{" "}
+                                      {enr.teacher?.lastName || ""} •{" "}
+                                      {enr.time || "No time"}
+                                    </p>
+                                  </div>
+                                ))}
+                                {enrollments.length > 2 && (
+                                  <p className="text-xs text-gray-500">
+                                    +{enrollments.length - 2} more
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </td>
+                      )}
 
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1133,6 +1157,14 @@ const AllStudents = () => {
                             className="inline-flex items-center rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-600 transition hover:bg-green-100"
                           >
                             Scores
+                          </button>
+                          {/* ✅ NEW: History Button */}
+                          <button
+                            onClick={() => handleViewHistory(student)}
+                            className="inline-flex items-center rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
+                            title="View enrollment & payment history"
+                          >
+                            📋 History
                           </button>
                           <button
                             onClick={() => handleDeleteClick(student)}
@@ -1197,6 +1229,13 @@ const AllStudents = () => {
           studentForScores?.lastName || ""
         }`}
         onClose={handleCloseScores}
+      />
+
+      {/* ✅ NEW: Enrollment History Modal */}
+      <EnrollmentHistoryModal
+        isOpen={showHistoryModal}
+        student={studentForHistory}
+        onClose={handleCloseHistory}
       />
 
       {/* ============================================ */}
