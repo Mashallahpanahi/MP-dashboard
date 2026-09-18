@@ -27,6 +27,7 @@ import TeacherPayrollPage from "@/pages/Payment/TeacherPayroll";
 
 // Payment pages - Other Expenses
 import OtherExpensesPage from "@/pages/Payment/OtherExpenses";
+import AddScores from "@/pages/Students/AddScores";
 
 // Note pages
 import Notes from "@/pages/Notes/Notes";
@@ -48,6 +49,7 @@ const AppRoutes = () => (
           <Route path="/students/all" element={<AllStudents />} />
           <Route path="/students/register" element={<StudentRegister />} />
           <Route path="/students/enroll/:studentId" element={<EnrollStudent />} />
+          <Route path="/students/add-scores" element={<AddScores/>} />
           
           {/* Class Routes */}
           <Route path="/classes/all" element={<AllClasses />} />

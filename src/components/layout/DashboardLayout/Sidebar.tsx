@@ -22,6 +22,7 @@ import {
   FaCreditCard,
   FaWallet,
   FaReceipt,
+  FaClipboardList,
 } from "react-icons/fa";
 import { TbDatabaseHeart } from "react-icons/tb";
 
@@ -118,6 +119,12 @@ const Sidebar = () => {
           label: "sidebar.allStudents",
           icon: <FaUserCheck />,
         },
+        // ✅ NEW: Add Scores
+        {
+          path: "/students/add-scores",
+          label: "sidebar.addScores",
+          icon: <FaClipboardList />,
+        },
       ],
     },
     {
@@ -125,7 +132,6 @@ const Sidebar = () => {
       icon: <FaMoneyBillWave />,
       menuId: "payment",
       subItems: [
-      
         // Teacher Payroll
         {
           path: "/payment/teacher",

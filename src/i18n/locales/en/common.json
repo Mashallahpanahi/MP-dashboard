@@ -15,16 +15,17 @@
     "students": "Students",
     "studentRegister": "Register a Student",
     "allStudents": "All Students",
+    "addScores": "Add Scores",
     "books": "Books",
     "addBook": "Add a Book",
     "allBooks": "All Books",
     "classes": "Classes",
     "addClass": "Add a Class",
     "allClasses": "All Classes",
-     "payment": "Payment",
+    "payment": "Payment",
     "teacherPayment": "Teacher Payment",
     "otherExpenses": "Other Expenses",
-      "notes": "Notes",                 
+    "notes": "Notes",
     "settings": "Settings"
   }
 }

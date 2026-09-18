@@ -13,6 +13,147 @@ import { ApiError } from "./teacherApi";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+
+
+
+// ============================================
+// ADD STUDENTS SCORES
+// ============================================
+
+export interface FindStudentsForScoringParams {
+  teacherId: string;       // required
+  bookId: string;          // required
+  classId?: string;        // optional
+  time?: string;           // optional
+  fromDate?: string;       // optional
+  toDate?: string;         // optional
+}
+
+export interface StudentForScoring {
+  enrollmentId: string;
+  studentId: string;
+  studentName: string;
+  studentLastName: string;
+  studentNumber: string;
+  studentImage: string | null;
+  teacherId: string;
+  teacherName: string;
+  teacherLastName: string;
+  bookId: string;
+  bookName: string;
+  bookLevelOrder: number;
+  passingScore: number;
+  classId: string | null;
+  className: string | null;
+  classBlock: string | null;
+  time: string | null;
+  startDate: string;
+  endDate: string;
+  enrollmentStatus: string;
+  result: string;
+  midtermScore: number | null;
+  finalScore: number | null;
+  totalScore: number | null;
+  scoreId: string | null;
+}
+
+export interface FindStudentsForScoringResponse {
+  success: boolean;
+  message: string;
+  count: number;
+  filters: {
+    teacherId: string;
+    bookId: string;
+    classId: string | null;
+    time: string | null;
+    fromDate: string | null;
+    toDate: string | null;
+  };
+  data: StudentForScoring[];
+}
+
+/**
+ * Find students for scoring
+ * GET /add-students-scores/find-students
+ */
+export const findStudentsForScoring = async (
+  params: FindStudentsForScoringParams
+): Promise<FindStudentsForScoringResponse> => {
+  const query = new URLSearchParams();
+  query.append("teacherId", params.teacherId);
+  query.append("bookId", params.bookId);
+  if (params.classId) query.append("classId", params.classId);
+  if (params.time) query.append("time", params.time);
+  if (params.fromDate) query.append("fromDate", params.fromDate);
+  if (params.toDate) query.append("toDate", params.toDate);
+
+  const response = await fetch(
+    `${API_URL}/add-students-scores/find-students?${query.toString()}`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+
+  if (!response.ok) {
+    let errorMessage = `Failed to find students. Status: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      if (errorData.message) errorMessage = errorData.message;
+    } catch {
+      /* keep default */
+    }
+    throw new ApiError(errorMessage, response.status);
+  }
+
+  return response.json();
+};
+
+
+// ============================================
+// BULK UPDATE STUDENT SCORES
+// ============================================
+
+export interface BulkScoreItem {
+  studentId: string;
+  bookId: string;
+  teacherId: string;
+  midtermScore?: number | null;
+  finalScore?: number | null;
+  notes?: string;
+}
+
+export interface BulkUpdateScoresResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  count?: number;
+}
+
+/**
+ * Bulk update (or create) student scores
+ * POST /add-students-scores/bulk-update
+ */
+export const bulkUpdateStudentScores = async (
+  scores: BulkScoreItem[]
+): Promise<BulkUpdateScoresResponse> => {
+  const response = await fetch(`${API_URL}/add-students-scores/bulk-update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scores }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || result.success === false) {
+    const errorMessage =
+      result?.message || `Failed to update scores. Status: ${response.status}`;
+    throw new ApiError(errorMessage, response.status, result);
+  }
+
+  return result;
+};
+
 // ============================================
 // FILTERED STUDENTS (Advanced Filter)
 // ============================================
