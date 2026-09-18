@@ -23,6 +23,7 @@ import {
   FaWallet,
   FaReceipt,
   FaClipboardList,
+  FaPrint,
 } from "react-icons/fa";
 import { TbDatabaseHeart } from "react-icons/tb";
 
@@ -119,11 +120,17 @@ const Sidebar = () => {
           label: "sidebar.allStudents",
           icon: <FaUserCheck />,
         },
-        // ✅ NEW: Add Scores
+        // ✅ Add Scores
         {
           path: "/students/add-scores",
           label: "sidebar.addScores",
           icon: <FaClipboardList />,
+        },
+        // ✅ NEW: Print Result Card
+        {
+          path: "/students/print-result-card",
+          label: "sidebar.printResultCard",
+          icon: <FaPrint />,
         },
       ],
     },
@@ -251,7 +258,6 @@ const Sidebar = () => {
                 {!isCollapsed && isExpanded && (
                   <ul className="mt-1 ms-6 border-s-2 ps-3 space-y-1 border-blue-700/30">
                     {item.subItems.map((sub) => {
-                      // Check if label is a translation key or hardcoded
                       const isTranslationKey = sub.label.startsWith("sidebar.");
                       return (
                         <li key={sub.path}>

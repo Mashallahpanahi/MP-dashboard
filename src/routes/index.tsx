@@ -32,6 +32,8 @@ import AddScores from "@/pages/Students/AddScores";
 // Note pages
 import Notes from "@/pages/Notes/Notes";
 import SettingPage from "@/pages/settings/SettingsPage";
+import PrintResultCart from "@/pages/Students/PrintResultCard";
+import PrintResultCard from "@/pages/Students/PrintResultCard";
 
 const AppRoutes = () => (
   <BrowserRouter>
@@ -50,6 +52,7 @@ const AppRoutes = () => (
           <Route path="/students/register" element={<StudentRegister />} />
           <Route path="/students/enroll/:studentId" element={<EnrollStudent />} />
           <Route path="/students/add-scores" element={<AddScores/>} />
+          <Route path="/students/print-result-card" element={<PrintResultCard />} />
           
           {/* Class Routes */}
           <Route path="/classes/all" element={<AllClasses />} />

@@ -1,3 +1,80 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Certificate Fonts */
+@font-face {
+  font-family: "Cinzel";
+  src: url("/fonts/Cinzel-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Cinzel";
+  src: url("/fonts/Cinzel-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Great Vibes";
+  src: url("/fonts/GreatVibes-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* ============================================================
+   PRINT STYLES — Result Card (one card per page)
+   ============================================================ */
+@media print {
+  /* Hide everything */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the print area */
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+
+  /* Reset positioning */
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Hide sidebar and screen-only UI */
+  aside,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Force color printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Each card on its own page */
+  .result-card {
+    page-break-after: always;
+    break-after: page;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    box-shadow: none !important;
+  }
+
+  .result-card:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* A4 landscape with margins */
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+}
