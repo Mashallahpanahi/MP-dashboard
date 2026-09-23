@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { updateStudentScore } from "@/api/scoreApi";
 import type { StudentScore, UpdateStudentScoreData } from "@/api/scoreApi";
+// ✅ Shamsi date picker
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
 interface ScoreUpdateModalProps {
   isOpen: boolean;
@@ -29,21 +31,23 @@ const ScoreUpdateModal = ({
     notes: "",
   });
 
-  // ✅ Reset form when score changes
+  // ✅ Reset form when score changes (date kept as MILADI ISO for backend)
   useEffect(() => {
     if (score) {
-      const midterm = score.midtermScore !== null && score.midtermScore !== undefined 
-        ? parseFloat(String(score.midtermScore)) || 0 
-        : 0;
-      const final = score.finalScore !== null && score.finalScore !== undefined 
-        ? parseFloat(String(score.finalScore)) || 0 
-        : 0;
-      
+      const midterm =
+        score.midtermScore !== null && score.midtermScore !== undefined
+          ? parseFloat(String(score.midtermScore)) || 0
+          : 0;
+      const final =
+        score.finalScore !== null && score.finalScore !== undefined
+          ? parseFloat(String(score.finalScore)) || 0
+          : 0;
+
       setFormData({
         midtermScore: midterm,
         finalScore: final,
         totalScore: midterm + final,
-        date: score.date ? score.date.split('T')[0] : "",
+        date: score.date ? score.date.split("T")[0] : "",
         time: score.time || "",
         notes: score.notes || "",
       });
@@ -89,20 +93,24 @@ const ScoreUpdateModal = ({
     setSuccess("");
 
     try {
-      // Validate scores
-      if (formData.midtermScore !== undefined && (formData.midtermScore < 0 || formData.midtermScore > 100)) {
+      if (
+        formData.midtermScore !== undefined &&
+        (formData.midtermScore < 0 || formData.midtermScore > 100)
+      ) {
         setError("Midterm score must be between 0 and 50");
         setSaving(false);
         return;
       }
 
-      if (formData.finalScore !== undefined && (formData.finalScore < 0 || formData.finalScore > 100)) {
+      if (
+        formData.finalScore !== undefined &&
+        (formData.finalScore < 0 || formData.finalScore > 100)
+      ) {
         setError("Final score must be between 0 and 50");
         setSaving(false);
         return;
       }
 
-      // ✅ Prepare submit data
       const submitData: UpdateStudentScoreData = {
         midtermScore: formData.midtermScore,
         finalScore: formData.finalScore,
@@ -112,21 +120,23 @@ const ScoreUpdateModal = ({
         notes: formData.notes,
       };
 
-      console.log('📤 Updating score with data:', submitData);
+      console.log("📤 Updating score with data:", submitData);
 
       const response = await updateStudentScore(score.id, submitData);
-      
-      console.log('✅ Update response:', response);
-      
+
+      console.log("✅ Update response:", response);
+
       setSuccess("Score updated successfully!");
-      
+
       setTimeout(() => {
         if (onUpdate) onUpdate();
         onClose();
       }, 1500);
     } catch (error) {
-      console.error('❌ Failed to update score:', error);
-      setError(error instanceof Error ? error.message : "Failed to update score");
+      console.error("❌ Failed to update score:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to update score"
+      );
     } finally {
       setSaving(false);
     }
@@ -157,30 +167,58 @@ const ScoreUpdateModal = ({
             disabled={saving}
             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
-        {/* Success Message */}
         {success && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-green-700">{success}</p>
             </div>
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-red-700">{error}</p>
             </div>
@@ -190,7 +228,6 @@ const ScoreUpdateModal = ({
         <form onSubmit={handleSubmit}>
           {/* Scores Grid */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {/* Midterm Score */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Midterm Score
@@ -209,7 +246,6 @@ const ScoreUpdateModal = ({
               />
             </div>
 
-            {/* Final Score */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Final Score
@@ -228,7 +264,6 @@ const ScoreUpdateModal = ({
               />
             </div>
 
-            {/* Total Score - Read Only */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Total Score
@@ -238,7 +273,7 @@ const ScoreUpdateModal = ({
                 name="totalScore"
                 value={formData.totalScore ?? 0}
                 disabled
-                className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 cursor-not-allowed"
+                className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700"
               />
               <p className="mt-1 text-xs text-gray-400">
                 Auto-calculated: Midterm + Final
@@ -246,24 +281,21 @@ const ScoreUpdateModal = ({
             </div>
           </div>
 
-          {/* Date and Time */}
+          {/* ✅ Date and Time — Shamsi date picker */}
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* Date */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Date
               </label>
-              <input
-                type="date"
-                name="date"
+              <ShamsiDatePicker
                 value={formData.date || ""}
-                onChange={handleInputChange}
-                disabled={saving}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onChange={(miladiISO) =>
+                  setFormData((prev) => ({ ...prev, date: miladiISO }))
+                }
+                placeholder="انتخاب تاریخ"
               />
             </div>
 
-            {/* Time */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Time

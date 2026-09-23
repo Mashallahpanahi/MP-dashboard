@@ -6,6 +6,8 @@ import { getBooks, type Book } from "@/api/bookApi";
 import { getTeachers, type Teacher } from "@/api/teacherApi";
 import ScoreUpdateModal from "./ScoreUpdateModal";
 import ScoreAddModal from "./ScoreAddModal";
+// ✅ Shamsi formatter
+import { formatShamsi } from "@/utils/dateConverter";
 
 interface StudentScoresModalProps {
   isOpen: boolean;
@@ -34,7 +36,7 @@ const StudentScoresModal = ({
   // Add modal state
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // ✅ Delete state
+  // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [scoreToDelete, setScoreToDelete] = useState<StudentScore | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -47,7 +49,7 @@ const StudentScoresModal = ({
 
   const fetchScoresAndData = async () => {
     if (!studentId) return;
-    
+
     try {
       setLoading(true);
       setError("");
@@ -100,7 +102,7 @@ const StudentScoresModal = ({
     fetchScoresAndData();
   };
 
-  // ✅ Handle Delete Click - Show Confirmation
+  // Handle Delete Click
   const handleDeleteClick = (score: StudentScore) => {
     setScoreToDelete(score);
     setShowDeleteConfirm(true);
@@ -111,21 +113,20 @@ const StudentScoresModal = ({
     setShowDeleteConfirm(false);
   };
 
-  // ✅ Confirm Delete
+  // Confirm Delete
   const handleConfirmDelete = async () => {
     if (!scoreToDelete) return;
 
     try {
       setDeletingId(scoreToDelete.id);
       await deleteStudentScore(scoreToDelete.id);
-      
+
       setSuccess("Score deleted successfully!");
       setShowDeleteConfirm(false);
       setScoreToDelete(null);
-      
-      // Refresh scores list
+
       await fetchScoresAndData();
-      
+
       setTimeout(() => setSuccess(""), 3000);
     } catch (error) {
       console.error("Failed to delete score:", error);
@@ -140,40 +141,37 @@ const StudentScoresModal = ({
   };
 
   const getBookName = (bookId: string) => {
-    const book = books.find(b => b.id === bookId);
-    return book ? book.name : 'N/A';
+    const book = books.find((b) => b.id === bookId);
+    return book ? book.name : "N/A";
   };
 
   const getTeacherName = (teacherId: string) => {
-    const teacher = teachers.find(t => t.id === teacherId);
-    return teacher ? `${teacher.firstName} ${teacher.lastName}` : 'N/A';
+    const teacher = teachers.find((t) => t.id === teacherId);
+    return teacher ? `${teacher.firstName} ${teacher.lastName}` : "N/A";
   };
 
   const formatNumber = (value: any): string => {
-    if (value === null || value === undefined || value === '') return '0.00';
-    const num = typeof value === 'number' ? value : parseFloat(value);
-    if (isNaN(num)) return '0.00';
+    if (value === null || value === undefined || value === "") return "0.00";
+    const num = typeof value === "number" ? value : parseFloat(value);
+    if (isNaN(num)) return "0.00";
     return num.toFixed(2);
   };
 
+  // ✅ Shamsi date — replaces toLocaleDateString
   const formatDate = (date: string) => {
-    if (!date) return 'N/A';
+    if (!date) return "N/A";
     try {
-      return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
+      return formatShamsi(date, "YYYY/MM/DD");
     } catch {
-      return 'Invalid date';
+      return "Invalid date";
     }
   };
 
   const getScoreColor = (score: number): string => {
-    if (score >= 80) return 'text-green-600 font-bold';
-    if (score >= 60) return 'text-blue-600 font-bold';
-    if (score >= 40) return 'text-yellow-600 font-bold';
-    return 'text-red-600 font-bold';
+    if (score >= 80) return "text-green-600 font-bold";
+    if (score >= 60) return "text-blue-600 font-bold";
+    if (score >= 40) return "text-yellow-600 font-bold";
+    return "text-red-600 font-bold";
   };
 
   if (!isOpen) return null;
@@ -202,8 +200,18 @@ const StudentScoresModal = ({
               onClick={onClose}
               className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -214,8 +222,18 @@ const StudentScoresModal = ({
               onClick={handleAddClick}
               className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <svg
+                className="mr-2 h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               Add Score
             </button>
@@ -225,26 +243,46 @@ const StudentScoresModal = ({
               disabled={loading}
               className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <svg
+                className="mr-2 h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
               Refresh
             </button>
           </div>
 
-          {/* Success Message */}
+          {/* Success */}
           {success && (
             <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
               <div className="flex items-start gap-2">
-                <svg className="mt-0.5 h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="mt-0.5 h-5 w-5 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <p className="text-sm font-medium text-green-700">{success}</p>
               </div>
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Error */}
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
               <p className="text-sm font-medium text-red-700">{error}</p>
@@ -258,11 +296,13 @@ const StudentScoresModal = ({
             </div>
           )}
 
-          {/* Empty State */}
+          {/* Empty */}
           {!loading && scores.length === 0 && (
             <div className="rounded-lg bg-gray-50 p-8 text-center">
               <div className="mb-4 text-4xl">📊</div>
-              <h4 className="text-lg font-semibold text-gray-900">No Scores Yet</h4>
+              <h4 className="text-lg font-semibold text-gray-900">
+                No Scores Yet
+              </h4>
               <p className="mt-2 text-sm text-gray-500">
                 This student doesn't have any score records yet.
               </p>
@@ -270,8 +310,18 @@ const StudentScoresModal = ({
                 onClick={handleAddClick}
                 className="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
-                <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg
+                  className="mr-2 h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
                 Add First Score
               </button>
@@ -332,10 +382,15 @@ const StudentScoresModal = ({
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`text-sm ${getScoreColor(parseFloat(formatNumber(score.totalScore)))}`}>
+                          <span
+                            className={`text-sm ${getScoreColor(
+                              parseFloat(formatNumber(score.totalScore))
+                            )}`}
+                          >
                             {formatNumber(score.totalScore)}
                           </span>
                         </td>
+                        {/* ✅ Date — Shamsi */}
                         <td className="px-4 py-3">
                           <span className="text-sm text-gray-600">
                             {formatDate(score.date)}
@@ -343,21 +398,21 @@ const StudentScoresModal = ({
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {/* ✅ Edit Button */}
                             <button
                               onClick={() => handleEditClick(score)}
                               className="rounded bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100"
                             >
                               Edit
                             </button>
-                            
-                            {/* ✅ Delete Button */}
+
                             <button
                               onClick={() => handleDeleteClick(score)}
                               disabled={deletingId === score.id}
                               className="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {deletingId === score.id ? 'Deleting...' : 'Delete'}
+                              {deletingId === score.id
+                                ? "Deleting..."
+                                : "Delete"}
                             </button>
                           </div>
                         </td>
@@ -399,15 +454,24 @@ const StudentScoresModal = ({
         onSuccess={handleAddSuccess}
       />
 
-      {/* ✅ Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && scoreToDelete && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            {/* Header */}
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <svg
+                  className="h-6 w-6 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
                 </svg>
               </div>
               <div>
@@ -420,7 +484,6 @@ const StudentScoresModal = ({
               </div>
             </div>
 
-            {/* Score Details */}
             <div className="mb-6 rounded-lg bg-gray-50 p-4">
               <p className="text-sm font-medium text-gray-900">
                 {getBookName(scoreToDelete.bookId)}
@@ -429,9 +492,9 @@ const StudentScoresModal = ({
                 Teacher: {getTeacherName(scoreToDelete.teacherId)}
               </p>
               <p className="text-sm text-gray-500">
-                Score: Midterm: {formatNumber(scoreToDelete.midtermScore)} | 
-                Final: {formatNumber(scoreToDelete.finalScore)} | 
-                Total: {formatNumber(scoreToDelete.totalScore)}
+                Score: Midterm: {formatNumber(scoreToDelete.midtermScore)} |
+                Final: {formatNumber(scoreToDelete.finalScore)} | Total:{" "}
+                {formatNumber(scoreToDelete.totalScore)}
               </p>
             </div>
 
@@ -439,7 +502,6 @@ const StudentScoresModal = ({
               This action cannot be undone.
             </p>
 
-            {/* Buttons */}
             <div className="flex gap-3">
               <button
                 type="button"

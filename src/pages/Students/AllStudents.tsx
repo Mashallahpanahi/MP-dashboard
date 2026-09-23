@@ -23,8 +23,10 @@ import StudentEditModal from "@/components/students/StudentEditModal";
 import MoreFilterModal, {
   type MoreFilterValues,
 } from "@/components/students/MoreFilterModal";
-// ✅ NEW: Enrollment History modal
+// ✅ Enrollment History modal
 import EnrollmentHistoryModal from "@/components/students/EnrollmentHistoryModal";
+// ✅ Shamsi date picker
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import { useNavigate } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -65,6 +67,7 @@ const AllStudents = () => {
   const [searchNumber, setSearchNumber] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [useDateFilter, setUseDateFilter] = useState(false);
+  // ⚠️ Kept as MILADI ISO ("YYYY-MM-DD") for the backend
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -103,7 +106,7 @@ const AllStudents = () => {
     null
   );
 
-  // ✅ NEW: History state
+  // History state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [studentForHistory, setStudentForHistory] = useState<Student | null>(
     null
@@ -113,9 +116,6 @@ const AllStudents = () => {
   // DATA FETCHING
   // ============================================
 
-  /**
-   * Fetch paginated students (default view)
-   */
   const fetchPaginatedStudents = useCallback(
     async (page: number = 1, limit: number = pageSize) => {
       try {
@@ -149,9 +149,6 @@ const AllStudents = () => {
     [pageSize, useDateFilter, fromDate, toDate]
   );
 
-  /**
-   * Fetch all unenrolled students
-   */
   const fetchUnenrolledStudents = useCallback(async () => {
     try {
       setLoading(true);
@@ -182,9 +179,6 @@ const AllStudents = () => {
     }
   }, [useDateFilter, fromDate, toDate]);
 
-  /**
-   * Search students by name (fuzzy search)
-   */
   const handleSearchByName = useCallback(async (name: string) => {
     try {
       setLoading(true);
@@ -216,9 +210,6 @@ const AllStudents = () => {
     }
   }, []);
 
-  /**
-   * Search student by student number
-   */
   const handleSearchByNumber = useCallback(async (studentNumber: string) => {
     try {
       setLoading(true);
@@ -252,9 +243,6 @@ const AllStudents = () => {
     }
   }, []);
 
-  /**
-   * Apply advanced filters (teacher, book, time, date range)
-   */
   const handleApplyMoreFilters = useCallback(
     async (filters: MoreFilterValues) => {
       try {
@@ -267,7 +255,6 @@ const AllStudents = () => {
 
         if (response.success) {
           setFilteredStudents(response.data);
-          // Also set students array (extract student from each) for modals
           setStudents(response.data.map((item) => item.student));
           setTotalCount(response.count);
           setTotalPages(1);
@@ -286,9 +273,6 @@ const AllStudents = () => {
     []
   );
 
-  /**
-   * Main search handler
-   */
   const handleSearch = useCallback(async () => {
     const trimmedInput = searchInput.trim();
 
@@ -310,7 +294,6 @@ const AllStudents = () => {
     fetchPaginatedStudents,
   ]);
 
-  // Initial fetch
   useEffect(() => {
     fetchPaginatedStudents(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -375,7 +358,6 @@ const AllStudents = () => {
     setShowMoreFilter(false);
   };
 
-  // Check if any advanced filters are active
   const hasActiveMoreFilters =
     moreFilters.teacherId ||
     moreFilters.bookId ||
@@ -503,7 +485,6 @@ const AllStudents = () => {
     setStudentForScores(null);
   };
 
-  // ✅ NEW: History handlers
   const handleViewHistory = (student: Student) => {
     setStudentForHistory(student);
     setShowHistoryModal(true);
@@ -747,28 +728,36 @@ const AllStudents = () => {
 
             {useDateFilter && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                {/* ✅ From — Shamsi picker */}
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-500">
                     From:
                   </label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
+                  <div className="w-32">
+                    <ShamsiDatePicker
+                      value={fromDate}
+                      onChange={setFromDate}
+                      placeholder="1403/07/02"
+                      compact
+                    />
+                  </div>
                 </div>
+
+                {/* ✅ To — Shamsi picker */}
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-500">
                     To:
                   </label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
+                  <div className="w-32">
+                    <ShamsiDatePicker
+                      value={toDate}
+                      onChange={setToDate}
+                      placeholder="1403/12/29"
+                      compact
+                    />
+                  </div>
                 </div>
+
                 <button
                   onClick={handleApplyDateFilter}
                   disabled={loading}
@@ -1014,7 +1003,6 @@ const AllStudents = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {students.map((student) => {
-                  // Find matching filtered enrollment data
                   const filteredItem =
                     viewMode === "filtered"
                       ? filteredStudents.find(
@@ -1091,7 +1079,6 @@ const AllStudents = () => {
                         </span>
                       </td>
 
-                      {/* Show matched enrollments when filtered */}
                       {viewMode === "filtered" && (
                         <td className="px-6 py-4">
                           {(() => {
@@ -1158,7 +1145,6 @@ const AllStudents = () => {
                           >
                             Scores
                           </button>
-                          {/* ✅ NEW: History Button */}
                           <button
                             onClick={() => handleViewHistory(student)}
                             className="inline-flex items-center rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
@@ -1231,16 +1217,12 @@ const AllStudents = () => {
         onClose={handleCloseScores}
       />
 
-      {/* ✅ NEW: Enrollment History Modal */}
       <EnrollmentHistoryModal
         isOpen={showHistoryModal}
         student={studentForHistory}
         onClose={handleCloseHistory}
       />
 
-      {/* ============================================ */}
-      {/* MORE FILTER MODAL */}
-      {/* ============================================ */}
       <MoreFilterModal
         isOpen={showMoreFilter}
         onClose={handleCloseMoreFilter}

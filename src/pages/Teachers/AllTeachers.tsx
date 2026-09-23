@@ -1,7 +1,7 @@
 // src/pages/Teachers/AllTeachers.tsx
 import { useEffect, useState } from "react";
 import {
-  getActiveTeachers,  // ✅ Changed from getTeachers to getActiveTeachers
+  getActiveTeachers,
   deleteTeacher,
   getTeacherById,
   updateTeacher,
@@ -11,6 +11,8 @@ import {
 import type { Teacher } from "@/types/teacher";
 import TeacherUpdateModal from "@/components/teachers/TeacherUpdateModal";
 import TeacherDeleteModal from "@/components/teachers/TeacherDeleteModal";
+// ✅ Shamsi formatter
+import { formatShamsi } from "@/utils/dateConverter";
 
 const AllTeachers = () => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -35,7 +37,6 @@ const AllTeachers = () => {
       setLoading(true);
       setError("");
 
-      // ✅ Using getActiveTeachers instead of getTeachers
       const data = await getActiveTeachers();
 
       setTeachers(data);
@@ -61,20 +62,22 @@ const AllTeachers = () => {
     const newStatus = !teacher.isActive;
     const action = newStatus ? "activate" : "deactivate";
 
-    if (!confirm(`Are you sure you want to ${action} ${teacher.firstName} ${teacher.lastName}?`)) {
+    if (
+      !confirm(
+        `Are you sure you want to ${action} ${teacher.firstName} ${teacher.lastName}?`
+      )
+    ) {
       return;
     }
 
     try {
       setStatusLoading(teacher.id);
-      
+
       await updateTeacherStatus(teacher.id, { isActive: newStatus });
 
-      // If deactivated, remove from list (since we only show active teachers)
       if (!newStatus) {
         setTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
       } else {
-        // If activated, update the teacher in the list
         setTeachers((prev) =>
           prev.map((t) =>
             t.id === teacher.id ? { ...t, isActive: newStatus } : t
@@ -82,7 +85,6 @@ const AllTeachers = () => {
         );
       }
 
-      // Show success message
       const statusText = newStatus ? "activated" : "deactivated";
       alert(`Teacher ${statusText} successfully!`);
     } catch (error) {
@@ -235,7 +237,8 @@ const AllTeachers = () => {
           </h3>
 
           <p className="mt-2 text-sm text-gray-500">
-            There are no active teachers currently. Register a new teacher or activate an existing one.
+            There are no active teachers currently. Register a new teacher or
+            activate an existing one.
           </p>
         </div>
       )}
@@ -323,7 +326,7 @@ const AllTeachers = () => {
                       {/* Salary */}
                       <td className="px-6 py-4">
                         <p className="font-semibold text-gray-900">
-                          {teacher.salaryType === "Fixed" 
+                          {teacher.salaryType === "Fixed"
                             ? teacher.salaryAmount.toLocaleString()
                             : teacher.feePercentage + "%"}
                         </p>
@@ -340,9 +343,9 @@ const AllTeachers = () => {
                         </span>
                       </td>
 
-                      {/* Hire Date */}
+                      {/* ✅ Hire Date — Shamsi */}
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                        {new Date(teacher.hireDate).toLocaleDateString()}
+                        {formatShamsi(teacher.hireDate, "YYYY/MM/DD")}
                       </td>
 
                       {/* Status */}
@@ -497,7 +500,7 @@ const AllTeachers = () => {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-gray-800">
-                      {teacher.salaryType === "Fixed" 
+                      {teacher.salaryType === "Fixed"
                         ? teacher.salaryAmount.toLocaleString()
                         : teacher.feePercentage + "%"}
                     </p>
@@ -523,13 +526,14 @@ const AllTeachers = () => {
                     </p>
                   </div>
 
+                  {/* ✅ Hire Date — Shamsi */}
                   <div>
                     <p className="text-xs font-medium uppercase text-gray-400">
                       Hire Date
                     </p>
 
                     <p className="mt-1 text-sm text-gray-800">
-                      {new Date(teacher.hireDate).toLocaleDateString()}
+                      {formatShamsi(teacher.hireDate, "YYYY/MM/DD")}
                     </p>
                   </div>
                 </div>

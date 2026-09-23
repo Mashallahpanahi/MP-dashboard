@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import type { Teacher } from "@/types/teacher";
 import type { UpdateTeacherData, ApiError } from "@/api/teacherApi";
+// ✅ Shamsi date picker
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
 interface TeacherUpdateModalProps {
   isOpen: boolean;
@@ -72,6 +74,11 @@ const TeacherUpdateModal = ({
     }
   };
 
+  // ✅ Special handler for Shamsi hire-date picker
+  const handleHireDateChange = (miladiISO: string) => {
+    setFormData((prev) => ({ ...prev, hireDate: miladiISO }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -85,12 +92,14 @@ const TeacherUpdateModal = ({
       // Prepare the data for submission
       const submitData: Partial<UpdateTeacherData> = {
         ...formData,
-        salaryAmount: formData.salaryAmount !== undefined
-          ? Number(formData.salaryAmount)
-          : undefined,
-        feePercentage: formData.feePercentage !== undefined
-          ? Number(formData.feePercentage)
-          : undefined,
+        salaryAmount:
+          formData.salaryAmount !== undefined
+            ? Number(formData.salaryAmount)
+            : undefined,
+        feePercentage:
+          formData.feePercentage !== undefined
+            ? Number(formData.feePercentage)
+            : undefined,
       };
 
       // If salary type is Fixed, set feePercentage to 0
@@ -122,7 +131,7 @@ const TeacherUpdateModal = ({
       }, 1500);
     } catch (error) {
       console.error("Failed to update teacher:", error);
-      
+
       // Handle ApiError with better messages
       if (error instanceof ApiError) {
         setError(error.message);
@@ -212,7 +221,8 @@ const TeacherUpdateModal = ({
               </svg>
               <div>
                 <p className="text-sm font-medium text-red-700">{error}</p>
-                {(error.includes("phone number") || error.includes("email address")) && (
+                {(error.includes("phone number") ||
+                  error.includes("email address")) && (
                   <p className="mt-1 text-sm text-red-600">
                     Please check the phone number and email address you entered.
                   </p>
@@ -347,24 +357,16 @@ const TeacherUpdateModal = ({
                 </p>
               </div>
 
-              {/* Hire Date */}
+              {/* ✅ Hire Date — Shamsi picker */}
               <div>
-                <label
-                  htmlFor="update-hireDate"
-                  className="mb-1.5 block text-sm font-medium text-gray-700"
-                >
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Hire Date <span className="text-red-500">*</span>
                 </label>
 
-                <input
-                  id="update-hireDate"
-                  name="hireDate"
-                  type="date"
+                <ShamsiDatePicker
                   value={formData.hireDate || ""}
-                  onChange={handleChange}
-                  required
-                  disabled={isLoading || isSubmitting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  onChange={handleHireDateChange}
+                  placeholder="انتخاب تاریخ استخدام"
                 />
               </div>
 
@@ -424,11 +426,12 @@ const TeacherUpdateModal = ({
                   <option value="PerStudent">Per Student</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  Select "Fixed" for monthly salary or "Per Student" for percentage-based
+                  Select "Fixed" for monthly salary or "Per Student" for
+                  percentage-based
                 </p>
               </div>
 
-              {/* ✅ Show Salary Amount only if Fixed is selected */}
+              {/* Salary Amount — Fixed */}
               {currentSalaryType === "Fixed" && (
                 <div>
                   <label
@@ -457,7 +460,7 @@ const TeacherUpdateModal = ({
                 </div>
               )}
 
-              {/* ✅ Show Fee Percentage only if PerStudent is selected */}
+              {/* Fee Percentage — PerStudent */}
               {currentSalaryType === "PerStudent" && (
                 <div>
                   <label
@@ -487,10 +490,9 @@ const TeacherUpdateModal = ({
                 </div>
               )}
 
-              {/* Info message when no salary type selected */}
               {!currentSalaryType && (
                 <div className="col-span-2">
-                  <p className="text-sm text-gray-500 italic">
+                  <p className="text-sm italic text-gray-500">
                     Please select a salary type to configure salary details
                   </p>
                 </div>

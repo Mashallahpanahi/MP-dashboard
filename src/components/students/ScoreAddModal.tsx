@@ -5,6 +5,9 @@ import type { CreateStudentScoreData } from "@/api/scoreApi";
 import { getBooks, type Book } from "@/api/bookApi";
 import { getTeachers, type Teacher } from "@/api/teacherApi";
 import { getEnrollmentsByStudent } from "@/api/studentEnrollmentApi";
+// ✅ Shamsi date picker + miladi helper
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+import { formatMiladiISO } from "@/utils/dateConverter";
 
 interface ScoreAddModalProps {
   isOpen: boolean;
@@ -22,7 +25,7 @@ interface EnrolledBook {
   teacherName: string;
   status: string;
   startDate: string;
-  time: string; // ✅ Added time from enrollment
+  time: string;
   hasScore: boolean;
 }
 
@@ -59,7 +62,8 @@ const ScoreAddModal = ({
     midtermScore: undefined,
     finalScore: undefined,
     totalScore: 0,
-    date: new Date().toISOString().split('T')[0],
+    // ✅ Miladi ISO for the backend
+    date: formatMiladiISO(new Date()),
     time: "",
     notes: "",
   });
@@ -72,22 +76,26 @@ const ScoreAddModal = ({
 
   const fetchData = async () => {
     if (!studentId) return;
-    
+
     try {
       setLoadingData(true);
       setError("");
 
-      const [enrollmentsResponse, booksData, teachersData, scoresData] = await Promise.all([
-        getEnrollmentsByStudent(studentId).catch(() => []),
-        getBooks().catch(() => []),
-        getTeachers().catch(() => []),
-        getScoresByStudent(studentId).catch(() => []),
-      ]);
+      const [enrollmentsResponse, booksData, teachersData, scoresData] =
+        await Promise.all([
+          getEnrollmentsByStudent(studentId).catch(() => []),
+          getBooks().catch(() => []),
+          getTeachers().catch(() => []),
+          getScoresByStudent(studentId).catch(() => []),
+        ]);
 
       let enrollmentsData: any[] = [];
       if (Array.isArray(enrollmentsResponse)) {
         enrollmentsData = enrollmentsResponse;
-      } else if (enrollmentsResponse && typeof enrollmentsResponse === 'object') {
+      } else if (
+        enrollmentsResponse &&
+        typeof enrollmentsResponse === "object"
+      ) {
         if (Array.isArray((enrollmentsResponse as any).data)) {
           enrollmentsData = (enrollmentsResponse as any).data;
         }
@@ -96,7 +104,7 @@ const ScoreAddModal = ({
       let scoresArray: any[] = [];
       if (Array.isArray(scoresData)) {
         scoresArray = scoresData;
-      } else if (scoresData && typeof scoresData === 'object') {
+      } else if (scoresData && typeof scoresData === "object") {
         if (Array.isArray((scoresData as any).data)) {
           scoresArray = (scoresData as any).data;
         }
@@ -106,28 +114,31 @@ const ScoreAddModal = ({
       const teachersArray = Array.isArray(teachersData) ? teachersData : [];
 
       const bookMap: Record<string, Book> = {};
-      booksArray.forEach((b: Book) => { bookMap[b.id] = b; });
-      
+      booksArray.forEach((b: Book) => {
+        bookMap[b.id] = b;
+      });
+
       const teacherMap: Record<string, Teacher> = {};
-      teachersArray.forEach((t: Teacher) => { teacherMap[t.id] = t; });
+      teachersArray.forEach((t: Teacher) => {
+        teacherMap[t.id] = t;
+      });
 
       const enrolled: EnrolledBook[] = [];
-      
+
       enrollmentsData.forEach((item: any) => {
         const enrollment = item.enrollment || item;
         if (!enrollment || !enrollment.id) return;
-        
+
         const book = bookMap[enrollment.bookId];
         const teacher = teacherMap[enrollment.teacherId];
-        
+
         if (!book) return;
-        
+
         const hasScore = scoresArray.some(
           (s: any) => s.bookId === enrollment.bookId
         );
-        
-        // ✅ Debug log to see what's in the enrollment
-        console.log('📋 Enrollment data:', {
+
+        console.log("📋 Enrollment data:", {
           id: enrollment.id,
           bookId: enrollment.bookId,
           teacherId: enrollment.teacherId,
@@ -136,32 +147,32 @@ const ScoreAddModal = ({
           schedule: enrollment.schedule,
           allFields: Object.keys(enrollment),
         });
-        
-        // ✅ Extract time from enrollment - try different field names
-        const enrollmentTime = 
-          enrollment.timetable || 
-          enrollment.time || 
-          enrollment.schedule || 
+
+        const enrollmentTime =
+          enrollment.timetable ||
+          enrollment.time ||
+          enrollment.schedule ||
           enrollment.classTime ||
-          '';
-        
+          "";
+
         enrolled.push({
           enrollmentId: enrollment.id,
           bookId: enrollment.bookId,
           bookName: book.name,
           teacherId: enrollment.teacherId,
-          teacherName: teacher 
-            ? `${teacher.firstName} ${teacher.lastName}` 
-            : 'Unknown Teacher',
-          status: enrollment.status || 'Studying',
+          teacherName: teacher
+            ? `${teacher.firstName} ${teacher.lastName}`
+            : "Unknown Teacher",
+          status: enrollment.status || "Studying",
           startDate: enrollment.startDate || new Date().toISOString(),
           time: enrollmentTime,
           hasScore,
         });
       });
 
-      enrolled.sort((a, b) => 
-        new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      enrolled.sort(
+        (a, b) =>
+          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
       );
 
       setEnrolledBooks(enrolled);
@@ -169,21 +180,23 @@ const ScoreAddModal = ({
       setTeachers(teachersArray);
       setExistingScores(scoresArray);
 
-      const available = enrolled.filter(e => !e.hasScore);
+      const available = enrolled.filter((e) => !e.hasScore);
       setAvailableBooks(available);
 
-      // ✅ Auto-select the most recent enrolled book and auto-fill time
       if (available.length > 0) {
         const latestEnrollment = available[0];
         setFormData((prev) => ({
           ...prev,
           bookId: latestEnrollment.bookId,
           teacherId: latestEnrollment.teacherId,
-          date: new Date().toISOString().split('T')[0],
-          time: latestEnrollment.time || "", // ✅ Auto-fill time from enrollment
+          date: formatMiladiISO(new Date()),
+          time: latestEnrollment.time || "",
         }));
-        
-        console.log('✅ Auto-filled time from enrollment:', latestEnrollment.time);
+
+        console.log(
+          "✅ Auto-filled time from enrollment:",
+          latestEnrollment.time
+        );
       }
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -193,16 +206,15 @@ const ScoreAddModal = ({
     }
   };
 
-  // ✅ Handle book selection - auto-fill teacher and time from enrollment
   const handleBookChange = (bookId: string) => {
-    const selected = enrolledBooks.find(eb => eb.bookId === bookId);
-    
+    const selected = enrolledBooks.find((eb) => eb.bookId === bookId);
+
     if (selected) {
       setFormData((prev) => ({
         ...prev,
         bookId,
         teacherId: selected.teacherId,
-        time: selected.time || "", // ✅ Auto-fill time from selected enrollment
+        time: selected.time || "",
         midtermScore: undefined,
         finalScore: undefined,
         totalScore: 0,
@@ -211,7 +223,9 @@ const ScoreAddModal = ({
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) => {
     const { name, value, type } = e.target;
 
@@ -256,7 +270,9 @@ const ScoreAddModal = ({
         return;
       }
 
-      const isEnrolled = enrolledBooks.some(eb => eb.bookId === formData.bookId);
+      const isEnrolled = enrolledBooks.some(
+        (eb) => eb.bookId === formData.bookId
+      );
       if (!isEnrolled) {
         setError("Please select a book that this student is enrolled in");
         setSaving(false);
@@ -267,7 +283,9 @@ const ScoreAddModal = ({
         (s: any) => s.bookId === formData.bookId
       );
       if (alreadyHasScore) {
-        setError("This book already has a score record. Please use Edit instead.");
+        setError(
+          "This book already has a score record. Please use Edit instead."
+        );
         setSaving(false);
         return;
       }
@@ -278,9 +296,12 @@ const ScoreAddModal = ({
         return;
       }
 
-      const hasMidterm = formData.midtermScore !== undefined && formData.midtermScore !== null;
-      const hasFinal = formData.finalScore !== undefined && formData.finalScore !== null;
-      
+      const hasMidterm =
+        formData.midtermScore !== undefined &&
+        formData.midtermScore !== null;
+      const hasFinal =
+        formData.finalScore !== undefined && formData.finalScore !== null;
+
       if (!hasMidterm && !hasFinal) {
         setError("Please enter at least a midterm or final score");
         setSaving(false);
@@ -292,6 +313,7 @@ const ScoreAddModal = ({
         bookId: formData.bookId,
         teacherId: formData.teacherId,
         totalScore: formData.totalScore,
+        // ✅ formData.date is already Miladi ISO
         date: formData.date,
         time: formData.time,
         notes: formData.notes,
@@ -305,18 +327,18 @@ const ScoreAddModal = ({
         submitData.finalScore = formData.finalScore;
       }
 
-      console.log('📤 Creating score with data:', submitData);
+      console.log("📤 Creating score with data:", submitData);
 
       await createStudentScore(submitData);
-      
+
       setSuccess("Score added successfully!");
-      
+
       setTimeout(() => {
         if (onSuccess) onSuccess();
         onClose();
       }, 1500);
     } catch (error) {
-      console.error('❌ Failed to add score:', error);
+      console.error("❌ Failed to add score:", error);
       setError(error instanceof Error ? error.message : "Failed to add score");
     } finally {
       setSaving(false);
@@ -350,8 +372,18 @@ const ScoreAddModal = ({
             disabled={saving}
             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -359,8 +391,18 @@ const ScoreAddModal = ({
         {success && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-green-700">{success}</p>
             </div>
@@ -370,8 +412,18 @@ const ScoreAddModal = ({
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-red-700">{error}</p>
             </div>
@@ -389,7 +441,8 @@ const ScoreAddModal = ({
               No Enrollments Found
             </h4>
             <p className="mt-2 text-sm text-yellow-700">
-              This student is not enrolled in any courses yet. Please enroll the student in a course first before adding scores.
+              This student is not enrolled in any courses yet. Please enroll
+              the student in a course first before adding scores.
             </p>
             <button
               onClick={handleClose}
@@ -405,7 +458,8 @@ const ScoreAddModal = ({
               All Books Already Have Scores
             </h4>
             <p className="mt-2 text-sm text-orange-700">
-              This student already has scores for all enrolled books. Use the Edit button to modify existing scores.
+              This student already has scores for all enrolled books. Use the
+              Edit button to modify existing scores.
             </p>
             <button
               onClick={handleClose}
@@ -419,16 +473,17 @@ const ScoreAddModal = ({
             {/* Info Banner */}
             <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3">
               <p className="text-sm text-blue-800">
-                <span className="font-medium">ℹ️ Note:</span> You can only add scores for books this student is enrolled in.
+                <span className="font-medium">ℹ️ Note:</span> You can only add
+                scores for books this student is enrolled in.
               </p>
             </div>
 
-            {/* Book Selection with Better Styling */}
+            {/* Book Selection */}
             <div className="mb-5">
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Select Book <span className="text-red-500">*</span>
               </label>
-              
+
               <div className="space-y-2">
                 {availableBooks.map((eb) => (
                   <button
@@ -444,44 +499,80 @@ const ScoreAddModal = ({
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 space-y-2">
-                        {/* Book Badge */}
                         <div className="flex items-center gap-2">
                           <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-800">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                              />
                             </svg>
                             Book: {eb.bookName}
                           </span>
                         </div>
-                        
-                        {/* Teacher Badge */}
+
                         <div className="flex items-center gap-2">
                           <span className="inline-flex items-center gap-1.5 rounded-lg bg-purple-100 px-3 py-1.5 text-sm font-semibold text-purple-800">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                              />
                             </svg>
                             Teacher: {eb.teacherName}
                           </span>
                         </div>
 
-                        {/* ✅ Time Badge (if available) */}
                         {eb.time && (
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1.5 rounded-lg bg-green-100 px-3 py-1.5 text-sm font-medium text-green-800">
-                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
                               </svg>
                               Time: {eb.time}
                             </span>
                           </div>
                         )}
                       </div>
-                      
-                      {/* Selected Checkmark */}
+
                       {formData.bookId === eb.bookId && (
                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500">
-                          <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          <svg
+                            className="h-4 w-4 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         </div>
                       )}
@@ -489,7 +580,7 @@ const ScoreAddModal = ({
                   </button>
                 ))}
               </div>
-              
+
               <p className="mt-2 text-xs text-gray-500">
                 {availableBooks.length} book(s) available for scoring
               </p>
@@ -540,31 +631,28 @@ const ScoreAddModal = ({
                   name="totalScore"
                   value={formData.totalScore ?? 0}
                   disabled
-                  className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 cursor-not-allowed"
+                  className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700"
                 />
-                <p className="mt-1 text-xs text-gray-400">
-                  Auto-calculated
-                </p>
+                <p className="mt-1 text-xs text-gray-400">Auto-calculated</p>
               </div>
             </div>
 
-            {/* Date and Time */}
+            {/* ✅ Date and Time */}
             <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {/* Date — Shamsi picker */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Date
                 </label>
-                <input
-                  type="date"
-                  name="date"
+                <ShamsiDatePicker
                   value={formData.date}
-                  onChange={handleInputChange}
-                  disabled={saving}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  onChange={(miladiISO) =>
+                    setFormData((prev) => ({ ...prev, date: miladiISO }))
+                  }
+                  placeholder="انتخاب تاریخ"
                 />
               </div>
 
-              {/* ✅ Time - Auto-filled from enrollment */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Time

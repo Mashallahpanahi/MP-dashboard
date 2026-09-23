@@ -18,8 +18,15 @@ import type {
 } from "@/types/teacherPayroll";
 import {  
   TeacherPayrollCreateModal,
-  TeacherPayrollHistoryModal  // ✅ Add this
+  TeacherPayrollHistoryModal
 } from "@/components/teacher-payroll";
+// ✅ Shamsi helpers
+import {
+  formatShamsi,
+  formatMiladiISO,
+  convertToShamsi,
+  SHAMSI_MONTHS,
+} from "@/utils/dateConverter";
 
 const TeacherPayrollPage = () => {
   const [payrolls, setPayrolls] = useState<TeacherPayroll[]>([]);
@@ -47,13 +54,13 @@ const TeacherPayrollPage = () => {
   const [payrollToAddPayment, setPayrollToAddPayment] = useState<TeacherPayroll | null>(null);
   const [addPaymentLoading, setAddPaymentLoading] = useState(false);
 
-  // ✅ History state
+  // History state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Pre-fill data for create modal when paying from unpaid record
+  // Pre-fill data for create modal
   const [prefillData, setPrefillData] = useState<CreateTeacherPayrollData | null>(null);
 
   const fetchPayrolls = async () => {
@@ -158,7 +165,9 @@ const TeacherPayrollPage = () => {
     setShowCreateModal(true);
   };
 
-  // Handle paying salary for a specific unpaid record
+  // ✅ Handle paying salary for a specific unpaid record
+  //    - Converts the Miladi "month/year" of the unpaid record to Miladi number for the prefill.
+  //    - The display in the create modal will show Shamsi automatically.
   const handlePayForMonth = (record: UnpaidSalaryRecord) => {
     const monthNames = [
       "January", "February", "March", "April", "May", "June",
@@ -185,7 +194,7 @@ const TeacherPayrollPage = () => {
       baseSalary: baseSalary,
       paidAmount: baseSalary,
       remainingSalary: 0,
-      date: new Date().toISOString().split('T')[0],
+      date: formatMiladiISO(new Date()),
       status: 'Completed',
       notes: `Salary for ${record.month} ${record.year}`,
     });
@@ -243,7 +252,7 @@ const TeacherPayrollPage = () => {
     setPayrollToAddPayment(null);
   };
 
-  // ✅ History handlers
+  // History handlers
   const handleHistoryClick = () => {
     setShowHistoryModal(true);
   };
@@ -266,16 +275,32 @@ const TeacherPayrollPage = () => {
     return isNaN(num) ? 0 : num;
   };
 
+  // ✅ Shamsi date
   const formatDate = (date: string) => {
     if (!date) return 'N/A';
     try {
-      return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
+      return formatShamsi(date, "YYYY/MM/DD");
     } catch {
       return 'Invalid date';
+    }
+  };
+
+  // ✅ NEW: Convert a Miladi month/year to Shamsi month name + year
+  //    Used to display the "Month" column in the table in Shamsi.
+  const formatUnpaidMonth = (monthName: string, year: number): string => {
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthNumber = monthNames.indexOf(monthName) + 1;
+    if (!monthNumber) return `${monthName} ${year}`;
+
+    try {
+      const miladiMid = `${year}-${String(monthNumber).padStart(2, "0")}-15`;
+      const sh = convertToShamsi(miladiMid);
+      return `${SHAMSI_MONTHS[sh.month - 1]} ${sh.year}`;
+    } catch {
+      return `${monthName} ${year}`;
     }
   };
 
@@ -312,7 +337,6 @@ const TeacherPayrollPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* ✅ See History of Payment button */}
           <button
             onClick={handleHistoryClick}
             className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
@@ -322,7 +346,6 @@ const TeacherPayrollPage = () => {
             </svg>
             See History of Payment
           </button>
-          {/* Refresh button */}
           <button
             onClick={fetchUnpaidSalaries}
             disabled={loadingUnpaid}
@@ -395,7 +418,6 @@ const TeacherPayrollPage = () => {
                     key={`${record.teacherId}-${record.monthKey}-${index}`}
                     className="transition hover:bg-gray-50"
                   >
-                    {/* Teacher Name */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
@@ -415,14 +437,13 @@ const TeacherPayrollPage = () => {
                       </div>
                     </td>
 
-                    {/* Month */}
+                    {/* ✅ Month — now Shamsi */}
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
-                        {record.month} {record.year}
+                        {formatUnpaidMonth(record.month, record.year)}
                       </span>
                     </td>
 
-                    {/* Action */}
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handlePayForMonth(record)}
@@ -450,7 +471,8 @@ const TeacherPayrollPage = () => {
         isLoading={createLoading}
         prefillData={prefillData}
       />
-      {/* ✅ History Modal */}
+
+      {/* History Modal */}
       <TeacherPayrollHistoryModal
         isOpen={showHistoryModal}
         onClose={handleCloseHistory}

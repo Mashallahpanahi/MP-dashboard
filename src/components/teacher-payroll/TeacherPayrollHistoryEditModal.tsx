@@ -1,7 +1,14 @@
 // src/components/teacher-payroll/TeacherPayrollHistoryEditModal.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { updateTeacherPayroll } from "@/api/teacherPayrollApi";
 import type { TeacherPayroll, UpdateTeacherPayrollData } from "@/types/teacherPayroll";
+// ✅ Shamsi date picker + helpers
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+import {
+  convertToShamsi,
+  convertToMillady,
+  SHAMSI_MONTHS,
+} from "@/utils/dateConverter";
 
 interface TeacherPayrollHistoryEditModalProps {
   isOpen: boolean;
@@ -9,21 +16,6 @@ interface TeacherPayrollHistoryEditModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-const MONTHS = [
-  { value: 1, label: "January" },
-  { value: 2, label: "February" },
-  { value: 3, label: "March" },
-  { value: 4, label: "April" },
-  { value: 5, label: "May" },
-  { value: 6, label: "June" },
-  { value: 7, label: "July" },
-  { value: 8, label: "August" },
-  { value: 9, label: "September" },
-  { value: 10, label: "October" },
-  { value: 11, label: "November" },
-  { value: 12, label: "December" },
-];
 
 const TeacherPayrollHistoryEditModal = ({
   isOpen,
@@ -36,20 +28,24 @@ const TeacherPayrollHistoryEditModal = ({
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ Safe number conversion
+  // ✅ Shamsi month/year picked by the user (independent from Miladi stored values)
+  const [shamsiMonth, setShamsiMonth] = useState<number>(1);
+  const [shamsiYear, setShamsiYear] = useState<number>(1404);
+
   const safeNumber = (value: number | string | null | undefined): number => {
-    if (value === null || value === undefined || value === '') return 0;
-    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (value === null || value === undefined || value === "") return 0;
+    const num = typeof value === "string" ? parseFloat(value) : value;
     return isNaN(num) ? 0 : num;
   };
 
-  // ✅ Safe currency formatter
-  const formatCurrency = (amount: number | string | null | undefined): string => {
+  const formatCurrency = (
+    amount: number | string | null | undefined
+  ): string => {
     const num = safeNumber(amount);
     return `$${num.toFixed(2)}`;
   };
 
-  // ✅ Load payroll data into form when modal opens
+  // ✅ Load payroll data into form — convert Miladi month/year to Shamsi for display
   useEffect(() => {
     if (payroll) {
       setFormData({
@@ -59,39 +55,82 @@ const TeacherPayrollHistoryEditModal = ({
         baseSalary: safeNumber(payroll.baseSalary),
         paidAmount: safeNumber(payroll.paidAmount),
         remainingSalary: safeNumber(payroll.remainingSalary),
-        date: payroll.date ? payroll.date.split('T')[0] : "",
+        date: payroll.date ? payroll.date.split("T")[0] : "",
         status: payroll.status,
         notes: payroll.notes || "",
       });
+
+      // ✅ Compute Shamsi equivalent from the stored Miladi month/year
+      try {
+        // Use 15th of the month to avoid edge-of-month rollover issues
+        const miladiMid = `${payroll.year}-${String(payroll.month).padStart(
+          2,
+          "0"
+        )}-15`;
+        const sh = convertToShamsi(miladiMid);
+        setShamsiMonth(sh.month);
+        setShamsiYear(sh.year);
+      } catch {
+        setShamsiMonth(1);
+        setShamsiYear(1404);
+      }
+
       setError("");
       setSuccess("");
     }
   }, [payroll]);
 
-  // ✅ Auto-calculate remaining salary when base or paid changes
+  // ✅ Auto-calc remaining salary
   useEffect(() => {
-    if (formData.baseSalary !== undefined && formData.paidAmount !== undefined) {
-      const remaining = safeNumber(formData.baseSalary) - safeNumber(formData.paidAmount);
+    if (
+      formData.baseSalary !== undefined &&
+      formData.paidAmount !== undefined
+    ) {
+      const remaining =
+        safeNumber(formData.baseSalary) - safeNumber(formData.paidAmount);
       setFormData((prev) => ({
         ...prev,
         remainingSalary: remaining > 0 ? remaining : 0,
-        status: remaining <= 0 ? 'Completed' : 'Not Completed',
+        status: remaining <= 0 ? "Completed" : "Not Completed",
       }));
     }
   }, [formData.baseSalary, formData.paidAmount]);
 
+  // ✅ When Shamsi month/year changes → convert to Miladi and store in formData
+  useEffect(() => {
+    try {
+      // Use 15th of the Shamsi month to avoid edge cases
+      const miladi = convertToMillady({
+        year: shamsiYear,
+        month: shamsiMonth,
+        day: 15,
+      });
+      setFormData((prev) => ({
+        ...prev,
+        month: miladi.month,
+        year: miladi.year,
+      }));
+    } catch {
+      /* ignore invalid conversion */
+    }
+  }, [shamsiMonth, shamsiYear]);
+
   if (!isOpen || !payroll) return null;
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) => {
     const { name, value, type } = e.target;
 
     setFormData((prev) => ({
       ...prev,
       [name]:
-        type === "number" || name === "baseSalary" || name === "paidAmount" || name === "month" || name === "year"
-          ? value === "" ? 0 : parseFloat(value)
+        type === "number" || name === "baseSalary" || name === "paidAmount"
+          ? value === ""
+            ? 0
+            : parseFloat(value)
           : value,
     }));
   };
@@ -104,7 +143,6 @@ const TeacherPayrollHistoryEditModal = ({
       setError("");
       setSuccess("");
 
-      // ✅ Validate
       if (!formData.baseSalary || formData.baseSalary <= 0) {
         setError("Base salary must be greater than 0");
         setIsSubmitting(false);
@@ -129,7 +167,6 @@ const TeacherPayrollHistoryEditModal = ({
         return;
       }
 
-      // ✅ Prepare data for submission
       const submitData: UpdateTeacherPayrollData = {
         baseSalary: safeNumber(formData.baseSalary),
         paidAmount: safeNumber(formData.paidAmount),
@@ -141,7 +178,7 @@ const TeacherPayrollHistoryEditModal = ({
         notes: formData.notes || "",
       };
 
-      console.log('📤 Updating payroll:', payroll.id, submitData);
+      console.log("📤 Updating payroll:", payroll.id, submitData);
 
       await updateTeacherPayroll(payroll.id, submitData);
 
@@ -167,7 +204,6 @@ const TeacherPayrollHistoryEditModal = ({
     }
   };
 
-  // Get remaining color
   const remainingNum = safeNumber(formData.remainingSalary);
 
   return (
@@ -189,30 +225,60 @@ const TeacherPayrollHistoryEditModal = ({
             disabled={isSubmitting}
             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
-        {/* Success Message */}
+        {/* Success */}
         {success && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-green-700">{success}</p>
             </div>
           </div>
         )}
 
-        {/* Error Message */}
+        {/* Error */}
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-red-700">{error}</p>
             </div>
@@ -221,24 +287,22 @@ const TeacherPayrollHistoryEditModal = ({
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {/* Month and Year */}
+            {/* ✅ Shamsi Month and Year */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Month <span className="text-red-500">*</span>
                 </label>
                 <select
-                  name="month"
-                  value={formData.month || ""}
-                  onChange={handleChange}
+                  value={shamsiMonth}
+                  onChange={(e) => setShamsiMonth(parseInt(e.target.value))}
                   required
                   disabled={isSubmitting}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="">Select month</option>
-                  {MONTHS.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
+                  {SHAMSI_MONTHS.map((label, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {label}
                     </option>
                   ))}
                 </select>
@@ -250,11 +314,12 @@ const TeacherPayrollHistoryEditModal = ({
                 </label>
                 <input
                   type="number"
-                  name="year"
-                  value={formData.year || ""}
-                  onChange={handleChange}
-                  min="2000"
-                  max="2100"
+                  value={shamsiYear}
+                  onChange={(e) =>
+                    setShamsiYear(parseInt(e.target.value) || 0)
+                  }
+                  min="1300"
+                  max="1500"
                   required
                   disabled={isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -300,7 +365,7 @@ const TeacherPayrollHistoryEditModal = ({
               </div>
             </div>
 
-            {/* Remaining Salary - Read only */}
+            {/* Remaining Salary */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Remaining Salary ($)
@@ -309,10 +374,10 @@ const TeacherPayrollHistoryEditModal = ({
                 type="number"
                 value={remainingNum}
                 disabled
-                className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold cursor-not-allowed ${
-                  remainingNum > 0 
-                    ? 'bg-orange-50 text-orange-700' 
-                    : 'bg-green-50 text-green-700'
+                className={`w-full cursor-not-allowed rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold ${
+                  remainingNum > 0
+                    ? "bg-orange-50 text-orange-700"
+                    : "bg-green-50 text-green-700"
                 }`}
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -325,13 +390,12 @@ const TeacherPayrollHistoryEditModal = ({
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Payment Date
               </label>
-              <input
-                type="date"
-                name="date"
+              <ShamsiDatePicker
                 value={formData.date || ""}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onChange={(miladiISO) =>
+                  setFormData((prev) => ({ ...prev, date: miladiISO }))
+                }
+                placeholder="انتخاب تاریخ"
               />
             </div>
 
@@ -380,9 +444,24 @@ const TeacherPayrollHistoryEditModal = ({
             >
               {isSubmitting ? (
                 <>
-                  <svg className="mr-2 inline h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <svg
+                    className="mr-2 inline h-4 w-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Saving...
                 </>

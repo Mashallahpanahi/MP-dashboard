@@ -10,6 +10,9 @@ import type { Student } from "@/types/student";
 import { getTeachers, type Teacher } from "@/api/teacherApi";
 import { getBooks, type Book } from "@/api/bookApi";
 import { getClasses, type Class } from "@/api/classApi";
+// ✅ Shamsi date picker + formatter
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+import { formatShamsi, formatMiladiISO } from "@/utils/dateConverter";
 
 interface StudentEnrollmentModalProps {
   isOpen: boolean;
@@ -76,14 +79,11 @@ const formatCurrency = (value: string | number | undefined): string => {
   return `$${num.toFixed(2)}`;
 };
 
+// ✅ Shamsi date — replaces toLocaleDateString
 const formatDate = (dateStr: string | undefined): string => {
   if (!dateStr) return "N/A";
   try {
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatShamsi(dateStr, "YYYY/MM/DD");
   } catch {
     return dateStr;
   }
@@ -104,29 +104,26 @@ const StudentEnrollmentModal = ({
   const [success, setSuccess] = useState("");
   const [successData, setSuccessData] = useState<any>(null);
 
-  // ✅ NEW: view mode toggle (form vs history)
   const [viewMode, setViewMode] = useState<"form" | "history">("form");
 
-  // ✅ NEW: history state
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyData, setHistoryData] =
     useState<EnrollmentHistoryResponse | null>(null);
 
-  // Data for dropdowns
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Helper function to get date one month later
+  // ✅ Helper: date one month later, as MILADI ISO for the backend
   const getOneMonthLater = (date: Date): string => {
     const newDate = new Date(date);
     newDate.setMonth(newDate.getMonth() + 1);
-    return newDate.toISOString().split("T")[0];
+    return formatMiladiISO(newDate);
   };
 
-  // Form state with time field
+  // Form state — start/end/date kept as MILADI ISO for backend
   const [formData, setFormData] = useState<
     Partial<CreateEnrollmentWithPaymentData>
   >({
@@ -150,7 +147,7 @@ const StudentEnrollmentModal = ({
   useEffect(() => {
     if (isOpen && student) {
       fetchDropdownData();
-      const today = new Date().toISOString().split("T")[0];
+      const today = formatMiladiISO(new Date());
       const oneMonthLater = getOneMonthLater(new Date());
       setFormData((prev) => ({
         ...prev,
@@ -161,7 +158,6 @@ const StudentEnrollmentModal = ({
         paymentStatus: "Paid",
         time: "",
       }));
-      // Reset everything on open
       setSuccess("");
       setError("");
       setSuccessData(null);
@@ -210,7 +206,7 @@ const StudentEnrollmentModal = ({
     }));
   };
 
-  // Auto-calculate final fee when fee or discount changes
+  // Auto-calculate final fee
   useEffect(() => {
     const fee = formData.fee || 0;
     const discount = formData.discount || 0;
@@ -229,7 +225,6 @@ const StudentEnrollmentModal = ({
     setSuccessData(null);
 
     try {
-      // Validate required fields
       if (!formData.bookId) {
         setError("Please select a book");
         setSaving(false);
@@ -333,7 +328,6 @@ const StudentEnrollmentModal = ({
     }
   };
 
-  // ✅ Fetch history when user switches to history view
   const fetchHistory = async () => {
     if (!student) return;
     try {
@@ -365,7 +359,7 @@ const StudentEnrollmentModal = ({
   };
 
   const resetForm = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatMiladiISO(new Date());
     const oneMonthLater = getOneMonthLater(new Date());
     setFormData({
       studentId: student?.id || "",
@@ -398,7 +392,6 @@ const StudentEnrollmentModal = ({
 
   if (!isOpen) return null;
 
-  // History data shortcuts
   const summary = historyData?.data?.summary;
   const history = historyData?.data?.history || [];
   const studentInfo = historyData?.data?.student;
@@ -406,9 +399,7 @@ const StudentEnrollmentModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-        {/* ============================================ */}
-        {/* HEADER with History button + Close */}
-        {/* ============================================ */}
+        {/* HEADER */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div>
             <h3 className="text-xl font-semibold text-gray-900">
@@ -426,7 +417,6 @@ const StudentEnrollmentModal = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* History / Back Button */}
             {viewMode === "form" ? (
               <button
                 type="button"
@@ -448,7 +438,6 @@ const StudentEnrollmentModal = ({
               </button>
             )}
 
-            {/* Close Button */}
             <button
               type="button"
               onClick={handleClose}
@@ -472,16 +461,11 @@ const StudentEnrollmentModal = ({
           </div>
         </div>
 
-        {/* ============================================ */}
-        {/* BODY - scrollable */}
-        {/* ============================================ */}
+        {/* BODY */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {/* ======================================== */}
           {/* HISTORY VIEW */}
-          {/* ======================================== */}
           {viewMode === "history" && (
             <>
-              {/* Loading */}
               {historyLoading && (
                 <div className="flex items-center justify-center py-16">
                   <div className="text-center">
@@ -493,7 +477,6 @@ const StudentEnrollmentModal = ({
                 </div>
               )}
 
-              {/* Error */}
               {historyError && !historyLoading && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                   <p className="text-sm font-medium text-red-700">
@@ -502,7 +485,6 @@ const StudentEnrollmentModal = ({
                 </div>
               )}
 
-              {/* Empty */}
               {!historyLoading &&
                 !historyError &&
                 history.length === 0 && (
@@ -516,12 +498,10 @@ const StudentEnrollmentModal = ({
                   </div>
                 )}
 
-              {/* Data */}
               {!historyLoading &&
                 !historyError &&
                 history.length > 0 && (
                   <>
-                    {/* Summary Cards */}
                     {summary && (
                       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <div className="rounded-lg border border-gray-200 bg-white p-3">
@@ -559,7 +539,6 @@ const StudentEnrollmentModal = ({
                       </div>
                     )}
 
-                    {/* History Table */}
                     <div className="overflow-hidden rounded-xl border border-gray-200">
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[1100px]">
@@ -642,6 +621,7 @@ const StudentEnrollmentModal = ({
                                 <td className="px-3 py-3 text-xs text-gray-700">
                                   {record.time || "—"}
                                 </td>
+                                {/* ✅ Duration — Shamsi dates */}
                                 <td className="px-3 py-3 text-[10px] text-gray-600">
                                   <div>{formatDate(record.startDate)}</div>
                                   <div className="text-gray-400">
@@ -684,6 +664,7 @@ const StudentEnrollmentModal = ({
                                     {record.paymentStatus}
                                   </span>
                                 </td>
+                                {/* ✅ Pay Date — Shamsi */}
                                 <td className="px-3 py-3 text-xs text-gray-700">
                                   {formatDate(record.paymentDate)}
                                 </td>
@@ -691,7 +672,6 @@ const StudentEnrollmentModal = ({
                             ))}
                           </tbody>
 
-                          {/* Totals Footer */}
                           <tfoot className="bg-gray-50">
                             <tr className="border-t-2 border-gray-200">
                               <td
@@ -741,9 +721,7 @@ const StudentEnrollmentModal = ({
             </>
           )}
 
-          {/* ======================================== */}
           {/* FORM VIEW */}
-          {/* ======================================== */}
           {viewMode === "form" && (
             <>
               {loadingData ? (
@@ -763,7 +741,6 @@ const StudentEnrollmentModal = ({
                       Course Information
                     </h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {/* Book */}
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Book <span className="text-red-500">*</span>
@@ -784,7 +761,6 @@ const StudentEnrollmentModal = ({
                         </select>
                       </div>
 
-                      {/* Class */}
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Class <span className="text-red-500">*</span>
@@ -806,7 +782,6 @@ const StudentEnrollmentModal = ({
                         </select>
                       </div>
 
-                      {/* Teacher */}
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Teacher <span className="text-red-500">*</span>
@@ -827,7 +802,6 @@ const StudentEnrollmentModal = ({
                         </select>
                       </div>
 
-                      {/* Status */}
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Status
@@ -845,7 +819,6 @@ const StudentEnrollmentModal = ({
                         </select>
                       </div>
 
-                      {/* Result */}
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Result
@@ -865,7 +838,7 @@ const StudentEnrollmentModal = ({
                     </div>
                   </div>
 
-                  {/* Dates and Time */}
+                  {/* ✅ Course Schedule — Shamsi pickers */}
                   <div className="mb-6 border-t border-gray-200 pt-6">
                     <h4 className="mb-3 font-semibold text-gray-900">
                       Course Schedule
@@ -875,13 +848,15 @@ const StudentEnrollmentModal = ({
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Start Date <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="date"
-                          name="startDate"
+                        <ShamsiDatePicker
                           value={formData.startDate || ""}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          onChange={(miladiISO) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              startDate: miladiISO,
+                            }))
+                          }
+                          placeholder="انتخاب تاریخ"
                         />
                         <p className="mt-1 text-xs text-gray-500">
                           Default: Today's date
@@ -891,13 +866,15 @@ const StudentEnrollmentModal = ({
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           End Date <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="date"
-                          name="endDate"
+                        <ShamsiDatePicker
                           value={formData.endDate || ""}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          onChange={(miladiISO) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              endDate: miladiISO,
+                            }))
+                          }
+                          placeholder="انتخاب تاریخ"
                         />
                         <p className="mt-1 text-xs text-gray-500">
                           Default: One month from today
@@ -971,23 +948,28 @@ const StudentEnrollmentModal = ({
                           Auto-calculated: Fee - Discount
                         </p>
                       </div>
+
+                      {/* ✅ Payment Date — Shamsi picker */}
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Payment Date{" "}
                           <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="date"
-                          name="date"
+                        <ShamsiDatePicker
                           value={formData.date || ""}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          onChange={(miladiISO) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              date: miladiISO,
+                            }))
+                          }
+                          placeholder="انتخاب تاریخ"
                         />
                         <p className="mt-1 text-xs text-gray-500">
                           Default: Today's date
                         </p>
                       </div>
+
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Payment Status
@@ -1129,9 +1111,7 @@ const StudentEnrollmentModal = ({
           )}
         </div>
 
-        {/* ============================================ */}
-        {/* FOOTER (only on history view) */}
-        {/* ============================================ */}
+        {/* FOOTER (history view) */}
         {viewMode === "history" && (
           <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
             <button

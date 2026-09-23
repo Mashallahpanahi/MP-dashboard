@@ -6,19 +6,23 @@ import {
   ApiError,
 } from "@/api/teacherApi";
 import { useNavigate } from "react-router-dom";
+// ✅ Shamsi date picker
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
 const TeacherRegister = () => {
   const navigate = useNavigate();
+
+  // ⚠️ hireDate is stored as MILADI ISO ("YYYY-MM-DD") for the backend
   const [formData, setFormData] = useState<CreateTeacherData>({
     firstName: "",
     lastName: "",
     gender: "",
     phone: "",
-    email: "", // Optional - can be empty
-    address: "", // Optional - can be empty
+    email: "",
+    address: "",
     salaryType: "",
     salaryAmount: 0,
-    feePercentage: 0, // Default to 0
+    feePercentage: 0,
     hireDate: "",
     isActive: true,
   });
@@ -27,6 +31,9 @@ const TeacherRegister = () => {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
+  // ============================================
+  // CHANGE HANDLER (text/number/select)
+  // ============================================
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -38,11 +45,23 @@ const TeacherRegister = () => {
       ...previous,
       [name]:
         name === "salaryAmount" || name === "feePercentage"
-          ? value === "" ? 0 : Number(value)
+          ? value === ""
+            ? 0
+            : Number(value)
           : value,
     }));
   };
 
+  // ============================================
+  // SPECIAL HANDLER FOR HIRE DATE (Shamsi picker → Miladi ISO)
+  // ============================================
+  const handleHireDateChange = (miladiISO: string) => {
+    setFormData((prev) => ({ ...prev, hireDate: miladiISO }));
+  };
+
+  // ============================================
+  // SUBMIT
+  // ============================================
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -51,25 +70,16 @@ const TeacherRegister = () => {
     setError("");
 
     try {
-      // Prepare data for submission
       const submitData = { ...formData };
 
-      // If salary type is Fixed, set feePercentage to 0
       if (submitData.salaryType === "Fixed") {
         submitData.feePercentage = 0;
-      }
-      // If salary type is PerStudent, set salaryAmount to 0
-      else if (submitData.salaryType === "PerStudent") {
+      } else if (submitData.salaryType === "PerStudent") {
         submitData.salaryAmount = 0;
       }
 
-      // Remove empty optional fields
-      if (!submitData.email) {
-        delete submitData.email;
-      }
-      if (!submitData.address) {
-        delete submitData.address;
-      }
+      if (!submitData.email) delete submitData.email;
+      if (!submitData.address) delete submitData.address;
 
       await createTeacher(submitData);
 
@@ -93,7 +103,6 @@ const TeacherRegister = () => {
     }
   };
 
-  // Get current salary type for conditional rendering
   const currentSalaryType = formData.salaryType;
 
   return (
@@ -104,7 +113,6 @@ const TeacherRegister = () => {
           <h1 className="text-2xl font-bold text-gray-900">
             Register Teacher
           </h1>
-
           <p className="mt-1 text-sm text-gray-500">
             Add a new teacher to the system
           </p>
@@ -141,7 +149,8 @@ const TeacherRegister = () => {
                 <p className="text-sm font-medium text-red-700">
                   {error}
                 </p>
-                {(error.includes("phone number") || error.includes("email address")) && (
+                {(error.includes("phone number") ||
+                  error.includes("email address")) && (
                   <p className="mt-1 text-sm text-red-600">
                     Please check the phone number you entered.
                   </p>
@@ -275,24 +284,17 @@ const TeacherRegister = () => {
                 </p>
               </div>
 
-              {/* Hire Date */}
+              {/* ✅ Hire Date — Shamsi picker (Miladi sent to backend) */}
               <div>
-                <label
-                  htmlFor="hireDate"
-                  className="mb-2 block text-sm font-medium text-gray-700"
-                >
-                  Hire Date <span className="text-red-500">*</span>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Hire Date (تاریخ شمسی) <span className="text-red-500">*</span>
                 </label>
 
-                <input
-                  id="hireDate"
-                  name="hireDate"
-                  type="date"
-                  value={formData.hireDate}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+              <ShamsiDatePicker
+  value={formData.hireDate}
+  onChange={handleHireDateChange}
+  placeholder="تاریخ"
+/>
               </div>
 
               {/* Address - Optional */}
@@ -349,11 +351,12 @@ const TeacherRegister = () => {
                   <option value="PerStudent">Per Student</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  Select "Fixed" for monthly salary or "Per Student" for percentage-based
+                  Select "Fixed" for monthly salary or "Per Student" for
+                  percentage-based
                 </p>
               </div>
 
-              {/* Salary Amount - Show only if Fixed is selected */}
+              {/* Salary Amount */}
               {currentSalaryType === "Fixed" && (
                 <div>
                   <label
@@ -369,7 +372,9 @@ const TeacherRegister = () => {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.salaryAmount === 0 ? "" : formData.salaryAmount}
+                    value={
+                      formData.salaryAmount === 0 ? "" : formData.salaryAmount
+                    }
                     onChange={handleChange}
                     placeholder="Enter fixed salary amount"
                     required={currentSalaryType === "Fixed"}
@@ -381,7 +386,7 @@ const TeacherRegister = () => {
                 </div>
               )}
 
-              {/* Fee Percentage - Show only if PerStudent is selected */}
+              {/* Fee Percentage */}
               {currentSalaryType === "PerStudent" && (
                 <div>
                   <label
@@ -398,7 +403,11 @@ const TeacherRegister = () => {
                     min="0"
                     max="100"
                     step="0.01"
-                    value={formData.feePercentage === 0 ? "" : formData.feePercentage}
+                    value={
+                      formData.feePercentage === 0
+                        ? ""
+                        : formData.feePercentage
+                    }
                     onChange={handleChange}
                     placeholder="Enter percentage"
                     required={currentSalaryType === "PerStudent"}
@@ -410,10 +419,9 @@ const TeacherRegister = () => {
                 </div>
               )}
 
-              {/* Info message when no salary type selected */}
               {!currentSalaryType && (
                 <div className="col-span-2">
-                  <p className="text-sm text-gray-500 italic">
+                  <p className="text-sm italic text-gray-500">
                     Please select a salary type to configure salary details
                   </p>
                 </div>

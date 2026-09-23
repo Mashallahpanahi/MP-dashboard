@@ -1,11 +1,17 @@
 // src/pages/Students/EnrollStudent.tsx
 import { FormEvent, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createEnrollmentWithPayment, type CreateEnrollmentWithPaymentData } from "@/api/studentEnrollmentApi";
+import {
+  createEnrollmentWithPayment,
+  type CreateEnrollmentWithPaymentData,
+} from "@/api/studentEnrollmentApi";
 import { getStudentById } from "@/api/studentApi";
 import { getTeachers, type Teacher } from "@/api/teacherApi";
 import { getBooks, type Book } from "@/api/bookApi";
 import { getClasses, type Class } from "@/api/classApi";
+// ✅ Shamsi date picker
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+import { formatMiladiISO } from "@/utils/dateConverter";
 
 const EnrollStudent = () => {
   const navigate = useNavigate();
@@ -21,7 +27,9 @@ const EnrollStudent = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  const [formData, setFormData] = useState<Partial<CreateEnrollmentWithPaymentData>>({
+  const [formData, setFormData] = useState<
+    Partial<CreateEnrollmentWithPaymentData>
+  >({
     studentId: studentId || "",
     bookId: "",
     classId: "",
@@ -51,14 +59,14 @@ const EnrollStudent = () => {
           getBooks(),
           getClasses(),
         ]);
-        setTeachers(teachersData.filter(t => t.isActive));
-        setBooks(booksData.filter(b => b.isActive));
+        setTeachers(teachersData.filter((t) => t.isActive));
+        setBooks(booksData.filter((b) => b.isActive));
         setClasses(classesData);
 
         // Fetch student name
         if (studentId) {
           const student = await getStudentById(studentId);
-          setStudentName(`${student.firstName} ${student.lastName || ''}`);
+          setStudentName(`${student.firstName} ${student.lastName || ""}`);
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -81,8 +89,14 @@ const EnrollStudent = () => {
     setFormData((prev) => ({
       ...prev,
       [name]:
-        type === "number" || name === "fee" || name === "discount" || name === "finalFee" || name === "score"
-          ? value === "" ? 0 : parseFloat(value)
+        type === "number" ||
+        name === "fee" ||
+        name === "discount" ||
+        name === "finalFee" ||
+        name === "score"
+          ? value === ""
+            ? 0
+            : parseFloat(value)
           : value,
     }));
   };
@@ -98,12 +112,12 @@ const EnrollStudent = () => {
     }));
   }, [formData.fee, formData.discount]);
 
-  // Set date to today when not set
+  // Set payment date to today when not set (Miladi ISO for the backend)
   useEffect(() => {
     if (!formData.date) {
       setFormData((prev) => ({
         ...prev,
-        date: new Date().toISOString().split('T')[0],
+        date: formatMiladiISO(new Date()),
       }));
     }
   }, []);
@@ -160,13 +174,25 @@ const EnrollStudent = () => {
         teacherId: formData.teacherId,
         startDate: formData.startDate,
         endDate: formData.endDate,
-        status: formData.status as 'Studying' | 'Completed' | 'Dropped' | 'Pending',
-        result: formData.result as 'Passed' | 'Failed' | 'Pending' | 'In Progress',
+        status: formData.status as
+          | "Studying"
+          | "Completed"
+          | "Dropped"
+          | "Pending",
+        result: formData.result as
+          | "Passed"
+          | "Failed"
+          | "Pending"
+          | "In Progress",
         fee: formData.fee,
         discount: formData.discount || 0,
         finalFee: formData.finalFee || formData.fee,
         date: formData.date,
-        paymentStatus: formData.paymentStatus as 'Paid' | 'Pending' | 'Partially Paid' | 'Overdue',
+        paymentStatus: formData.paymentStatus as
+          | "Paid"
+          | "Pending"
+          | "Partially Paid"
+          | "Overdue",
         score: formData.score || undefined,
         scoreDate: formData.scoreDate || undefined,
         scoreTime: formData.scoreTime || undefined,
@@ -206,7 +232,7 @@ const EnrollStudent = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Enroll Student</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Enroll {studentName || 'Student'} in a new course with payment
+            Enroll {studentName || "Student"} in a new course with payment
           </p>
         </div>
 
@@ -336,36 +362,43 @@ const EnrollStudent = () => {
             </div>
           </div>
 
-          {/* Dates */}
+          {/* ✅ Course Dates — Shamsi pickers */}
           <div className="mb-8 border-t border-gray-200 pt-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
               Course Dates
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* Start Date */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Start Date *
                 </label>
-                <input
-                  name="startDate"
-                  type="date"
+                <ShamsiDatePicker
                   value={formData.startDate || ""}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(miladiISO) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      startDate: miladiISO,
+                    }))
+                  }
+                  placeholder="انتخاب تاریخ شروع"
                 />
               </div>
+
+              {/* End Date */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   End Date *
                 </label>
-                <input
-                  name="endDate"
-                  type="date"
+                <ShamsiDatePicker
                   value={formData.endDate || ""}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(miladiISO) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      endDate: miladiISO,
+                    }))
+                  }
+                  placeholder="انتخاب تاریخ ختم"
                 />
               </div>
             </div>
@@ -422,19 +455,21 @@ const EnrollStudent = () => {
                   Auto-calculated: Fee - Discount
                 </p>
               </div>
+
+              {/* ✅ Payment Date — Shamsi picker */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Payment Date *
                 </label>
-                <input
-                  name="date"
-                  type="date"
+                <ShamsiDatePicker
                   value={formData.date || ""}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(miladiISO) =>
+                    setFormData((prev) => ({ ...prev, date: miladiISO }))
+                  }
+                  placeholder="انتخاب تاریخ پرداخت"
                 />
               </div>
+
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Payment Status
@@ -457,7 +492,10 @@ const EnrollStudent = () => {
           {/* Score Information (Optional) */}
           <div className="mb-8 border-t border-gray-200 pt-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Score Information <span className="text-sm font-normal text-gray-500">(Optional)</span>
+              Score Information{" "}
+              <span className="text-sm font-normal text-gray-500">
+                (Optional)
+              </span>
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               <div>
@@ -476,18 +514,21 @@ const EnrollStudent = () => {
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
+
+              {/* ✅ Score Date — Shamsi picker */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Score Date
                 </label>
-                <input
-                  name="scoreDate"
-                  type="date"
+                <ShamsiDatePicker
                   value={formData.scoreDate || ""}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(miladiISO) =>
+                    setFormData((prev) => ({ ...prev, scoreDate: miladiISO }))
+                  }
+                  placeholder="انتخاب تاریخ نمبر"
                 />
               </div>
+
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Score Time

@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { getPayrollsByTeacher, getTeachers } from "@/api/teacherPayrollApi";
 import type { TeacherPayroll, Teacher } from "@/types/teacherPayroll";
 import TeacherPayrollHistoryEditModal from "./TeacherPayrollHistoryEditModal";
+// ✅ Shamsi helpers
+import { formatShamsi, convertToShamsi, SHAMSI_MONTHS } from "@/utils/dateConverter";
 
 interface TeacherPayrollHistoryModalProps {
   isOpen: boolean;
@@ -25,60 +27,59 @@ const TeacherPayrollHistoryModal = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [payrollToEdit, setPayrollToEdit] = useState<TeacherPayroll | null>(null);
 
-  // Month names for display
-  const MONTH_NAMES = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-
   // ✅ Safe number conversion
   const safeNumber = (value: number | string | null | undefined): number => {
-    if (value === null || value === undefined || value === '') return 0;
-    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (value === null || value === undefined || value === "") return 0;
+    const num = typeof value === "string" ? parseFloat(value) : value;
     return isNaN(num) ? 0 : num;
   };
 
   // ✅ Safe currency formatter
-  const formatCurrency = (amount: number | string | null | undefined): string => {
+  const formatCurrency = (
+    amount: number | string | null | undefined
+  ): string => {
     const num = safeNumber(amount);
     return `$${num.toFixed(2)}`;
   };
 
-  // ✅ Format month
+  // ✅ Format Month — now Shamsi
+  //    Converts the stored Miladi month/year to Shamsi, then shows the Shamsi month name.
   const formatMonth = (month: number, year: number): string => {
-    const monthName = MONTH_NAMES[month - 1] || `Month ${month}`;
-    return `${monthName} ${year}`;
+    try {
+      // Use the 15th of the month to avoid edge-of-month rollover
+      const miladiMid = `${year}-${String(month).padStart(2, "0")}-15`;
+      const sh = convertToShamsi(miladiMid);
+      return `${SHAMSI_MONTHS[sh.month - 1]} ${sh.year}`;
+    } catch {
+      return `${month}/${year}`;
+    }
   };
 
-  // ✅ Format date
+  // ✅ Format Date — now Shamsi
   const formatDate = (date: string): string => {
-    if (!date) return 'N/A';
+    if (!date) return "N/A";
     try {
-      return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
+      return formatShamsi(date, "YYYY/MM/DD");
     } catch {
-      return 'Invalid date';
+      return "Invalid date";
     }
   };
 
   // Get status color
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      Completed: 'bg-green-100 text-green-700',
-      'Not Completed': 'bg-yellow-100 text-yellow-700',
+      Completed: "bg-green-100 text-green-700",
+      "Not Completed": "bg-yellow-100 text-yellow-700",
     };
-    return colors[status] || 'bg-gray-100 text-gray-700';
+    return colors[status] || "bg-gray-100 text-gray-700";
   };
 
   const getStatusDotColor = (status: string) => {
     const colors: Record<string, string> = {
-      Completed: 'bg-green-500',
-      'Not Completed': 'bg-yellow-500',
+      Completed: "bg-green-500",
+      "Not Completed": "bg-yellow-500",
     };
-    return colors[status] || 'bg-gray-500';
+    return colors[status] || "bg-gray-500";
   };
 
   // ✅ Fetch teachers on modal open
@@ -96,7 +97,7 @@ const TeacherPayrollHistoryModal = ({
     try {
       setLoadingTeachers(true);
       const data = await getTeachers();
-      setTeachers(Array.isArray(data) ? data.filter(t => t.isActive) : []);
+      setTeachers(Array.isArray(data) ? data.filter((t) => t.isActive) : []);
     } catch (error) {
       console.error("Failed to fetch teachers:", error);
       setError("Failed to load teachers list");
@@ -108,7 +109,7 @@ const TeacherPayrollHistoryModal = ({
   // ✅ Fetch payrolls when teacher is selected
   const fetchPayrollsByTeacher = async (teacherId: string) => {
     if (!teacherId) return;
-    
+
     try {
       setLoadingPayrolls(true);
       setError("");
@@ -121,7 +122,9 @@ const TeacherPayrollHistoryModal = ({
     } catch (error) {
       console.error("Failed to fetch payrolls:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to load payroll history"
+        error instanceof Error
+          ? error.message
+          : "Failed to load payroll history"
       );
       setPayrolls([]);
     } finally {
@@ -134,7 +137,7 @@ const TeacherPayrollHistoryModal = ({
     setSelectedTeacherId(teacherId);
 
     if (teacherId) {
-      const teacher = teachers.find(t => t.id === teacherId);
+      const teacher = teachers.find((t) => t.id === teacherId);
       setSelectedTeacher(teacher || null);
       fetchPayrollsByTeacher(teacherId);
     } else {
@@ -163,15 +166,15 @@ const TeacherPayrollHistoryModal = ({
 
   // Calculate totals
   const totalBaseSalary = payrolls.reduce(
-    (sum, p) => sum + safeNumber(p.baseSalary), 
+    (sum, p) => sum + safeNumber(p.baseSalary),
     0
   );
   const totalPaid = payrolls.reduce(
-    (sum, p) => sum + safeNumber(p.paidAmount), 
+    (sum, p) => sum + safeNumber(p.paidAmount),
     0
   );
   const totalRemaining = payrolls.reduce(
-    (sum, p) => sum + safeNumber(p.remainingSalary), 
+    (sum, p) => sum + safeNumber(p.remainingSalary),
     0
   );
 
@@ -203,8 +206,18 @@ const TeacherPayrollHistoryModal = ({
               onClick={onClose}
               className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -234,10 +247,10 @@ const TeacherPayrollHistoryModal = ({
 
           {/* Selected Teacher Info */}
           {selectedTeacher && (
-            <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-4">
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white font-bold">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
                     {selectedTeacher.firstName?.charAt(0)}
                     {selectedTeacher.lastName?.charAt(0)}
                   </div>
@@ -254,7 +267,9 @@ const TeacherPayrollHistoryModal = ({
                   <div>
                     <p className="text-xs text-gray-600">Salary Type</p>
                     <p className="font-semibold text-gray-900">
-                      {selectedTeacher.salaryType === 'Fixed' ? 'Fixed' : 'Per Student'}
+                      {selectedTeacher.salaryType === "Fixed"
+                        ? "Fixed"
+                        : "Per Student"}
                     </p>
                   </div>
                   <div>
@@ -304,7 +319,9 @@ const TeacherPayrollHistoryModal = ({
             <div className="flex justify-center py-12">
               <div className="text-center">
                 <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
-                <p className="mt-2 text-sm text-gray-500">Loading payment history...</p>
+                <p className="mt-2 text-sm text-gray-500">
+                  Loading payment history...
+                </p>
               </div>
             </div>
           )}
@@ -317,23 +334,27 @@ const TeacherPayrollHistoryModal = ({
                 Select a Teacher
               </h4>
               <p className="mt-2 text-sm text-gray-500">
-                Choose a teacher from the dropdown above to view their payment history
+                Choose a teacher from the dropdown above to view their payment
+                history
               </p>
             </div>
           )}
 
           {/* No payrolls */}
-          {selectedTeacherId && !loadingPayrolls && payrolls.length === 0 && !error && (
-            <div className="rounded-lg bg-gray-50 p-8 text-center">
-              <div className="mb-4 text-4xl">📋</div>
-              <h4 className="text-lg font-semibold text-gray-900">
-                No Payment Records
-              </h4>
-              <p className="mt-2 text-sm text-gray-500">
-                This teacher has no payment records yet.
-              </p>
-            </div>
-          )}
+          {selectedTeacherId &&
+            !loadingPayrolls &&
+            payrolls.length === 0 &&
+            !error && (
+              <div className="rounded-lg bg-gray-50 p-8 text-center">
+                <div className="mb-4 text-4xl">📋</div>
+                <h4 className="text-lg font-semibold text-gray-900">
+                  No Payment Records
+                </h4>
+                <p className="mt-2 text-sm text-gray-500">
+                  This teacher has no payment records yet.
+                </p>
+              </div>
+            )}
 
           {/* Payroll Table */}
           {selectedTeacherId && !loadingPayrolls && payrolls.length > 0 && (
@@ -363,7 +384,6 @@ const TeacherPayrollHistoryModal = ({
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                         Notes
                       </th>
-                      {/* ✅ Edit column */}
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                         Action
                       </th>
@@ -372,9 +392,10 @@ const TeacherPayrollHistoryModal = ({
                   <tbody className="divide-y divide-gray-100">
                     {payrolls.map((payroll) => {
                       const remainingNum = safeNumber(payroll.remainingSalary);
-                      
+
                       return (
                         <tr key={payroll.id} className="hover:bg-gray-50">
+                          {/* ✅ Month — Shamsi */}
                           <td className="px-4 py-3">
                             <span className="font-medium text-gray-900">
                               {formatMonth(payroll.month, payroll.year)}
@@ -391,36 +412,58 @@ const TeacherPayrollHistoryModal = ({
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`font-semibold ${
-                              remainingNum > 0 ? 'text-red-600' : 'text-gray-500'
-                            }`}>
+                            <span
+                              className={`font-semibold ${
+                                remainingNum > 0
+                                  ? "text-red-600"
+                                  : "text-gray-500"
+                              }`}
+                            >
                               {formatCurrency(payroll.remainingSalary)}
                             </span>
                           </td>
+                          {/* ✅ Payment Date — Shamsi */}
                           <td className="px-4 py-3">
                             <span className="text-sm text-gray-600">
                               {formatDate(payroll.date)}
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusColor(payroll.status)}`}>
-                              <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${getStatusDotColor(payroll.status)}`} />
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusColor(
+                                payroll.status
+                              )}`}
+                            >
+                              <span
+                                className={`mr-1.5 h-1.5 w-1.5 rounded-full ${getStatusDotColor(
+                                  payroll.status
+                                )}`}
+                              />
                               {payroll.status}
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-xs text-gray-600">
-                              {payroll.notes || '—'}
+                              {payroll.notes || "—"}
                             </span>
                           </td>
-                          {/* ✅ Edit button */}
                           <td className="px-4 py-3">
                             <button
                               onClick={() => handleEditClick(payroll)}
                               className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition hover:bg-blue-100"
                             >
-                              <svg className="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              <svg
+                                className="mr-1 h-3 w-3"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
                               </svg>
                               Edit
                             </button>
@@ -447,7 +490,7 @@ const TeacherPayrollHistoryModal = ({
         </div>
       </div>
 
-      {/* ✅ Edit Modal */}
+      {/* Edit Modal */}
       <TeacherPayrollHistoryEditModal
         isOpen={showEditModal}
         payroll={payrollToEdit}

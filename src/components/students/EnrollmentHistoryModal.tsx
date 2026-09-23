@@ -7,6 +7,8 @@ import {
   type EnrollmentScore,
 } from "@/api/studentEnrollmentApi";
 import type { Student } from "@/types/student";
+// ✅ Shamsi date formatter
+import { formatShamsi } from "@/utils/dateConverter";
 
 interface EnrollmentHistoryModalProps {
   isOpen: boolean;
@@ -65,7 +67,6 @@ const getResultColor = (result: string) => {
   }
 };
 
-// Score text color for the summary card
 const getScoreTextColor = (score: number | null | undefined): string => {
   if (score === null || score === undefined || isNaN(Number(score)))
     return "text-gray-400";
@@ -75,7 +76,6 @@ const getScoreTextColor = (score: number | null | undefined): string => {
   return "text-red-600";
 };
 
-// Score badge color for the table cell
 const getScoreBadgeColor = (score: number | null): string => {
   if (score === null || isNaN(score)) {
     return "bg-gray-100 text-gray-500 ring-1 ring-gray-200";
@@ -97,14 +97,11 @@ const formatCurrency = (value: string | number | undefined): string => {
   return `$${num.toFixed(2)}`;
 };
 
+// ✅ Shamsi date — replaces the old toLocaleDateString version
 const formatDate = (dateStr: string | undefined): string => {
   if (!dateStr) return "N/A";
   try {
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatShamsi(dateStr, "YYYY/MM/DD");
   } catch {
     return dateStr;
   }
@@ -151,7 +148,6 @@ const EnrollmentHistoryModal = ({
   const [historyData, setHistoryData] =
     useState<EnrollmentHistoryResponse | null>(null);
 
-  // Fetch history when modal opens
   useEffect(() => {
     if (!isOpen || !student) return;
 
@@ -162,7 +158,7 @@ const EnrollmentHistoryModal = ({
         setHistoryData(null);
 
         const response = await getStudentEnrollmentHistory(student.id);
-        console.log("📊 Enrollment history response:", response); // debug
+        console.log("📊 Enrollment history response:", response);
         setHistoryData(response);
       } catch (err) {
         console.error("Failed to fetch enrollment history:", err);
@@ -179,7 +175,6 @@ const EnrollmentHistoryModal = ({
     fetchHistory();
   }, [isOpen, student]);
 
-  // Always sort newest first
   const sortedHistory = useMemo(() => {
     const list = historyData?.data?.history || [];
     return [...list].sort(
@@ -193,7 +188,6 @@ const EnrollmentHistoryModal = ({
   const studentInfo = historyData?.data?.student;
   const history = sortedHistory;
 
-  // Debug: how many records actually have a score?
   const scoredRecords = history.filter((r) => r.score !== null).length;
 
   return (
@@ -205,9 +199,7 @@ const EnrollmentHistoryModal = ({
         className="flex max-h-[92vh] w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ============================================ */}
         {/* HEADER */}
-        {/* ============================================ */}
         <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-slate-50 to-white px-6 py-4">
           <div className="flex items-center gap-3">
             {studentInfo?.image ? (
@@ -263,11 +255,8 @@ const EnrollmentHistoryModal = ({
           </button>
         </div>
 
-        {/* ============================================ */}
         {/* BODY */}
-        {/* ============================================ */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
@@ -279,14 +268,12 @@ const EnrollmentHistoryModal = ({
             </div>
           )}
 
-          {/* Error */}
           {error && !loading && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-4">
               <p className="text-sm font-medium text-red-700">{error}</p>
             </div>
           )}
 
-          {/* Empty State */}
           {!loading && !error && history.length === 0 && (
             <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
@@ -313,12 +300,9 @@ const EnrollmentHistoryModal = ({
             </div>
           )}
 
-          {/* Data */}
           {!loading && !error && history.length > 0 && (
             <>
-              {/* ============================================ */}
               {/* SUMMARY CARDS */}
-              {/* ============================================ */}
               {summary && (
                 <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                   <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-3 shadow-sm">
@@ -353,7 +337,6 @@ const EnrollmentHistoryModal = ({
                       {summary.pendingCount}
                     </p>
                   </div>
-                  {/* Scored count */}
                   <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white p-3 shadow-sm">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-600">
                       Scored
@@ -362,7 +345,6 @@ const EnrollmentHistoryModal = ({
                       {summary.scoredCount ?? scoredRecords}
                     </p>
                   </div>
-                  {/* Average score */}
                   <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-3 shadow-sm">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600">
                       Avg. Score
@@ -381,15 +363,11 @@ const EnrollmentHistoryModal = ({
                 </div>
               )}
 
-              {/* ============================================ */}
               {/* HISTORY TABLE */}
-              {/* ============================================ */}
               <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
                 <div className="max-h-[58vh] overflow-auto">
                   <table className="w-full min-w-[1600px] border-collapse">
-                    {/* ================= THEAD ================= */}
                     <thead className="sticky top-0 z-20">
-                      {/* Group header row */}
                       <tr className="bg-gradient-to-r from-slate-800 to-slate-700 text-white">
                         <th
                           colSpan={7}
@@ -417,7 +395,6 @@ const EnrollmentHistoryModal = ({
                         </th>
                       </tr>
 
-                      {/* Column header row */}
                       <tr className="bg-slate-100 shadow-sm">
                         <th className="border-b border-r border-slate-200 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600">
                           #
@@ -455,7 +432,6 @@ const EnrollmentHistoryModal = ({
                         <th className="border-b border-r border-slate-200 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600">
                           Pay Date
                         </th>
-                        {/* Score columns */}
                         <th className="border-b border-r border-slate-200 bg-indigo-50/60 px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                           Midterm
                         </th>
@@ -471,7 +447,6 @@ const EnrollmentHistoryModal = ({
                       </tr>
                     </thead>
 
-                    {/* ================= TBODY ================= */}
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {history.map((record, idx) => {
                         const midterm = parseScore(record.score?.midtermScore);
@@ -559,7 +534,6 @@ const EnrollmentHistoryModal = ({
                               {formatDate(record.paymentDate)}
                             </td>
 
-                            {/* ✅ SCORE CELLS */}
                             <td className="border-r border-gray-100 bg-indigo-50/20 px-4 py-3 text-right text-xs tabular-nums">
                               {hasScore ? (
                                 <span className="font-medium text-gray-800">
@@ -607,7 +581,6 @@ const EnrollmentHistoryModal = ({
                       })}
                     </tbody>
 
-                    {/* ================= TFOOT ================= */}
                     <tfoot className="sticky bottom-0 z-10">
                       <tr className="border-t-2 border-slate-300 bg-gradient-to-r from-slate-100 to-slate-50">
                         <td
@@ -662,9 +635,7 @@ const EnrollmentHistoryModal = ({
           )}
         </div>
 
-        {/* ============================================ */}
         {/* FOOTER */}
-        {/* ============================================ */}
         <div className="flex items-center justify-between border-t border-gray-200 bg-slate-50 px-6 py-4">
           <p className="text-xs text-gray-500">
             {history.length > 0 && (

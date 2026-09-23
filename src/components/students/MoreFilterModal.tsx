@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import type { Teacher } from "@/types/teacher";
 import type { Book } from "@/types/book";
-import { getTeachers } from "@/api/teacherApi";  // ⚠️ Verify this name matches your teacherApi
-import { getBooks } from "@/api/bookApi";        // ✅ Matches your bookApi.ts
+import { getTeachers } from "@/api/teacherApi";
+import { getBooks } from "@/api/bookApi";
+// ✅ Shamsi date picker
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
 export interface MoreFilterValues {
   teacherId?: string;
@@ -44,7 +46,7 @@ const MoreFilterModal = ({
   const [teachersLoading, setTeachersLoading] = useState(false);
   const [booksLoading, setBooksLoading] = useState(false);
 
-  // Form values
+  // Form values — fromDate / toDate kept as MILADI ISO for the backend
   const [teacherId, setTeacherId] = useState(initialValues.teacherId || "");
   const [bookId, setBookId] = useState(initialValues.bookId || "");
   const [time, setTime] = useState(initialValues.time || "");
@@ -67,7 +69,6 @@ const MoreFilterModal = ({
     if (!isOpen) return;
 
     const fetchData = async () => {
-      // Fetch teachers
       try {
         setTeachersLoading(true);
         const teacherData = await getTeachers();
@@ -78,7 +79,6 @@ const MoreFilterModal = ({
         setTeachersLoading(false);
       }
 
-      // Fetch books (using your actual function name)
       try {
         setBooksLoading(true);
         const bookData = await getBooks();
@@ -175,7 +175,9 @@ const MoreFilterModal = ({
                 <option value="">
                   {teachersLoading
                     ? "Loading teachers..."
-                    : `All teachers${teachers.length ? ` (${teachers.length})` : ""}`}
+                    : `All teachers${
+                        teachers.length ? ` (${teachers.length})` : ""
+                      }`}
                 </option>
                 {teachers.map((teacher) => (
                   <option key={teacher.id} value={teacher.id}>
@@ -240,28 +242,26 @@ const MoreFilterModal = ({
               />
             </div>
 
-            {/* Date Range */}
+            {/* ✅ Date Range — Shamsi pickers */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   From Date
                 </label>
-                <input
-                  type="date"
+                <ShamsiDatePicker
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={setFromDate}
+                  placeholder="1403/07/02"
                 />
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   To Date
                 </label>
-                <input
-                  type="date"
+                <ShamsiDatePicker
                   value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={setToDate}
+                  placeholder="1403/12/29"
                 />
               </div>
             </div>

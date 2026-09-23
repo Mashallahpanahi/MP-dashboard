@@ -8,6 +8,8 @@ import {
 import { getTeachers, type Teacher } from "@/api/teacherApi";
 import { getBooks, type Book } from "@/api/bookApi";
 import { getClasses, type Class } from "@/api/classApi";
+// ✅ Shamsi date picker
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -43,7 +45,7 @@ const AddScores = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
 
-  // Filters
+  // Filters — fromDate / toDate kept as MILADI ISO for backend
   const [teacherId, setTeacherId] = useState("");
   const [bookId, setBookId] = useState("");
   const [classId, setClassId] = useState("");
@@ -362,11 +364,11 @@ const AddScores = () => {
 
   return (
     <div className="p-6">
-      {/* ============================================ */}
       {/* HEADER */}
-      {/* ============================================ */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Add Students Scores</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Add Students Scores
+        </h1>
         <p className="mt-1 text-sm text-gray-500">
           Find students by teacher, book and class, then enter their scores
         </p>
@@ -414,9 +416,7 @@ const AddScores = () => {
         </div>
       )}
 
-      {/* ============================================ */}
       {/* FILTERS */}
-      {/* ============================================ */}
       <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-gray-900">Filters</h2>
 
@@ -506,7 +506,7 @@ const AddScores = () => {
                 />
               </div>
 
-              {/* From Date */}
+              {/* ✅ From Date — Shamsi picker */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   From Date{" "}
@@ -514,15 +514,14 @@ const AddScores = () => {
                     (optional)
                   </span>
                 </label>
-                <input
-                  type="date"
+                <ShamsiDatePicker
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={setFromDate}
+                  placeholder="انتخاب تاریخ"
                 />
               </div>
 
-              {/* To Date */}
+              {/* ✅ To Date — Shamsi picker */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   To Date{" "}
@@ -530,11 +529,10 @@ const AddScores = () => {
                     (optional)
                   </span>
                 </label>
-                <input
-                  type="date"
+                <ShamsiDatePicker
                   value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={setToDate}
+                  placeholder="انتخاب تاریخ"
                 />
               </div>
             </div>
@@ -561,9 +559,7 @@ const AddScores = () => {
         )}
       </div>
 
-      {/* ============================================ */}
       {/* NO RESULTS */}
-      {/* ============================================ */}
       {noResults && (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
           <h3 className="text-base font-semibold text-gray-900">
@@ -575,14 +571,10 @@ const AddScores = () => {
         </div>
       )}
 
-      {/* ============================================ */}
       {/* RESULTS TABLE */}
-      {/* ============================================ */}
       {hasResults && (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          {/* ✅ HEADER BAR — Save All on LEFT, info on RIGHT */}
           <div className="flex flex-col items-start justify-between gap-3 border-b border-gray-200 bg-gray-50 px-5 py-3 sm:flex-row sm:items-center">
-            {/* LEFT: Save All button */}
             <button
               type="button"
               onClick={handleSaveAll}
@@ -617,7 +609,6 @@ const AddScores = () => {
               )}
             </button>
 
-            {/* RIGHT: info text */}
             <p className="text-sm text-gray-700">
               Found <strong>{students.length}</strong> student
               {students.length !== 1 ? "s" : ""}
@@ -681,12 +672,10 @@ const AddScores = () => {
                         idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                       } hover:bg-blue-50/40`}
                     >
-                      {/* # */}
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {idx + 1}
                       </td>
 
-                      {/* ✅ Student Full Name */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {s.studentImage ? (
@@ -715,25 +704,21 @@ const AddScores = () => {
                         </div>
                       </td>
 
-                      {/* ✅ Teacher Name */}
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-gray-900">
                           {s.teacherName} {s.teacherLastName}
                         </p>
                       </td>
 
-                      {/* Class / Time */}
-                     {/* Class / Time */}
-                        <td className="px-4 py-3">
+                      <td className="px-4 py-3">
                         <p className="text-sm text-gray-900">
-                            {s.classBlock || "—"}
+                          {s.classBlock || "—"}
                         </p>
                         <p className="text-[11px] text-gray-500">
-                            {s.time || "—"}
+                          {s.time || "—"}
                         </p>
-                        </td>
+                      </td>
 
-                      {/* Status badge */}
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getResultBadge(
@@ -744,7 +729,6 @@ const AddScores = () => {
                         </span>
                       </td>
 
-                      {/* Midterm */}
                       <td className="px-4 py-3 text-right">
                         <input
                           type="text"
@@ -763,7 +747,6 @@ const AddScores = () => {
                         />
                       </td>
 
-                      {/* Final */}
                       <td className="px-4 py-3 text-right">
                         <input
                           type="text"
@@ -782,7 +765,6 @@ const AddScores = () => {
                         />
                       </td>
 
-                      {/* Total */}
                       <td className="px-4 py-3 text-right">
                         {total !== null ? (
                           <span
@@ -799,7 +781,6 @@ const AddScores = () => {
                         )}
                       </td>
 
-                      {/* Save */}
                       <td className="px-4 py-3 text-center">
                         <button
                           type="button"

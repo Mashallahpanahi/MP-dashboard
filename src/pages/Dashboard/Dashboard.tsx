@@ -16,6 +16,16 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+// ✅ Shamsi date picker (from utils)
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+// ✅ Shamsi conversion utils
+import {
+  convertToMillady,
+  convertToShamsi,
+  formatShamsi,
+  todayShamsi,
+  SHAMSI_MONTHS,
+} from "@/utils/dateConverter";
 
 // ============================================
 // HELPERS
@@ -63,41 +73,57 @@ const SummaryCard = ({
 );
 
 // ============================================
-// MINI CALENDAR
+// MINI CALENDAR (Shamsi)
 // ============================================
 const MiniCalendar = () => {
-  const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const todayS = todayShamsi();
+  const [currentYear, setCurrentYear] = useState(todayS.year);
+  const [currentMonth, setCurrentMonth] = useState(todayS.month); // 1..12
 
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-  ];
-  const dayNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+  const dayNames = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayRaw = new Date(currentYear, currentMonth, 1).getDay();
-  const firstDay = firstDayRaw === 0 ? 6 : firstDayRaw - 1;
+  // Days in Shamsi month
+  const getDaysInShamsiMonth = (year: number, month: number): number => {
+    if (month <= 6) return 31;
+    if (month <= 11) return 30;
+    const leapRemainders = [1, 5, 9, 13, 17, 22, 26, 30];
+    return leapRemainders.includes((year + 12) % 33) ? 30 : 29;
+  };
+
+  const daysInMonth = getDaysInShamsiMonth(currentYear, currentMonth);
+
+  // Weekday of first day (Sat=0 ... Fri=6)
+  const firstMiladi = convertToMillady({
+    year: currentYear,
+    month: currentMonth,
+    day: 1,
+  });
+  const firstJsDate = new Date(
+    firstMiladi.year,
+    firstMiladi.month - 1,
+    firstMiladi.day
+  );
+  const jsDay = firstJsDate.getDay(); // Sun=0..Sat=6
+  const firstDay = (jsDay + 1) % 7;
 
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
   const isToday = (d: number) =>
-    d === today.getDate() &&
-    currentMonth === today.getMonth() &&
-    currentYear === today.getFullYear();
+    d === todayS.day &&
+    currentMonth === todayS.month &&
+    currentYear === todayS.year;
 
   const prevMonth = () => {
-    if (currentMonth === 0) {
-      setCurrentMonth(11);
+    if (currentMonth === 1) {
+      setCurrentMonth(12);
       setCurrentYear((y) => y - 1);
     } else setCurrentMonth((m) => m - 1);
   };
   const nextMonth = () => {
-    if (currentMonth === 11) {
-      setCurrentMonth(0);
+    if (currentMonth === 12) {
+      setCurrentMonth(1);
       setCurrentYear((y) => y + 1);
     } else setCurrentMonth((m) => m + 1);
   };
@@ -116,7 +142,7 @@ const MiniCalendar = () => {
             </svg>
           </button>
           <span className="text-sm font-medium text-gray-700">
-            {monthNames[currentMonth]} {currentYear}
+            {SHAMSI_MONTHS[currentMonth - 1]} {currentYear}
           </span>
           <button
             onClick={nextMonth}
@@ -169,6 +195,7 @@ const Dashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
+  // ⚠️ Stored as MILADI ISO ("YYYY-MM-DD") for the backend
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -273,25 +300,23 @@ const Dashboard = () => {
         </h1>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* From Date */}
-          <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-2">
+          {/* From Date — Shamsi picker */}
+          <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5">
             <label className="text-xs font-medium text-gray-500">From:</label>
-            <input
-              type="date"
+            <ShamsiDatePicker
               value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="border-none bg-transparent text-sm outline-none"
+              onChange={setFromDate}
+              placeholder="1403/07/02"
             />
           </div>
 
-          {/* To Date */}
-          <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-2">
+          {/* To Date — Shamsi picker */}
+          <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5">
             <label className="text-xs font-medium text-gray-500">To:</label>
-            <input
-              type="date"
+            <ShamsiDatePicker
               value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="border-none bg-transparent text-sm outline-none"
+              onChange={setToDate}
+              placeholder="1403/12/29"
             />
           </div>
 
@@ -344,15 +369,20 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Filter info */}
+      {/* Filter info — display in Shamsi */}
       {report?.filters && (
         <div className="mb-4 text-xs text-gray-500">
           {report.filters.effectiveFrom || report.filters.effectiveTo ? (
             <>
               Showing:{" "}
               <span className="font-medium text-gray-700">
-                {report.filters.effectiveFrom || "Beginning"} →{" "}
-                {report.filters.effectiveTo || "Now"}
+                {report.filters.effectiveFrom
+                  ? formatShamsi(report.filters.effectiveFrom, "YYYY/MM/DD")
+                  : "Beginning"}{" "}
+                →{" "}
+                {report.filters.effectiveTo
+                  ? formatShamsi(report.filters.effectiveTo, "YYYY/MM/DD")
+                  : "Now"}
               </span>
             </>
           ) : (

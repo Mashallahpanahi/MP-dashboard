@@ -15,6 +15,14 @@ import {
   UpdateOtherExpenseModal,
   DeleteOtherExpenseModal,
 } from "@/components/other-expenses";
+// ✅ Shamsi helpers
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+import {
+  formatShamsi,
+  formatMiladiISO,
+  convertToShamsi,
+  SHAMSI_MONTHS,
+} from "@/utils/dateConverter";
 
 const OtherExpensesPage = () => {
   const [expenses, setExpenses] = useState<OtherExpense[]>([]);
@@ -24,19 +32,20 @@ const OtherExpensesPage = () => {
   const [loadingTotal, setLoadingTotal] = useState(true);
   const [error, setError] = useState("");
 
-  // ✅ Default date range: last 1 month
+  // ✅ Default date range: last 1 month (Miladi ISO for backend)
   const getDefaultDates = () => {
     const today = new Date();
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(today.getMonth() - 1);
 
     return {
-      fromDate: oneMonthAgo.toISOString().split("T")[0],
-      toDate: today.toISOString().split("T")[0],
+      fromDate: formatMiladiISO(oneMonthAgo),
+      toDate: formatMiladiISO(today),
     };
   };
 
   const defaultDates = getDefaultDates();
+  // ⚠️ fromDate / toDate kept as MILADI ISO for backend
   const [fromDate, setFromDate] = useState(defaultDates.fromDate);
   const [toDate, setToDate] = useState(defaultDates.toDate);
 
@@ -65,16 +74,35 @@ const OtherExpensesPage = () => {
     return `$${num.toFixed(2)}`;
   };
 
+  // ✅ Shamsi date — replaces toLocaleDateString
   const formatDate = (date: string): string => {
     if (!date) return "N/A";
     try {
-      return new Date(date).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+      return formatShamsi(date, "YYYY/MM/DD");
     } catch {
       return "Invalid date";
+    }
+  };
+
+  // ✅ Convert "September 2026" (Miladi month name + year) to "سنبله 1405"
+  const formatLastMonthLabel = (
+    monthName: string | undefined,
+    year: number | string | undefined
+  ): string => {
+    if (!monthName || !year) return "Last Month";
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+    const monthNumber = monthNames.indexOf(monthName) + 1;
+    if (!monthNumber) return `${monthName} ${year}`;
+
+    try {
+      const miladiMid = `${year}-${String(monthNumber).padStart(2, "0")}-15`;
+      const sh = convertToShamsi(miladiMid);
+      return `${SHAMSI_MONTHS[sh.month - 1]} ${sh.year}`;
+    } catch {
+      return `${monthName} ${year}`;
     }
   };
 
@@ -142,7 +170,6 @@ const OtherExpensesPage = () => {
       setExpenses((prev) => prev.filter((e) => e.id !== expenseToDelete.id));
       setShowDeleteModal(false);
       setExpenseToDelete(null);
-      // Refresh totals
       fetchExpenses(fromDate, toDate);
       fetchLastMonthTotal();
     } catch (error) {
@@ -233,13 +260,18 @@ const OtherExpensesPage = () => {
         </button>
       </div>
 
-      {/* ✅ Last Month Total Card */}
+      {/* ✅ Last Month Total Card — label now Shamsi */}
       <div className="mb-6">
         <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-gray-600">
-                Total Expenses for {lastMonthTotal?.month || "Last Month"} {lastMonthTotal?.year || ""} (preview month)
+                Total Expenses for{" "}
+                {formatLastMonthLabel(
+                  lastMonthTotal?.month,
+                  lastMonthTotal?.year
+                )}{" "}
+                (preview month)
               </p>
               {loadingTotal ? (
                 <div className="mt-2 h-8 w-32 animate-pulse rounded bg-gray-200" />
@@ -261,7 +293,7 @@ const OtherExpensesPage = () => {
         </div>
       </div>
 
-      {/* ✅ Date Range Filter */}
+      {/* ✅ Date Range Filter — Shamsi pickers */}
       <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <h3 className="mb-3 text-sm font-semibold text-gray-700">
           Filter by Date Range
@@ -271,22 +303,20 @@ const OtherExpensesPage = () => {
             <label className="mb-1.5 block text-xs font-medium text-gray-600">
               From Date
             </label>
-            <input
-              type="date"
+            <ShamsiDatePicker
               value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              onChange={setFromDate}
+              placeholder="انتخاب تاریخ"
             />
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-600">
               To Date
             </label>
-            <input
-              type="date"
+            <ShamsiDatePicker
               value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              onChange={setToDate}
+              placeholder="انتخاب تاریخ"
             />
           </div>
           <button
@@ -299,7 +329,7 @@ const OtherExpensesPage = () => {
             </svg>
             Search
           </button>
-          <div className="ml-auto rounded-lg bg-gray-50 px-4 py-2 border border-gray-200">
+          <div className="ml-auto rounded-lg border border-gray-200 bg-gray-50 px-4 py-2">
             <p className="text-xs text-gray-600">Total in Range</p>
             <p className="text-lg font-bold text-gray-900">
               {formatCurrency(totalForRange)}
@@ -358,6 +388,7 @@ const OtherExpensesPage = () => {
               <tbody className="divide-y divide-gray-100">
                 {expenses.map((expense) => (
                   <tr key={expense.id} className="transition hover:bg-gray-50">
+                    {/* ✅ Date — Shamsi */}
                     <td className="px-6 py-4">
                       <span className="text-sm font-medium text-gray-900">
                         {formatDate(expense.date)}

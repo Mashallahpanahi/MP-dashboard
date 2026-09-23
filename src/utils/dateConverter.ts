@@ -1,5 +1,5 @@
 // src/utils/dateConverter.ts
-import jalaali from "jalaali-js";
+import * as jalaali from "jalaali-js";
 
 // ============================================================
 // TYPES

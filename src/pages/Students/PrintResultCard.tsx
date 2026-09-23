@@ -7,6 +7,9 @@ import {
 import { getTeachers, type Teacher } from "@/api/teacherApi";
 import { getBooks, type Book } from "@/api/bookApi";
 import { getClasses, type Class } from "@/api/classApi";
+// ✅ Shamsi date picker + formatter
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+import { formatShamsi } from "@/utils/dateConverter";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -60,7 +63,7 @@ const ResultCard = ({ student }: ResultCardProps) => {
         breakInside: "avoid",
       }}
     >
-      {/* ---------- DECORATIVE BORDERS ---------- */}
+      {/* DECORATIVE BORDERS */}
       <div className="pointer-events-none absolute inset-0 z-20 border-[3px] border-amber-500" />
       <div className="pointer-events-none absolute inset-[8px] z-20 border border-blue-900/60" />
       <div className="pointer-events-none absolute left-0 top-0 z-20 h-16 w-16 border-l-4 border-t-4 border-amber-500" />
@@ -68,12 +71,12 @@ const ResultCard = ({ student }: ResultCardProps) => {
       <div className="pointer-events-none absolute bottom-0 left-0 z-20 h-16 w-16 border-b-4 border-l-4 border-amber-500" />
       <div className="pointer-events-none absolute bottom-0 right-0 z-20 h-16 w-16 border-b-4 border-r-4 border-amber-500" />
 
-      {/* ---------- BLUE CURVED SHAPE (bottom-right) ---------- */}
+      {/* BLUE CURVED SHAPE */}
       <div className="pointer-events-none absolute -bottom-32 -right-32 z-0 h-[320px] w-[320px] rounded-full bg-gradient-to-br from-blue-700 to-blue-900 opacity-40" />
       <div className="pointer-events-none absolute -bottom-24 -right-24 z-0 h-[260px] w-[260px] rounded-full bg-gradient-to-br from-amber-400 to-amber-600 opacity-25" />
       <div className="pointer-events-none absolute -bottom-16 -right-16 z-0 h-[200px] w-[200px] rounded-full bg-gradient-to-br from-blue-800 to-blue-950 opacity-50" />
 
-      {/* ---------- STUDENT PHOTO (top-right) ---------- */}
+      {/* STUDENT PHOTO */}
       <div className="absolute right-12 top-14 z-30">
         {student.studentImage ? (
           <div className="relative">
@@ -97,7 +100,7 @@ const ResultCard = ({ student }: ResultCardProps) => {
         )}
       </div>
 
-      {/* ---------- CONTENT ---------- */}
+      {/* CONTENT */}
       <div className="relative z-10 flex h-full flex-col px-14 pt-14 pb-6">
         {/* Title */}
         <div className="max-w-[500px]">
@@ -131,7 +134,7 @@ const ResultCard = ({ student }: ResultCardProps) => {
           <div className="mt-1 h-[2px] w-[380px] bg-gradient-to-r from-amber-600 via-amber-400 to-transparent" />
         </div>
 
-        {/* ONE LINE: Score · Passed · Book · Teacher */}
+        {/* Score · Passed · Book · Teacher */}
         <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <div className="flex items-center gap-1.5">
             <span className="font-bold uppercase tracking-widest text-blue-900">
@@ -173,17 +176,13 @@ const ResultCard = ({ student }: ResultCardProps) => {
           {message}
         </p>
 
-        {/* ---------- FOOTER ---------- */}
+        {/* FOOTER */}
         <div className="mt-auto flex items-end justify-between pb-2">
-          {/* Date */}
+          {/* ✅ Date — now Shamsi */}
           <div className="text-center">
             <div className="mb-1 h-[2px] w-32 bg-amber-500" />
             <p className="text-[11px] font-bold uppercase tracking-widest text-blue-900">
-              {new Date().toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
+              {formatShamsi(new Date(), "YYYY/MM/DD")}
             </p>
             <p className="mt-0.5 text-[9px] uppercase tracking-widest text-gray-500">
               Date
@@ -223,13 +222,12 @@ const ResultCard = ({ student }: ResultCardProps) => {
 // MAIN PAGE
 // ============================================
 const PrintResultCard = () => {
-  // Dropdowns
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
 
-  // Filters
+  // Filters — fromDate / toDate kept as MILADI ISO for backend
   const [teacherId, setTeacherId] = useState("");
   const [bookId, setBookId] = useState("");
   const [classId, setClassId] = useState("");
@@ -237,11 +235,9 @@ const PrintResultCard = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // Results
   const [students, setStudents] = useState<StudentForScoring[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Loading / messages
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState("");
@@ -365,9 +361,11 @@ const PrintResultCard = () => {
         pdf.addImage(imgData, "JPEG", 0, y, A4_W, CARD_H, undefined, "FAST");
       }
 
-      const fileName = `result-cards-${new Date()
-        .toISOString()
-        .slice(0, 10)}.pdf`;
+      // ✅ Shamsi date in filename too
+      const fileName = `result-cards-${formatShamsi(
+        new Date(),
+        "YYYY-MM-DD"
+      )}.pdf`;
       pdf.save(fileName);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
@@ -412,6 +410,7 @@ const PrintResultCard = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {/* Teacher */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Teacher <span className="text-red-500">*</span>
@@ -430,6 +429,7 @@ const PrintResultCard = () => {
                 </select>
               </div>
 
+              {/* Book */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Book <span className="text-red-500">*</span>
@@ -449,6 +449,7 @@ const PrintResultCard = () => {
                 </select>
               </div>
 
+              {/* Class */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Class{" "}
@@ -471,6 +472,7 @@ const PrintResultCard = () => {
                 </select>
               </div>
 
+              {/* Time */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   Time{" "}
@@ -487,6 +489,7 @@ const PrintResultCard = () => {
                 />
               </div>
 
+              {/* ✅ From Date — Shamsi picker */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   From Date{" "}
@@ -494,14 +497,14 @@ const PrintResultCard = () => {
                     (optional)
                   </span>
                 </label>
-                <input
-                  type="date"
+                <ShamsiDatePicker
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={setFromDate}
+                  placeholder="انتخاب تاریخ"
                 />
               </div>
 
+              {/* ✅ To Date — Shamsi picker */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   To Date{" "}
@@ -509,11 +512,10 @@ const PrintResultCard = () => {
                     (optional)
                   </span>
                 </label>
-                <input
-                  type="date"
+                <ShamsiDatePicker
                   value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={setToDate}
+                  placeholder="انتخاب تاریخ"
                 />
               </div>
             </div>
