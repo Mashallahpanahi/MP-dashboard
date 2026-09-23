@@ -1,5 +1,5 @@
 // src/pages/Students/PrintResultCard.tsx
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   findStudentsForScoring,
   type StudentForScoring,
@@ -22,28 +22,8 @@ const getImageUrl = (imagePath: string | null | undefined) => {
 const getInitials = (first?: string, last?: string) =>
   `${first?.charAt(0) || "?"}${last?.charAt(0) || ""}`.toUpperCase();
 
-const formatDate = (dateStr: string | undefined): string => {
-  if (!dateStr) return "—";
-  try {
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-};
-
 // ============================================
-// RESULT CARD (one per student)
-// ============================================
-interface ResultCardProps {
-  student: StudentForScoring;
-}
-
-// ============================================
-// RESULT CARD (one per student)
+// RESULT CARD (one per student — half A4)
 // ============================================
 interface ResultCardProps {
   student: StudentForScoring;
@@ -66,42 +46,39 @@ const ResultCard = ({ student }: ResultCardProps) => {
       : null;
   const passed = total !== null && total >= student.passingScore;
 
-  // Dynamic message based on result
   const message = passed
-    ? `You have shown remarkable dedication and a genuine love for learning. Your hard work in "${student.bookName}" has truly paid off, and your achievement is something to be proud of. Keep shining and continue to inspire those around you with your commitment and passion for knowledge.`
+    ? `You have shown remarkable dedication and a genuine love for learning. Your hard work in "${student.bookName}" has truly paid off, and your achievement is something to be proud of. Keep shining and continue to inspire those around you.`
     : `Every step you take is a step toward growth. Although this chapter has come to a close, your journey is far from over. Use this experience as fuel for the next challenge — with persistence and a willing heart, success will surely follow.`;
 
   return (
     <div
-      className="result-card relative mx-auto aspect-[1.414/1] w-full max-w-[900px] overflow-hidden rounded-sm bg-white shadow-xl print:shadow-none"
+      className="result-card relative mx-auto overflow-hidden rounded-sm bg-white shadow-xl print:shadow-none"
       style={{
-        pageBreakAfter: "always",
-        breakAfter: "page",
+        width: "210mm",
+        height: "148.5mm",
+        pageBreakInside: "avoid",
+        breakInside: "avoid",
       }}
     >
-      {/* ---------- DECORATIVE BORDER ---------- */}
-      {/* Outer gold border */}
+      {/* ---------- DECORATIVE BORDERS ---------- */}
       <div className="pointer-events-none absolute inset-0 z-20 border-[3px] border-amber-500" />
-      {/* Inner navy border */}
       <div className="pointer-events-none absolute inset-[8px] z-20 border border-blue-900/60" />
-      {/* Corner accents */}
       <div className="pointer-events-none absolute left-0 top-0 z-20 h-16 w-16 border-l-4 border-t-4 border-amber-500" />
       <div className="pointer-events-none absolute right-0 top-0 z-20 h-16 w-16 border-r-4 border-t-4 border-amber-500" />
       <div className="pointer-events-none absolute bottom-0 left-0 z-20 h-16 w-16 border-b-4 border-l-4 border-amber-500" />
       <div className="pointer-events-none absolute bottom-0 right-0 z-20 h-16 w-16 border-b-4 border-r-4 border-amber-500" />
 
       {/* ---------- BLUE CURVED SHAPE (bottom-right) ---------- */}
-     {/* ---------- BLUE CURVED SHAPE (bottom-right, subtle) ---------- */}
-<div className="pointer-events-none absolute -bottom-32 -right-32 z-0 h-[320px] w-[320px] rounded-full bg-gradient-to-br from-blue-700 to-blue-900 opacity-40" />
-<div className="pointer-events-none absolute -bottom-24 -right-24 z-0 h-[260px] w-[260px] rounded-full bg-gradient-to-br from-amber-400 to-amber-600 opacity-25" />
-<div className="pointer-events-none absolute -bottom-16 -right-16 z-0 h-[200px] w-[200px] rounded-full bg-gradient-to-br from-blue-800 to-blue-950 opacity-50" />
-      {/* ---------- STUDENT PHOTO (top-right, replacing the seal) ---------- */}
-      <div className="absolute right-10 top-16 z-30">
+      <div className="pointer-events-none absolute -bottom-32 -right-32 z-0 h-[320px] w-[320px] rounded-full bg-gradient-to-br from-blue-700 to-blue-900 opacity-40" />
+      <div className="pointer-events-none absolute -bottom-24 -right-24 z-0 h-[260px] w-[260px] rounded-full bg-gradient-to-br from-amber-400 to-amber-600 opacity-25" />
+      <div className="pointer-events-none absolute -bottom-16 -right-16 z-0 h-[200px] w-[200px] rounded-full bg-gradient-to-br from-blue-800 to-blue-950 opacity-50" />
+
+      {/* ---------- STUDENT PHOTO (top-right) ---------- */}
+      <div className="absolute right-12 top-14 z-30">
         {student.studentImage ? (
           <div className="relative">
-            {/* Gold ring around photo */}
-            <div className="absolute -inset-1 rounded-lg bg-gradient-to-br from-amber-300 via-amber-500 to-amber-700 opacity-90" />
-            <div className="relative h-32 w-24 overflow-hidden rounded-md border-2 border-white shadow-md">
+            <div className="absolute -inset-[2px] rounded-md bg-gradient-to-br from-amber-300 via-amber-500 to-amber-700 opacity-90" />
+            <div className="relative h-28 w-20 overflow-hidden rounded-md border border-white shadow-md">
               <img
                 src={getImageUrl(student.studentImage) || ""}
                 alt={`${student.studentName} ${student.studentLastName}`}
@@ -114,24 +91,24 @@ const ResultCard = ({ student }: ResultCardProps) => {
             </div>
           </div>
         ) : (
-          <div className="flex h-28 w-24 items-center justify-center rounded-md bg-gradient-to-br from-blue-100 to-blue-200 text-2xl font-bold text-blue-700 shadow-lg ring-2 ring-amber-400">
+          <div className="flex h-28 w-20 items-center justify-center rounded-md bg-gradient-to-br from-blue-100 to-blue-200 text-2xl font-bold text-blue-700 shadow-sm ring-1 ring-amber-400">
             {getInitials(student.studentName, student.studentLastName)}
           </div>
         )}
       </div>
 
       {/* ---------- CONTENT ---------- */}
-      <div className="relative z-10 flex h-full flex-col px-16 py-12">
+      <div className="relative z-10 flex h-full flex-col px-14 pt-14 pb-6">
         {/* Title */}
-        <div className="mb-6 max-w-[540px]">
+        <div className="max-w-[500px]">
           <h1
-            className="text-6xl font-bold tracking-widest text-blue-900"
+            className="text-4xl font-bold tracking-widest text-blue-900"
             style={{ fontFamily: "Cinzel, serif" }}
           >
             CERTIFICATE
           </h1>
           <p
-            className="mt-2 text-2xl font-semibold tracking-[0.35em] text-amber-600"
+            className="mt-1 text-lg font-semibold tracking-[0.35em] text-amber-600"
             style={{ fontFamily: "Cinzel, serif" }}
           >
             OF APPRECIATION
@@ -139,103 +116,100 @@ const ResultCard = ({ student }: ResultCardProps) => {
         </div>
 
         {/* Presented to */}
-        <p className="text-sm font-bold uppercase tracking-widest text-blue-900">
+        <p className="mt-5 text-xs font-bold uppercase tracking-widest text-blue-900">
           This certificate is proudly presented to:
         </p>
 
-        {/* Student name (cursive) */}
-        <div className="mt-6">
+        {/* Student name */}
+        <div className="mt-2">
           <h2
-            className="max-w-[600px] text-6xl leading-tight text-blue-900"
+            className="max-w-[560px] text-5xl leading-tight text-blue-900"
             style={{ fontFamily: "'Great Vibes', cursive" }}
           >
             {student.studentName} {student.studentLastName}
           </h2>
-          <div className="mt-2 h-[2px] w-[420px] bg-gradient-to-r from-amber-600 via-amber-400 to-transparent" />
+          <div className="mt-1 h-[2px] w-[380px] bg-gradient-to-r from-amber-600 via-amber-400 to-transparent" />
         </div>
 
-        {/* Score & result (NO passing score shown) */}
-        <div className="mt-6 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-blue-900">
+        {/* ONE LINE: Score · Passed · Book · Teacher */}
+        <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold uppercase tracking-widest text-blue-900">
               Score:
             </span>
             <span
-              className={`text-3xl font-bold ${
+              className={`text-xl font-bold ${
                 passed ? "text-emerald-600" : "text-red-600"
               }`}
             >
               {total !== null ? total.toFixed(1) : "—"}
             </span>
           </div>
-         <div className="h-6 w-px bg-gray-300" />
-<span
-  className={`text-sm font-bold uppercase tracking-widest ${
-    passed ? "text-emerald-600" : "text-red-600"
-  }`}
->
-  {passed ? "✓ Passed" : " Not Passed"}
-</span>
-        </div>
-
-        {/* Book / Teacher info */}
-        <div className="mt-3 text-xs text-gray-600">
-          <span className="font-semibold text-blue-900">
-            {student.bookName}
-          </span>{" "}
-          · Taught by{" "}
-          <span className="font-semibold">
-            {student.teacherName} {student.teacherLastName}
+          <span className="text-gray-300">|</span>
+          <span
+            className={`font-bold uppercase tracking-widest ${
+              passed ? "text-emerald-600" : "text-red-600"
+            }`}
+          >
+            {passed ? "✓ Passed" : " Not Passed"}
+          </span>
+          <span className="text-gray-300">|</span>
+          <span className="text-gray-600">
+            <span className="font-semibold text-blue-900">
+              {student.bookName}
+            </span>{" "}
+            · Taught by{" "}
+            <span className="font-semibold">
+              {student.teacherName} {student.teacherLastName}
+            </span>
           </span>
         </div>
 
         {/* Message */}
         <p
-          className="mt-6 max-w-[600px] text-[13px] leading-relaxed text-gray-700"
+          className="mt-4 max-w-[560px] text-[11px] leading-relaxed text-gray-700"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           {message}
         </p>
 
-        {/* ---------- FOOTER: DATE / SIGNATURE ---------- */}
-        <div className="mt-auto flex items-end justify-between pt-8">
+        {/* ---------- FOOTER ---------- */}
+        <div className="mt-auto flex items-end justify-between pb-2">
           {/* Date */}
-          {/* Date */}
-<div className="text-center">
-  <div className="mb-1 h-[2px] w-40 bg-amber-500" />
-  <p className="text-xs font-bold uppercase tracking-widest text-blue-900">
+          <div className="text-center">
+            <div className="mb-1 h-[2px] w-32 bg-amber-500" />
+            <p className="text-[11px] font-bold uppercase tracking-widest text-blue-900">
               {new Date().toLocaleDateString("en-US", {
                 year: "numeric",
                 month: "short",
                 day: "numeric",
               })}
             </p>
-            <p className="mt-1 text-[10px] uppercase tracking-widest text-gray-500">
+            <p className="mt-0.5 text-[9px] uppercase tracking-widest text-gray-500">
               Date
             </p>
           </div>
 
-          {/* Student number (center, small) */}
+          {/* Student number */}
           <div className="text-center">
-            <p className="text-xs font-semibold text-gray-700">
+            <p className="text-[11px] font-semibold text-gray-700">
               {student.studentNumber || "—"}
             </p>
-            <p className="mt-0.5 text-[10px] uppercase tracking-widest text-gray-500">
+            <p className="mt-0.5 text-[9px] uppercase tracking-widest text-gray-500">
               Student No.
             </p>
           </div>
 
           {/* Signature */}
-        {/* Signature */}
-<div className="text-center">
-  <div className="mb-1 mt-14 h-[1px] w-40 bg-amber-500" />
-  <p
-    className="text-lg text-blue-900"
-    style={{ fontFamily: "'Great Vibes', cursive" }}
-  >
-    School Director
-  </p>
-            <p className="mt-0.5 text-[10px] uppercase tracking-widest text-gray-500">
+          <div className="text-center">
+            <div className="mb-1 h-[2px] w-32 bg-amber-500" />
+            <p
+              className="text-base leading-tight text-blue-900"
+              style={{ fontFamily: "'Great Vibes', cursive" }}
+            >
+              School Director
+            </p>
+            <p className="mt-0.5 text-[9px] uppercase tracking-widest text-gray-500">
               Signature
             </p>
           </div>
@@ -244,11 +218,12 @@ const ResultCard = ({ student }: ResultCardProps) => {
     </div>
   );
 };
+
 // ============================================
 // MAIN PAGE
 // ============================================
 const PrintResultCard = () => {
-  // Dropdown data
+  // Dropdowns
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -347,7 +322,7 @@ const PrintResultCard = () => {
   };
 
   // ============================================
-  // DOWNLOAD AS PDF
+  // DOWNLOAD AS PDF (2 cards per A4 page)
   // ============================================
   const handleDownloadPDF = async () => {
     if (students.length === 0) return;
@@ -360,7 +335,7 @@ const PrintResultCard = () => {
       ]);
 
       const pdf = new jsPDF({
-        orientation: "landscape",
+        orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
@@ -368,9 +343,12 @@ const PrintResultCard = () => {
       const cards = document.querySelectorAll<HTMLElement>(".result-card");
       if (cards.length === 0) return;
 
+      const A4_W = 210;
+      const A4_H = 297;
+      const CARD_H = A4_H / 2; // 148.5mm
+
       for (let i = 0; i < cards.length; i++) {
-        const card = cards[i];
-        const canvas = await html2canvas(card, {
+        const canvas = await html2canvas(cards[i], {
           scale: 2,
           useCORS: true,
           backgroundColor: "#ffffff",
@@ -379,34 +357,21 @@ const PrintResultCard = () => {
 
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
 
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
+        const slot = i % 2;
+        const y = slot * CARD_H;
 
-        if (i > 0) pdf.addPage();
+        if (i > 0 && slot === 0) pdf.addPage();
 
-        // Fit card to page with margin
-        const margin = 8;
-        const availW = pageW - margin * 2;
-        const availH = pageH - margin * 2;
-        const ratio = Math.min(availW / canvas.width, availH / canvas.height);
-        const imgW = canvas.width * ratio;
-        const imgH = canvas.height * ratio;
-        const x = (pageW - imgW) / 2;
-        const y = (pageH - imgH) / 2;
-
-        pdf.addImage(imgData, "JPEG", x, y, imgW, imgH, undefined, "FAST");
+        pdf.addImage(imgData, "JPEG", 0, y, A4_W, CARD_H, undefined, "FAST");
       }
 
-      // Save
       const fileName = `result-cards-${new Date()
         .toISOString()
         .slice(0, 10)}.pdf`;
       pdf.save(fileName);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to generate PDF"
-      );
+      setError(err instanceof Error ? err.message : "Failed to generate PDF");
     } finally {
       setPdfLoading(false);
     }
@@ -421,13 +386,11 @@ const PrintResultCard = () => {
 
   return (
     <div className="p-6">
-      {/* ============================================ */}
-      {/* HEADER (screen only) */}
-      {/* ============================================ */}
+      {/* HEADER */}
       <div className="mb-6 print:hidden">
         <h1 className="text-2xl font-bold text-gray-900">Print Result Card</h1>
         <p className="mt-1 text-sm text-gray-500">
-          چاپ نمودن ریزلت کارت — Print or download PDF (one page per student)
+          چاپ نمودن ریزلت کارت — Print or download PDF (2 cards per A4 page)
         </p>
       </div>
 
@@ -438,9 +401,7 @@ const PrintResultCard = () => {
         </div>
       )}
 
-      {/* ============================================ */}
-      {/* FILTERS (screen only) */}
-      {/* ============================================ */}
+      {/* FILTERS */}
       <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm print:hidden">
         <h2 className="mb-4 text-base font-semibold text-gray-900">Filters</h2>
 
@@ -579,9 +540,7 @@ const PrintResultCard = () => {
         )}
       </div>
 
-      {/* ============================================ */}
       {/* NO RESULTS */}
-      {/* ============================================ */}
       {noResults && (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center print:hidden">
           <h3 className="text-base font-semibold text-gray-900">
@@ -593,9 +552,7 @@ const PrintResultCard = () => {
         </div>
       )}
 
-      {/* ============================================ */}
-      {/* ACTION BUTTONS (screen only) */}
-      {/* ============================================ */}
+      {/* ACTION BUTTONS */}
       {hasResults && (
         <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
           <button
@@ -641,11 +598,12 @@ const PrintResultCard = () => {
         </div>
       )}
 
-      {/* ============================================ */}
-      {/* RESULT CARDS (one per student, one per page) */}
-      {/* ============================================ */}
+      {/* RESULT CARDS */}
       {hasResults && (
-        <div id="print-area" className="space-y-10 print:space-y-0">
+        <div
+          id="print-area"
+          className="mx-auto flex flex-col items-center gap-10 print:gap-0"
+        >
           {students.map((student) => (
             <ResultCard key={student.enrollmentId} student={student} />
           ))}

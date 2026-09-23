@@ -21,50 +21,57 @@
   font-weight: 400;
   font-style: normal;
 }
-
 /* ============================================================
-   PRINT STYLES — Result Card (one card per page)
+   PRINT STYLES — Result Card (2 cards per A4 page)
    ============================================================ */
 @media print {
-  /* Hide everything */
   body * {
     visibility: hidden;
   }
 
-  /* Show only the print area */
   #print-area,
   #print-area * {
     visibility: visible;
   }
 
-  /* Reset positioning */
   #print-area {
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
+    width: 210mm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 0;
+    padding: 0;
   }
 
-  /* Hide sidebar and screen-only UI */
   aside,
   .print\:hidden {
     display: none !important;
   }
 
-  /* Force color printing */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Each card on its own page */
+  /* Each card = exactly half A4 */
   .result-card {
+    width: 210mm !important;
+    height: 148.5mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+  }
+
+  /* After every 2nd card → new page */
+  .result-card:nth-child(2n) {
     page-break-after: always;
     break-after: page;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    box-shadow: none !important;
   }
 
   .result-card:last-child {
@@ -72,9 +79,8 @@
     break-after: auto;
   }
 
-  /* A4 landscape with margins */
   @page {
-    size: A4 landscape;
-    margin: 8mm;
+    size: A4 portrait;
+    margin: 0;
   }
 }
