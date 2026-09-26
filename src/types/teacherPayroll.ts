@@ -17,8 +17,8 @@ export interface TeacherPayroll {
     hireDate: string;
     isActive: boolean;
   };
-  month: number;        // ✅ Added: Month number (1-12)
-  year: number;         // ✅ Added: Year
+  month: number;
+  year: number;
   baseSalary: number;
   paidAmount: number;
   remainingSalary: number;
@@ -31,8 +31,8 @@ export interface TeacherPayroll {
 
 export interface CreateTeacherPayrollData {
   teacherId: string;
-  month: number;              // ✅ Added: Month number (1-12)
-  year: number;               // ✅ Added: Year
+  month: number;
+  year: number;
   baseSalary: number;
   paidAmount?: number;
   remainingSalary?: number;
@@ -43,8 +43,8 @@ export interface CreateTeacherPayrollData {
 
 export interface UpdateTeacherPayrollData {
   teacherId?: string;
-  month?: number;             // ✅ Added
-  year?: number;              // ✅ Added
+  month?: number;
+  year?: number;
   baseSalary?: number;
   paidAmount?: number;
   remainingSalary?: number;
@@ -80,18 +80,33 @@ export interface AddPaymentData {
   notes?: string;
 }
 
+// ✅ NEW: student detail inside a PerStudent unpaid record
+export interface UnpaidStudentDetail {
+  studentId: string;
+  studentName: string;
+  studentLastName: string;
+  finalFee: number;
+  teacherShare: number;
+}
+
+// ✅ UPDATED: UnpaidSalaryRecord with new backend fields
 export interface UnpaidSalaryRecord {
   teacherId: string;
   firstName: string;
   lastName: string;
   phone: string;
   email: string;
-  salaryType: string;
+  salaryType: string;                    // "Fixed" | "PerStudent"
   salaryAmount: number | string;
   feePercentage: number | string;
   hireDate: string;
   month: string;
+  monthNumber?: number;                  // ✅ NEW
   year: number;
   monthKey: string;
   message: string;
+  // ✅ NEW (only present for PerStudent)
+  calculatedSalary?: number | null;
+  enrolledStudents?: number | null;
+  studentDetails?: UnpaidStudentDetail[] | null;
 }

@@ -31,7 +31,7 @@ import {
 // HELPERS
 // ============================================
 const formatCurrency = (v: number) =>
-  `$${v.toLocaleString("en-US", {
+  `AF ${v.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -497,7 +497,7 @@ const Dashboard = () => {
                   }
                 />
                 <Tooltip
-                  formatter={(value: number) => `$${value.toLocaleString()}`}
+                  formatter={(value: number) => `AF ${value.toLocaleString()}`}
                   contentStyle={{
                     borderRadius: 8,
                     border: "1px solid #e5e7eb",

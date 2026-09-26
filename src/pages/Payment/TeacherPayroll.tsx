@@ -1,24 +1,24 @@
 // src/pages/Payment/TeacherPayroll.tsx
 import { useEffect, useState } from "react";
-import { 
-  getTeacherPayrolls, 
+import {
+  getTeacherPayrolls,
   deleteTeacherPayroll,
   getTeacherPayrollById,
   updateTeacherPayroll,
   createTeacherPayroll,
   addPaymentToPayroll,
-  getUnpaidSalaries
+  getUnpaidSalaries,
 } from "@/api/teacherPayrollApi";
-import type { 
-  TeacherPayroll, 
-  UpdateTeacherPayrollData, 
-  CreateTeacherPayrollData, 
+import type {
+  TeacherPayroll,
+  UpdateTeacherPayrollData,
+  CreateTeacherPayrollData,
   AddPaymentData,
-  UnpaidSalaryRecord
+  UnpaidSalaryRecord,
 } from "@/types/teacherPayroll";
-import {  
+import {
   TeacherPayrollCreateModal,
-  TeacherPayrollHistoryModal
+  TeacherPayrollHistoryModal,
 } from "@/components/teacher-payroll";
 // ✅ Shamsi helpers
 import {
@@ -37,12 +37,16 @@ const TeacherPayrollPage = () => {
 
   // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [payrollToDelete, setPayrollToDelete] = useState<TeacherPayroll | null>(null);
+  const [payrollToDelete, setPayrollToDelete] = useState<TeacherPayroll | null>(
+    null
+  );
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Update state
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [payrollToUpdate, setPayrollToUpdate] = useState<TeacherPayroll | null>(null);
+  const [payrollToUpdate, setPayrollToUpdate] = useState<TeacherPayroll | null>(
+    null
+  );
   const [updateLoading, setUpdateLoading] = useState(false);
 
   // Create state
@@ -51,7 +55,8 @@ const TeacherPayrollPage = () => {
 
   // Add Payment state
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
-  const [payrollToAddPayment, setPayrollToAddPayment] = useState<TeacherPayroll | null>(null);
+  const [payrollToAddPayment, setPayrollToAddPayment] =
+    useState<TeacherPayroll | null>(null);
   const [addPaymentLoading, setAddPaymentLoading] = useState(false);
 
   // History state
@@ -60,8 +65,9 @@ const TeacherPayrollPage = () => {
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Pre-fill data for create modal
-  const [prefillData, setPrefillData] = useState<CreateTeacherPayrollData | null>(null);
+  // Prefill data for create modal
+  const [prefillData, setPrefillData] =
+    useState<CreateTeacherPayrollData | null>(null);
 
   const fetchPayrolls = async () => {
     try {
@@ -72,7 +78,9 @@ const TeacherPayrollPage = () => {
     } catch (error) {
       console.error("Failed to fetch teacher payrolls:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to fetch teacher payrolls"
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch teacher payrolls"
       );
     } finally {
       setLoading(false);
@@ -144,12 +152,13 @@ const TeacherPayrollPage = () => {
     }
   };
 
-  const handleUpdatePayroll = async (id: string, data: UpdateTeacherPayrollData) => {
+  const handleUpdatePayroll = async (
+    id: string,
+    data: UpdateTeacherPayrollData
+  ) => {
     const updatedPayroll = await updateTeacherPayroll(id, data);
     setPayrolls((prev) =>
-      prev.map((p) =>
-        p.id === updatedPayroll.id ? updatedPayroll : p
-      )
+      prev.map((p) => (p.id === updatedPayroll.id ? updatedPayroll : p))
     );
     fetchUnpaidSalaries();
   };
@@ -165,38 +174,58 @@ const TeacherPayrollPage = () => {
     setShowCreateModal(true);
   };
 
-  // ✅ Handle paying salary for a specific unpaid record
-  //    - Converts the Miladi "month/year" of the unpaid record to Miladi number for the prefill.
-  //    - The display in the create modal will show Shamsi automatically.
+  // ============================================
+  // ✅ Pay salary for an unpaid record
+  //   - Fixed: use salaryAmount as before
+  //   - PerStudent: use calculatedSalary (from enrolled students)
+  // ============================================
   const handlePayForMonth = (record: UnpaidSalaryRecord) => {
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthNumber = monthNames.indexOf(record.month) + 1;
+    const isPerStudent = record.salaryType === "PerStudent";
 
-    const baseSalary = typeof record.salaryAmount === 'string' 
-      ? parseFloat(record.salaryAmount) 
-      : record.salaryAmount;
+    // ✅ Prefer calculatedSalary when it exists (PerStudent)
+    const calculated = safeNumber(record.calculatedSalary as any);
+    const fixedAmount = safeNumber(record.salaryAmount);
 
-    console.log('📤 Prefilling for:', {
+    let baseSalary: number;
+    let paidAmount: number;
+
+    if (isPerStudent) {
+      // Use backend-calculated amount (0 if no students)
+      baseSalary = calculated;
+      paidAmount = calculated;
+    } else {
+      baseSalary = fixedAmount;
+      paidAmount = fixedAmount;
+    }
+
+    // ✅ Build a nicer note depending on type
+    const noteText = isPerStudent
+      ? `Salary for ${record.month} ${record.year} — ${calculated} from ${
+          record.enrolledStudents ?? 0
+        } students`
+      : `Salary for ${record.month} ${record.year}`;
+
+    console.log("📤 Prefilling payroll:", {
       teacher: `${record.firstName} ${record.lastName}`,
+      type: record.salaryType,
       month: record.month,
-      monthNumber,
       year: record.year,
       baseSalary,
+      paidAmount,
+      calculatedSalary: record.calculatedSalary,
+      enrolledStudents: record.enrolledStudents,
     });
 
     setPrefillData({
       teacherId: record.teacherId,
-      month: monthNumber,
+      month: record.monthNumber ?? monthNameToNumber(record.month),
       year: record.year,
-      baseSalary: baseSalary,
-      paidAmount: baseSalary,
+      baseSalary,
+      paidAmount,
       remainingSalary: 0,
       date: formatMiladiISO(new Date()),
-      status: 'Completed',
-      notes: `Salary for ${record.month} ${record.year}`,
+      status: "Completed",
+      notes: noteText,
     });
     setShowCreateModal(true);
   };
@@ -233,9 +262,7 @@ const TeacherPayrollPage = () => {
       setAddPaymentLoading(true);
       const updatedPayroll = await addPaymentToPayroll(id, data);
       setPayrolls((prev) =>
-        prev.map((p) =>
-          p.id === updatedPayroll.id ? updatedPayroll : p
-        )
+        prev.map((p) => (p.id === updatedPayroll.id ? updatedPayroll : p))
       );
       setShowAddPaymentModal(false);
       setPayrollToAddPayment(null);
@@ -261,38 +288,44 @@ const TeacherPayrollPage = () => {
     setShowHistoryModal(false);
   };
 
-  // Helper functions
-  const formatCurrency = (amount: number | string | null | undefined): string => {
-    if (amount === null || amount === undefined || amount === '') return '$0.00';
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-    if (isNaN(numAmount)) return '$0.00';
+  // ============================================
+  // HELPERS
+  // ============================================
+  const formatCurrency = (
+    amount: number | string | null | undefined
+  ): string => {
+    if (amount === null || amount === undefined || amount === "") return "$0.00";
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(numAmount)) return "$0.00";
     return `$${numAmount.toFixed(2)}`;
   };
 
   const safeNumber = (value: number | string | null | undefined): number => {
-    if (value === null || value === undefined || value === '') return 0;
-    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (value === null || value === undefined || value === "") return 0;
+    const num = typeof value === "string" ? parseFloat(value) : value;
     return isNaN(num) ? 0 : num;
   };
 
-  // ✅ Shamsi date
+  const monthNameToNumber = (monthName: string): number => {
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+    return monthNames.indexOf(monthName) + 1;
+  };
+
   const formatDate = (date: string) => {
-    if (!date) return 'N/A';
+    if (!date) return "N/A";
     try {
       return formatShamsi(date, "YYYY/MM/DD");
     } catch {
-      return 'Invalid date';
+      return "Invalid date";
     }
   };
 
-  // ✅ NEW: Convert a Miladi month/year to Shamsi month name + year
-  //    Used to display the "Month" column in the table in Shamsi.
+  // ✅ Convert Miladi month name + year to Shamsi label
   const formatUnpaidMonth = (monthName: string, year: number): string => {
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthNumber = monthNames.indexOf(monthName) + 1;
+    const monthNumber = monthNameToNumber(monthName);
     if (!monthNumber) return `${monthName} ${year}`;
 
     try {
@@ -320,7 +353,9 @@ const TeacherPayrollPage = () => {
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
-          <p className="mt-4 text-sm text-gray-500">Loading unpaid salaries...</p>
+          <p className="mt-4 text-sm text-gray-500">
+            Loading unpaid salaries...
+          </p>
         </div>
       </div>
     );
@@ -341,8 +376,18 @@ const TeacherPayrollPage = () => {
             onClick={handleHistoryClick}
             className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
           >
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="mr-2 h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             See History of Payment
           </button>
@@ -351,8 +396,18 @@ const TeacherPayrollPage = () => {
             disabled={loadingUnpaid}
             className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg
+              className="mr-2 h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
             Refresh
           </button>
@@ -382,12 +437,12 @@ const TeacherPayrollPage = () => {
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
           <div className="mb-4 text-4xl">✅</div>
           <h3 className="text-lg font-semibold text-gray-900">
-            {unpaidRecords.length === 0 
-              ? "All Teachers Are Paid!" 
+            {unpaidRecords.length === 0
+              ? "All Teachers Are Paid!"
               : "No Results Match Your Search"}
           </h3>
           <p className="mt-2 text-sm text-gray-500">
-            {unpaidRecords.length === 0 
+            {unpaidRecords.length === 0
               ? "All active teachers have received their salaries for all months."
               : "Try adjusting your search criteria."}
           </p>
@@ -405,7 +460,13 @@ const TeacherPayrollPage = () => {
                     Teacher Name
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Type
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Month
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Amount Due
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Action
@@ -413,50 +474,112 @@ const TeacherPayrollPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredUnpaidRecords.map((record, index) => (
-                  <tr
-                    key={`${record.teacherId}-${record.monthKey}-${index}`}
-                    className="transition hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                          <span className="text-sm font-bold text-red-700">
-                            {record.firstName?.charAt(0)}
-                            {record.lastName?.charAt(0)}
+                {filteredUnpaidRecords.map((record, index) => {
+                  const isPerStudent = record.salaryType === "PerStudent";
+                  const calculated = safeNumber(
+                    record.calculatedSalary as any
+                  );
+                  const fixed = safeNumber(record.salaryAmount);
+                  const amountDue = isPerStudent ? calculated : fixed;
+                  const studentsCount = record.enrolledStudents ?? 0;
+
+                  return (
+                    <tr
+                      key={`${record.teacherId}-${record.monthKey}-${index}`}
+                      className="transition hover:bg-gray-50"
+                    >
+                      {/* Teacher */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                            <span className="text-sm font-bold text-red-700">
+                              {record.firstName?.charAt(0)}
+                              {record.lastName?.charAt(0)}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {record.firstName} {record.lastName}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {record.email}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Type */}
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            isPerStudent
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {record.salaryType}
+                        </span>
+                      </td>
+
+                      {/* Month (Shamsi) */}
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
+                          {formatUnpaidMonth(record.month, record.year)}
+                        </span>
+                      </td>
+
+                      {/* Amount Due — differs by type */}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-bold text-gray-900">
+                            {formatCurrency(amountDue)}
                           </span>
+                          {isPerStudent && (
+                            <span className="text-[11px] text-purple-600">
+                              {studentsCount} student
+                              {studentsCount !== 1 ? "s" : ""} •{" "}
+                              {safeNumber(record.feePercentage)}% share
+                            </span>
+                          )}
+                          {isPerStudent && studentsCount === 0 && (
+                            <span className="text-[11px] text-gray-500">
+                              No students enrolled this month
+                            </span>
+                          )}
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {record.firstName} {record.lastName}
-                          </p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {record.email}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* ✅ Month — now Shamsi */}
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
-                        {formatUnpaidMonth(record.month, record.year)}
-                      </span>
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => handlePayForMonth(record)}
-                        className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700"
-                      >
-                        <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        Pay Salary
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Action */}
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handlePayForMonth(record)}
+                          disabled={isPerStudent && amountDue <= 0}
+                          title={
+                            isPerStudent && amountDue <= 0
+                              ? "Nothing to pay — no students enrolled this month"
+                              : "Pay Salary"
+                          }
+                          className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <svg
+                            className="mr-2 h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                            />
+                          </svg>
+                          Pay Salary
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

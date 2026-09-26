@@ -23,22 +23,18 @@ import StudentEditModal from "@/components/students/StudentEditModal";
 import MoreFilterModal, {
   type MoreFilterValues,
 } from "@/components/students/MoreFilterModal";
-// ✅ Enrollment History modal
 import EnrollmentHistoryModal from "@/components/students/EnrollmentHistoryModal";
-// ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import { useNavigate } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// Helper function to get full image URL
 const getImageUrl = (imagePath: string | null | undefined) => {
   if (!imagePath) return null;
   if (imagePath.startsWith("http")) return imagePath;
   return `${API_URL}${imagePath}`;
 };
 
-// View mode type
 type ViewMode =
   | "paginated"
   | "unenrolled"
@@ -46,7 +42,6 @@ type ViewMode =
   | "search-number"
   | "filtered";
 
-// Search type
 type SearchType = "name" | "studentNumber";
 
 const AllStudents = () => {
@@ -67,46 +62,37 @@ const AllStudents = () => {
   const [searchNumber, setSearchNumber] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [useDateFilter, setUseDateFilter] = useState(false);
-  // ⚠️ Kept as MILADI ISO ("YYYY-MM-DD") for the backend
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // More Filter state
   const [showMoreFilter, setShowMoreFilter] = useState(false);
   const [moreFilters, setMoreFilters] = useState<MoreFilterValues>({});
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Detail state
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [studentToView, setStudentToView] = useState<Student | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Edit Modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [studentForEdit, setStudentForEdit] = useState<Student | null>(null);
 
-  // Enrollments state
   const [showEnrollmentsModal, setShowEnrollmentsModal] = useState(false);
   const [studentForEnrollments, setStudentForEnrollments] =
     useState<Student | null>(null);
 
-  // Scores state
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [studentForScores, setStudentForScores] = useState<Student | null>(
     null
   );
 
-  // History state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [studentForHistory, setStudentForHistory] = useState<Student | null>(
     null
@@ -115,7 +101,6 @@ const AllStudents = () => {
   // ============================================
   // DATA FETCHING
   // ============================================
-
   const fetchPaginatedStudents = useCallback(
     async (page: number = 1, limit: number = pageSize) => {
       try {
@@ -302,7 +287,6 @@ const AllStudents = () => {
   // ============================================
   // HANDLERS
   // ============================================
-
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       fetchPaginatedStudents(newPage);
@@ -314,14 +298,10 @@ const AllStudents = () => {
     fetchPaginatedStudents(1, newSize);
   };
 
-  const handleSearchClick = () => {
-    handleSearch();
-  };
+  const handleSearchClick = () => handleSearch();
 
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
+    if (e.key === "Enter") handleSearch();
   };
 
   const handleSearchTypeChange = (newType: SearchType) => {
@@ -350,13 +330,8 @@ const AllStudents = () => {
     fetchUnenrolledStudents();
   };
 
-  const handleOpenMoreFilter = () => {
-    setShowMoreFilter(true);
-  };
-
-  const handleCloseMoreFilter = () => {
-    setShowMoreFilter(false);
-  };
+  const handleOpenMoreFilter = () => setShowMoreFilter(true);
+  const handleCloseMoreFilter = () => setShowMoreFilter(false);
 
   const hasActiveMoreFilters =
     moreFilters.teacherId ||
@@ -381,7 +356,6 @@ const AllStudents = () => {
     }
   };
 
-  // Delete handlers
   const handleDeleteClick = (student: Student) => {
     setStudentToDelete(student);
     setShowDeleteModal(true);
@@ -417,7 +391,6 @@ const AllStudents = () => {
     setStudentToDelete(null);
   };
 
-  // Detail handlers
   const handleViewClick = async (student: Student) => {
     try {
       setDetailLoading(true);
@@ -497,19 +470,6 @@ const AllStudents = () => {
 
   const handleAddStudent = () => {
     navigate("/students/register");
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Active":
-        return "bg-green-100 text-green-700";
-      case "Inactive":
-        return "bg-gray-100 text-gray-700";
-      case "Graduated":
-        return "bg-blue-100 text-blue-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
   };
 
   // ============================================
@@ -650,7 +610,6 @@ const AllStudents = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Search Type Selector */}
           <select
             value={searchType}
             onChange={(e) =>
@@ -662,7 +621,6 @@ const AllStudents = () => {
             <option value="studentNumber">By Student No.</option>
           </select>
 
-          {/* Search Input */}
           <div className="relative flex items-center">
             <input
               type="text"
@@ -712,7 +670,6 @@ const AllStudents = () => {
       {/* ============================================ */}
       <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Left: Date Filter */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <label className="flex cursor-pointer items-center gap-2">
               <input
@@ -728,7 +685,6 @@ const AllStudents = () => {
 
             {useDateFilter && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                {/* ✅ From — Shamsi picker */}
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-500">
                     From:
@@ -743,7 +699,6 @@ const AllStudents = () => {
                   </div>
                 </div>
 
-                {/* ✅ To — Shamsi picker */}
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-500">
                     To:
@@ -769,7 +724,6 @@ const AllStudents = () => {
             )}
           </div>
 
-          {/* Right: View Mode Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleShowAllStudents}
@@ -795,7 +749,6 @@ const AllStudents = () => {
               All Unenrolled
             </button>
 
-            {/* MORE FILTER BUTTON */}
             <button
               onClick={handleOpenMoreFilter}
               disabled={loading}
@@ -813,7 +766,6 @@ const AllStudents = () => {
               )}
             </button>
 
-            {/* Active filter chips */}
             {viewMode === "search-name" && searchName && (
               <span className="rounded-full bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700">
                 🔍 Name: "{searchName}"
@@ -828,7 +780,6 @@ const AllStudents = () => {
           </div>
         </div>
 
-        {/* Active Advanced Filters Display */}
         {hasActiveMoreFilters && (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
             <span className="text-xs font-medium text-gray-500">
@@ -972,7 +923,9 @@ const AllStudents = () => {
         </div>
       )}
 
-      {/* Students Table */}
+      {/* ============================================ */}
+      {/* Students Table — Only Name + Actions */}
+      {/* ============================================ */}
       {students.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -983,187 +936,96 @@ const AllStudents = () => {
                     Student
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Contact
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Gender
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Status
-                  </th>
-                  {viewMode === "filtered" && (
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Matched Enrollments
-                    </th>
-                  )}
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {students.map((student) => {
-                  const filteredItem =
-                    viewMode === "filtered"
-                      ? filteredStudents.find(
-                          (f) => f.student.id === student.id
-                        )
-                      : null;
-
-                  return (
-                    <tr
-                      key={student.id}
-                      className="transition hover:bg-gray-50"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {student.image ? (
-                            <img
-                              src={getImageUrl(student.image) || ""}
-                              alt={`${student.firstName} ${student.lastName}`}
-                              className="h-10 w-10 rounded-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  const fallback =
-                                    document.createElement("div");
-                                  fallback.className =
-                                    "flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm";
-                                  fallback.textContent = `${
-                                    student.firstName.charAt(0)
-                                  }${student.lastName?.charAt(0) || ""}`;
-                                  parent.appendChild(fallback);
-                                }
-                              }}
-                            />
-                          ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
-                              {student.firstName.charAt(0)}
-                              {student.lastName?.charAt(0) || ""}
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {student.firstName} {student.lastName || ""}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500">
-                              {student.studentNumber || "No ID"}
-                            </p>
+                {students.map((student) => (
+                  <tr
+                    key={student.id}
+                    className="transition hover:bg-gray-50"
+                  >
+                    {/* Student name only */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {student.image ? (
+                          <img
+                            src={getImageUrl(student.image) || ""}
+                            alt={`${student.firstName} ${student.lastName}`}
+                            className="h-10 w-10 rounded-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const fallback =
+                                  document.createElement("div");
+                                fallback.className =
+                                  "flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm";
+                                fallback.textContent = `${
+                                  student.firstName.charAt(0)
+                                }${student.lastName?.charAt(0) || ""}`;
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700">
+                            {student.firstName.charAt(0)}
+                            {student.lastName?.charAt(0) || ""}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-900">
-                          {student.phone || "N/A"}
-                        </p>
-                        {student.fatherPhone && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            Parent: {student.fatherPhone}
-                          </p>
                         )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                          {student.gender}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
-                            student.status
-                          )}`}
+                        <p className="font-semibold text-gray-900">
+                          {student.firstName} {student.lastName || ""}
+                        </p>
+                      </div>
+                    </td>
+
+                    {/* Actions — all buttons same width */}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => handleViewClick(student)}
+                          className="inline-flex w-24 items-center justify-center rounded-lg bg-purple-50 px-3 py-2 text-sm font-medium text-purple-600 transition hover:bg-purple-100"
                         >
-                          <span className="mr-2 h-2 w-2 rounded-full bg-current" />
-                          {student.status}
-                        </span>
-                      </td>
-
-                      {viewMode === "filtered" && (
-                        <td className="px-6 py-4">
-                          {(() => {
-                            const enrollments =
-                              filteredItem?.enrollments ?? [];
-                            if (enrollments.length === 0) {
-                              return (
-                                <span className="text-xs text-gray-400">
-                                  —
-                                </span>
-                              );
-                            }
-                            return (
-                              <div className="space-y-1">
-                                {enrollments.slice(0, 2).map((enr) => (
-                                  <div
-                                    key={enr.id}
-                                    className="rounded bg-purple-50 px-2 py-1 text-xs"
-                                  >
-                                    <p className="font-medium text-purple-700">
-                                      {enr.book?.name || "N/A"}
-                                    </p>
-                                    <p className="text-purple-500">
-                                      {enr.teacher?.firstName || ""}{" "}
-                                      {enr.teacher?.lastName || ""} •{" "}
-                                      {enr.time || "No time"}
-                                    </p>
-                                  </div>
-                                ))}
-                                {enrollments.length > 2 && (
-                                  <p className="text-xs text-gray-500">
-                                    +{enrollments.length - 2} more
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </td>
-                      )}
-
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            onClick={() => handleViewClick(student)}
-                            className="inline-flex items-center rounded-lg bg-purple-50 px-3 py-2 text-sm font-medium text-purple-600 transition hover:bg-purple-100"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => handleEditClick(student)}
-                            className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleViewEnrollments(student)}
-                            className="inline-flex items-center rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-100"
-                          >
-                            Enrollments
-                          </button>
-                          <button
-                            onClick={() => handleViewScores(student)}
-                            className="inline-flex items-center rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-600 transition hover:bg-green-100"
-                          >
-                            Scores
-                          </button>
-                          <button
-                            onClick={() => handleViewHistory(student)}
-                            className="inline-flex items-center rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
-                            title="View enrollment & payment history"
-                          >
-                            📋 History
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(student)}
-                            disabled={deleteLoading}
-                            className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {deleteLoading ? "Deleting..." : "Delete"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                          View
+                        </button>
+                        <button
+                          onClick={() => handleEditClick(student)}
+                          className="inline-flex w-24 items-center justify-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleViewEnrollments(student)}
+                          className="inline-flex w-24 items-center justify-center rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-100"
+                        >
+                          Enrollments
+                        </button>
+                        <button
+                          onClick={() => handleViewScores(student)}
+                          className="inline-flex w-24 items-center justify-center rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-600 transition hover:bg-green-100"
+                        >
+                          Scores
+                        </button>
+                        <button
+                          onClick={() => handleViewHistory(student)}
+                          className="inline-flex w-24 items-center justify-center rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
+                          title="View enrollment & payment history"
+                        >
+                          📋 History
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(student)}
+                          disabled={deleteLoading}
+                          className="inline-flex w-24 items-center justify-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {deleteLoading ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
