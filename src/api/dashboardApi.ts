@@ -26,8 +26,19 @@ export const getStudentStatistics = async (): Promise<StudentStatistics> => {
 };
 
 // ============================================
-// ✅ NEW: Dashboard Report
+// ✅ Dashboard Report
 // ============================================
+
+// ✅ NEW: Monthly breakdown row
+export interface DashboardMonthlyBreakdown {
+  month: number;           // 1-12
+  monthName: string;       // "January", ...
+  income: number;
+  payrollExpenses: number;
+  otherExpenses: number;
+  totalExpenses: number;
+  benefit: number;
+}
 
 export interface DashboardReportData {
   totalStudents: number;
@@ -40,11 +51,17 @@ export interface DashboardReportData {
   totalOtherExpenses: number;
   totalExpenses: number;
   totalBenefit: number;
+  // ✅ NEW
+  monthlyBreakdown?: DashboardMonthlyBreakdown[];
 }
 
 export interface DashboardReportFilters {
   fromDate: string | null;
   toDate: string | null;
+  effectiveFrom?: string | null;      // ✅ optional new fields
+  effectiveTo?: string | null;
+  defaultRange?: string | null;
+  breakdownYear?: number;
 }
 
 export interface DashboardReportResponse {
