@@ -2,6 +2,9 @@
 import { useState, useEffect } from "react";
 import { createOtherExpense } from "@/api/otherExpenseApi";
 import type { CreateOtherExpenseData } from "@/types/otherExpense";
+// ✅ Shamsi date picker + miladi helper
+import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
+import { formatMiladiISO } from "@/utils/dateConverter";
 
 interface AddOtherExpenseModalProps {
   isOpen: boolean;
@@ -17,7 +20,8 @@ const AddOtherExpenseModal = ({
   const [formData, setFormData] = useState<CreateOtherExpenseData>({
     amount: 0,
     description: "",
-    date: new Date().toISOString().split("T")[0],
+    // ✅ Miladi ISO for backend — shown as Shamsi in the picker
+    date: formatMiladiISO(new Date()),
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -29,7 +33,7 @@ const AddOtherExpenseModal = ({
       setFormData({
         amount: 0,
         description: "",
-        date: new Date().toISOString().split("T")[0],
+        date: formatMiladiISO(new Date()),
       });
       setError("");
       setSuccess("");
@@ -45,8 +49,14 @@ const AddOtherExpenseModal = ({
 
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "number" ? (value === "" ? 0 : parseFloat(value)) : value,
+      [name]:
+        type === "number" ? (value === "" ? 0 : parseFloat(value)) : value,
     }));
+  };
+
+  // ✅ Dedicated handler for the Shamsi date picker
+  const handleDateChange = (miladiISO: string) => {
+    setFormData((prev) => ({ ...prev, date: miladiISO }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,6 +86,7 @@ const AddOtherExpenseModal = ({
       await createOtherExpense({
         amount: formData.amount,
         description: formData.description.trim(),
+        // ✅ formData.date is already Miladi ISO for the backend
         date: formData.date,
       });
 
@@ -120,8 +131,18 @@ const AddOtherExpenseModal = ({
             disabled={isSubmitting}
             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -130,8 +151,18 @@ const AddOtherExpenseModal = ({
         {success && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-green-700">{success}</p>
             </div>
@@ -142,8 +173,18 @@ const AddOtherExpenseModal = ({
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-red-700">{error}</p>
             </div>
@@ -188,19 +229,15 @@ const AddOtherExpenseModal = ({
               />
             </div>
 
-            {/* Date */}
+            {/* ✅ Date — Shamsi picker */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Date <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
-                name="date"
+              <ShamsiDatePicker
                 value={formData.date}
-                onChange={handleChange}
-                required
-                disabled={isSubmitting}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onChange={handleDateChange}
+                placeholder="انتخاب تاریخ"
               />
             </div>
           </div>

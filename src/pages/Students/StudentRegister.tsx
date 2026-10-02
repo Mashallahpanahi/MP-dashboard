@@ -1,3 +1,4 @@
+
 // src/pages/Students/StudentRegister.tsx
 import { FormEvent, useState, useRef } from "react";
 import { createStudent, type CreateStudentData } from "@/api/studentApi";
@@ -41,15 +42,16 @@ const StudentRegister = () => {
         setError('Please upload a valid image file (jpg, jpeg, or png)');
         return;
       }
-      
+
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setError('Image size must be less than 5MB');
         return;
       }
 
+      setError(""); // clear previous errors on valid file
       setFormData((prev) => ({ ...prev, image: file }));
-      
+
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -110,19 +112,16 @@ const StudentRegister = () => {
         }
       }
 
-      // Validate image is required
-      if (!formData.image) {
-        setError("Student image is required");
-        setLoading(false);
-        return;
-      }
-
-      // Create FormData for file upload
+      // Build FormData
       const submitData = new FormData();
       submitData.append('firstName', formData.firstName.trim());
       submitData.append('lastName', formData.lastName.trim());
       submitData.append('phone', formData.phone.trim());
-      submitData.append('image', formData.image);
+
+      // ✅ Image is OPTIONAL — only append if a file was selected
+      if (formData.image instanceof File) {
+        submitData.append('image', formData.image);
+      }
 
       if (formData.fatherName && formData.fatherName.trim()) {
         submitData.append('fatherName', formData.fatherName.trim());
@@ -238,10 +237,10 @@ const StudentRegister = () => {
                 </p>
               </div>
 
-              {/* Image Upload - Required */}
+              {/* Image Upload - OPTIONAL ✅ */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Student Image <span className="text-red-500">*</span>
+                  Student Image <span className="text-gray-400">(Optional)</span>
                 </label>
                 <div className="flex items-start gap-4">
                   <div className="flex-1">
@@ -250,11 +249,10 @@ const StudentRegister = () => {
                       type="file"
                       accept="image/jpeg,image/jpg,image/png"
                       onChange={handleFileChange}
-                      required={!imagePreview}
                       className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      Accepted formats: JPG, JPEG, PNG (Max 5MB)
+                      Optional — JPG, JPEG, PNG (Max 5MB)
                     </p>
                   </div>
                   {imagePreview && (
