@@ -4,6 +4,106 @@ import { ApiError } from "./teacherApi";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+
+// ============================================
+// ✅ Dashboard Report by Month / Date Range
+// ============================================
+
+export interface DashboardByMonthFilters {
+  month?: number;
+  monthName?: string;
+  year?: number;
+  fromDate?: string;
+  toDate?: string;
+  mode?: "month" | "range";
+}
+
+export interface DashboardReportFilters {
+  month?: number;
+  monthName?: string;
+  year?: number;
+  fromDate?: string;
+  toDate?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  defaultRange?: string;
+  breakdownYear?: number;
+  mode?: string;
+}
+
+export interface DashboardReportData {
+  totalStudents: number;
+  totalActiveStudents: number;
+  totalInactiveStudents: number;
+  totalEnrolledStudents: number;
+  totalActiveTeachers: number;
+  totalIncome: number;
+  totalPayrollExpenses: number;
+  totalOtherExpenses: number;
+  totalExpenses: number;
+  totalBenefit: number;
+  monthlyBreakdown?: {
+    month: number;
+    monthName: string;
+    income: number;
+    payrollExpenses: number;
+    otherExpenses: number;
+    totalExpenses: number;
+    benefit: number;
+  }[];
+}
+
+export interface DashboardByMonthResponse {
+  success: boolean;
+  message: string;
+  filters: DashboardByMonthFilters;
+  data: DashboardReportData;
+}
+
+/**
+ * Get dashboard report by month number OR date range
+ * GET /dashboard-report/by-month
+ *
+ * Priority:
+ *   1. fromDate + toDate → range
+ *   2. month (+ year)   → month
+ *   3. else             → error
+ */
+export const getDashboardReportByMonth = async (params: {
+  month?: number;
+  year?: number;
+  fromDate?: string;
+  toDate?: string;
+}): Promise<DashboardByMonthResponse> => {
+  const query = new URLSearchParams();
+  if (params.fromDate && params.toDate) {
+    query.append("fromDate", params.fromDate);
+    query.append("toDate", params.toDate);
+  } else if (params.month) {
+    query.append("month", String(params.month));
+    if (params.year) query.append("year", String(params.year));
+  }
+
+  const url = `${API_URL}/dashboard-report/by-month?${query.toString()}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Failed to fetch report. Status: ${response.status}`;
+    try {
+      const err = await response.json();
+      if (err.message) errorMessage = err.message;
+    } catch {
+      /* keep default */
+    }
+    throw new ApiError(errorMessage, response.status);
+  }
+
+  return response.json();
+};
 /**
  * Get student statistics (existing)
  * GET /students/statistics
