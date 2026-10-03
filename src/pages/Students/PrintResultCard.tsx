@@ -25,32 +25,34 @@ const getImageUrl = (imagePath: string | null | undefined) => {
 const getInitials = (first?: string, last?: string) =>
   `${first?.charAt(0) || "?"}${last?.charAt(0) || ""}`.toUpperCase();
 
+const parseScore = (
+  value: string | number | null | undefined
+): number | null => {
+  if (value === null || value === undefined) return null;
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return null;
+  return num;
+};
+
+type ResultCardDesign = "design-1" | "design-2";
+
 // ============================================
-// RESULT CARD (one per student — half A4)
+// DESIGN 1 — Certificate (existing)
 // ============================================
 interface ResultCardProps {
   student: StudentForScoring;
 }
 
-const ResultCard = ({ student }: ResultCardProps) => {
-  const midterm =
-    student.midtermScore !== null && student.midtermScore !== undefined
-      ? Number(student.midtermScore)
-      : null;
-  const final =
-    student.finalScore !== null && student.finalScore !== undefined
-      ? Number(student.finalScore)
-      : null;
+const ResultCardDesign1 = ({ student }: ResultCardProps) => {
+  const midterm = parseScore(student.midtermScore);
+  const final = parseScore(student.finalScore);
   const total =
-    student.totalScore !== null && student.totalScore !== undefined
-      ? Number(student.totalScore)
-      : midterm !== null || final !== null
-      ? (midterm || 0) + (final || 0)
-      : null;
+    parseScore(student.totalScore) ??
+    (midterm !== null || final !== null ? (midterm || 0) + (final || 0) : null);
   const passed = total !== null && total >= student.passingScore;
 
   const message = passed
-    ? `You have shown remarkable dedication and a genuine love for learning. Your hard work in "${student.bookName}" has truly paid off, and your achievement is something to be proud of. Keep shining and continue to inspire those around you.`
+    ? `You have shown remarkable dedication and a genuine love for learning. Your hard work in "${student.bookName}" has truly paid off, and your achievement is something to be proud of. Keep shining and continue to inspire those around you with your commitment and passion for knowledge.`
     : `Every step you take is a step toward growth. Although this chapter has come to a close, your journey is far from over. Use this experience as fuel for the next challenge — with persistence and a willing heart, success will surely follow.`;
 
   return (
@@ -102,7 +104,6 @@ const ResultCard = ({ student }: ResultCardProps) => {
 
       {/* CONTENT */}
       <div className="relative z-10 flex h-full flex-col px-14 pt-14 pb-6">
-        {/* Title */}
         <div className="max-w-[500px]">
           <h1
             className="text-4xl font-bold tracking-widest text-blue-900"
@@ -118,12 +119,10 @@ const ResultCard = ({ student }: ResultCardProps) => {
           </p>
         </div>
 
-        {/* Presented to */}
         <p className="mt-5 text-xs font-bold uppercase tracking-widest text-blue-900">
           This certificate is proudly presented to:
         </p>
 
-        {/* Student name */}
         <div className="mt-2">
           <h2
             className="max-w-[560px] text-5xl leading-tight text-blue-900"
@@ -134,7 +133,6 @@ const ResultCard = ({ student }: ResultCardProps) => {
           <div className="mt-1 h-[2px] w-[380px] bg-gradient-to-r from-amber-600 via-amber-400 to-transparent" />
         </div>
 
-        {/* Score · Passed · Book · Teacher */}
         <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <div className="flex items-center gap-1.5">
             <span className="font-bold uppercase tracking-widest text-blue-900">
@@ -168,7 +166,6 @@ const ResultCard = ({ student }: ResultCardProps) => {
           </span>
         </div>
 
-        {/* Message */}
         <p
           className="mt-4 max-w-[560px] text-[11px] leading-relaxed text-gray-700"
           style={{ fontFamily: "Inter, sans-serif" }}
@@ -176,9 +173,7 @@ const ResultCard = ({ student }: ResultCardProps) => {
           {message}
         </p>
 
-        {/* FOOTER */}
         <div className="mt-auto flex items-end justify-between pb-2">
-          {/* ✅ Date — now Shamsi */}
           <div className="text-center">
             <div className="mb-1 h-[2px] w-32 bg-amber-500" />
             <p className="text-[11px] font-bold uppercase tracking-widest text-blue-900">
@@ -189,7 +184,6 @@ const ResultCard = ({ student }: ResultCardProps) => {
             </p>
           </div>
 
-          {/* Student number */}
           <div className="text-center">
             <p className="text-[11px] font-semibold text-gray-700">
               {student.studentNumber || "—"}
@@ -199,7 +193,6 @@ const ResultCard = ({ student }: ResultCardProps) => {
             </p>
           </div>
 
-          {/* Signature */}
           <div className="text-center">
             <div className="mb-1 h-[2px] w-32 bg-amber-500" />
             <p
@@ -219,6 +212,326 @@ const ResultCard = ({ student }: ResultCardProps) => {
 };
 
 // ============================================
+// DESIGN 2 — Elegant Ribbon (uses Great Vibes font)
+// A4 width (210mm) × half-A4 height (148.5mm)
+// Logo: /images/cours-log.png (same size as the photo: 26mm × 34mm)
+// ============================================
+const ResultCardDesign2 = ({ student }: ResultCardProps) => {
+  const midterm = parseScore(student.midtermScore);
+  const final = parseScore(student.finalScore);
+  const total =
+    parseScore(student.totalScore) ??
+    (midterm !== null || final !== null ? (midterm || 0) + (final || 0) : null);
+  const passed = total !== null && total >= student.passingScore;
+
+  const percentage = total !== null ? total.toFixed(1) : "—";
+  const resultText = passed ? "Passed" : "Failed";
+
+  // Shamsi date split into day / month / year
+  const todayShamsi = formatShamsi(new Date(), "YYYY/MM/DD");
+  const [y, m, d] = todayShamsi.split("/");
+
+  return (
+    <div
+      className="result-card relative mx-auto overflow-hidden bg-white shadow-xl print:shadow-none"
+      style={{
+        width: "210mm",
+        height: "148.5mm",
+        pageBreakInside: "avoid",
+        breakInside: "avoid",
+        fontFamily: "'Great Vibes', cursive",
+      }}
+    >
+      {/* ============================================
+          TOP-LEFT RIBBON — 5 layered shapes
+          ============================================ */}
+      <div className="pointer-events-none absolute left-0 top-0 z-0">
+        <div
+          className="h-[58mm] w-[58mm]"
+          style={{
+            backgroundColor: "#0a1a5c",
+            clipPath: "polygon(0 0, 100% 0, 0 100%)",
+          }}
+        />
+        <div
+          className="absolute left-0 top-0 h-[52mm] w-[52mm]"
+          style={{
+            background:
+              "linear-gradient(135deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
+            clipPath: "polygon(0 0, 100% 0, 0 100%)",
+          }}
+        />
+        <div
+          className="absolute left-0 top-0 h-[46mm] w-[46mm] bg-white"
+          style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }}
+        />
+        <div
+          className="absolute left-0 top-0 h-[26mm] w-[26mm]"
+          style={{
+            background:
+              "linear-gradient(135deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
+            clipPath: "polygon(0 0, 100% 0, 0 100%)",
+          }}
+        />
+        <div
+          className="absolute left-0 top-0 h-[18mm] w-[18mm]"
+          style={{
+            backgroundColor: "#0a1a5c",
+            clipPath: "polygon(0 0, 100% 0, 0 100%)",
+          }}
+        />
+      </div>
+
+      {/* ============================================
+          BOTTOM-RIGHT RIBBON
+          ============================================ */}
+      <div className="pointer-events-none absolute bottom-0 right-0 z-0">
+        <div
+          className="h-[58mm] w-[58mm]"
+          style={{
+            backgroundColor: "#0a1a5c",
+            clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0 h-[52mm] w-[52mm]"
+          style={{
+            background:
+              "linear-gradient(315deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
+            clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0 h-[46mm] w-[46mm] bg-white"
+          style={{ clipPath: "polygon(100% 100%, 100% 0, 0 100%)" }}
+        />
+        <div
+          className="absolute bottom-[24mm] right-0 h-[3mm] w-[60mm]"
+          style={{
+            backgroundColor: "#1e8a3c",
+            transform: "rotate(-45deg)",
+            transformOrigin: "right center",
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0 h-[26mm] w-[26mm]"
+          style={{
+            background:
+              "linear-gradient(315deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
+            clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0 h-[18mm] w-[18mm]"
+          style={{
+            backgroundColor: "#0a1a5c",
+            clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
+          }}
+        />
+      </div>
+
+      {/* ============================================
+          HEADER — Logo · Center · Photo
+          ============================================ */}
+      <div className="relative z-10 flex items-start justify-between gap-3 px-10 pt-10">
+        {/* Logo */}
+        <div className="flex h-[40mm] w-[40mm] shrink-0 items-center justify-center">
+          <img
+            src="/images/cours-log.png"
+            alt="Center Logo"
+            className="h-full w-full object-contain"
+            onError={(e) => {
+              const parent = e.currentTarget.parentElement;
+              if (parent) {
+                parent.innerHTML = `
+                  <div style="
+                    display:flex; align-items:center; justify-content:center;
+                    width:100%; height:100%; border-radius:9999px;
+                    background:#0a1a5c; border:3px solid #c9a227;
+                    color:#f5d77a; font-family:'Great Vibes',cursive; font-weight:700;
+                    font-size:11px; line-height:1.2; text-align:center;
+                  ">
+                    <span>MODERN<br/>MOAFAQ</span>
+                  </div>
+                `;
+              }
+            }}
+          />
+        </div>
+
+        {/* Center name + subtitle + tagline */}
+        <div className="min-w-0 flex-1 px-2 text-center">
+          <h1
+            className="whitespace-nowrap text-[26px] leading-[1.15] text-[#0a1a5c]"
+            style={{ fontFamily: "'Great Vibes', cursive" }}
+          >
+            Modern Moafaq Educational Center
+          </h1>
+
+          <h2
+            className="mt-2 whitespace-nowrap text-[24px] leading-[1.15] text-[#0a1a5c]"
+            style={{ fontFamily: "'Great Vibes', cursive" }}
+          >
+            English Certificate
+          </h2>
+
+          <p
+            className="mt-2 whitespace-nowrap text-[16px] leading-[1.2] text-[#1c3ca8]"
+            style={{ fontFamily: "'Great Vibes', cursive" }}
+          >
+            Enlightening Minds Empowering Tomorrow
+          </p>
+        </div>
+
+        {/* Photo frame */}
+        <div className="flex h-[34mm] w-[26mm] shrink-0 items-center justify-center border-[3px] border-[#0a1a5c] bg-white p-1">
+          {student.studentImage ? (
+            <img
+              src={getImageUrl(student.studentImage) || ""}
+              alt={`${student.studentName} ${student.studentLastName}`}
+              className="h-full w-full object-cover"
+              crossOrigin="anonymous"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <div
+              className="flex h-full w-full items-center justify-center bg-blue-50 text-[22px] font-bold text-blue-900"
+              style={{ fontFamily: "'Great Vibes', cursive" }}
+            >
+              {getInitials(student.studentName, student.studentLastName)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ============================================
+          BODY — Reduced padding, left-aligned rows
+          ============================================ */}
+      <div
+        className="relative z-10 mt-[8mm] px-8"
+        style={{
+          fontFamily: "'Great Vibes', cursive",
+        }}
+      >
+        {/* Row 1 */}
+        <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
+          <span>This Certificate is awarded to</span>
+          <span
+            className="mx-2 inline-block min-w-[55mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {student.studentName} {student.studentLastName}
+          </span>
+          <span>S/D of</span>
+          <span
+            className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          />
+        </div>
+
+        {/* Row 2 */}
+        <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
+          <span>Course Level:</span>
+          <span
+            className="mx-2 inline-block min-w-[55mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {student.bookLevelOrder ? `Level ${student.bookLevelOrder}` : ""}
+          </span>
+          <span>English for Level:</span>
+          <span
+            className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {student.bookName}
+          </span>
+          <span>at final</span>
+        </div>
+
+        {/* Row 3 */}
+        <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
+          <span>grade: (</span>
+          <span
+            className="mx-2 inline-block min-w-[16mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {percentage}
+          </span>
+          <span>% result:</span>
+          <span
+            className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {resultText}
+          </span>
+          <span>) Date Awarded:</span>
+          <span
+            className="mx-2 inline-block min-w-[12mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {d}
+          </span>
+          <span>/</span>
+          <span
+            className="mx-2 inline-block min-w-[12mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {m}
+          </span>
+          <span>/</span>
+          <span
+            className="mx-2 inline-block min-w-[16mm] border-b-2 border-dotted border-black text-center"
+            style={{ lineHeight: 1.1 }}
+          >
+            {y}
+          </span>
+        </div>
+      </div>
+
+      {/* ============================================
+          FOOTER — Signatures
+          ============================================ */}
+      <div className="absolute bottom-[10mm] left-0 right-0 z-10 flex items-end justify-around px-[22mm]">
+        <p
+          className="text-[26px]"
+          style={{
+            fontFamily: "'Great Vibes', cursive",
+            color: "#c9a227",
+          }}
+        >
+          Director sign
+        </p>
+        <p
+          className="text-[26px]"
+          style={{
+            fontFamily: "'Great Vibes', cursive",
+            color: "#c9a227",
+          }}
+        >
+          Instructor sign
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Wrapper that switches between the two designs based on the selected design
+const ResultCard = ({
+  student,
+  design,
+}: {
+  student: StudentForScoring;
+  design: ResultCardDesign;
+}) => {
+  if (design === "design-2") {
+    return <ResultCardDesign2 student={student} />;
+  }
+  return <ResultCardDesign1 student={student} />;
+};
+
+// ============================================
 // MAIN PAGE
 // ============================================
 const PrintResultCard = () => {
@@ -227,7 +540,7 @@ const PrintResultCard = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
 
-  // Filters — fromDate / toDate kept as MILADI ISO for backend
+  // Filters
   const [teacherId, setTeacherId] = useState("");
   const [bookId, setBookId] = useState("");
   const [classId, setClassId] = useState("");
@@ -241,6 +554,9 @@ const PrintResultCard = () => {
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ✅ Design selection
+  const [design, setDesign] = useState<ResultCardDesign>("design-1");
 
   // ============================================
   // FETCH DROPDOWNS
@@ -361,7 +677,6 @@ const PrintResultCard = () => {
         pdf.addImage(imgData, "JPEG", 0, y, A4_W, CARD_H, undefined, "FAST");
       }
 
-      // ✅ Shamsi date in filename too
       const fileName = `result-cards-${formatShamsi(
         new Date(),
         "YYYY-MM-DD"
@@ -489,7 +804,7 @@ const PrintResultCard = () => {
                 />
               </div>
 
-              {/* ✅ From Date — Shamsi picker */}
+              {/* From Date */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   From Date{" "}
@@ -504,7 +819,7 @@ const PrintResultCard = () => {
                 />
               </div>
 
-              {/* ✅ To Date — Shamsi picker */}
+              {/* To Date */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                   To Date{" "}
@@ -517,6 +832,94 @@ const PrintResultCard = () => {
                   onChange={setToDate}
                   placeholder="انتخاب تاریخ"
                 />
+              </div>
+
+              {/* ✅ Design selector */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Result Card Design
+                </label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/* Design 1 */}
+                  <button
+                    type="button"
+                    onClick={() => setDesign("design-1")}
+                    className={`flex items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition ${
+                      design === "design-1"
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded border border-amber-500 bg-white">
+                      <span className="text-[9px] font-bold text-blue-900">
+                        CERT
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Design 1 — Certificate
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Traditional certificate with gold & blue border
+                      </p>
+                    </div>
+                    {design === "design-1" && (
+                      <svg
+                        className="ml-auto h-5 w-5 text-blue-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                  </button>
+
+                  {/* Design 2 */}
+                  <button
+                    type="button"
+                    onClick={() => setDesign("design-2")}
+                    className={`flex items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition ${
+                      design === "design-2"
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded border border-blue-900 bg-gradient-to-br from-blue-50 to-amber-50">
+                      <span className="text-[9px] font-bold text-blue-900">
+                        RIBBON
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Design 2 — Elegant Ribbon
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Corner ribbons, logo, dotted fill-in lines
+                      </p>
+                    </div>
+                    {design === "design-2" && (
+                      <svg
+                        className="ml-auto h-5 w-5 text-blue-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={3}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -607,7 +1010,11 @@ const PrintResultCard = () => {
           className="mx-auto flex flex-col items-center gap-10 print:gap-0"
         >
           {students.map((student) => (
-            <ResultCard key={student.enrollmentId} student={student} />
+            <ResultCard
+              key={student.enrollmentId}
+              student={student}
+              design={design}
+            />
           ))}
         </div>
       )}

@@ -21,6 +21,13 @@
   font-weight: 400;
   font-style: normal;
 }
+
+@font-face {
+  font-family: "CertificateScript";
+  src: url("/fonts/certificatescript.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
 /* ============================================================
    PRINT STYLES — Result Card (2 cards per A4 page)
    ============================================================ */
@@ -84,3 +91,4 @@
     margin: 0;
   }
 }
+
