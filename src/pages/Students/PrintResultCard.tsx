@@ -416,20 +416,23 @@ const ResultCardDesign2 = ({ student }: ResultCardProps) => {
         }}
       >
         {/* Row 1 */}
-        <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
-          <span>This Certificate is awarded to</span>
-          <span
-            className="mx-2 inline-block min-w-[55mm] border-b-2 border-dotted border-black text-center"
-            style={{ lineHeight: 1.1 }}
-          >
-            {student.studentName} {student.studentLastName}
-          </span>
-          <span>S/D of</span>
-          <span
-            className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
-            style={{ lineHeight: 1.1 }}
-          />
-        </div>
+       {/* Row 1 — Student name + S/D of Father name */}
+<div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
+  <span>This Certificate is awarded to</span>
+  <span
+    className="mx-2 inline-block min-w-[55mm] border-b-2 border-dotted border-black text-center"
+    style={{ lineHeight: 1.1 }}
+  >
+    {student.studentName} {student.studentLastName}
+  </span>
+  <span>S/D of</span>
+  <span
+    className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
+    style={{ lineHeight: 1.1 }}
+  >
+    {student.studentFatherName || ""}
+  </span>
+</div>
 
         {/* Row 2 */}
         <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">

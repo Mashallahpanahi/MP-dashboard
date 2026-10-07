@@ -36,6 +36,7 @@ export interface StudentForScoring {
   studentLastName: string;
   studentNumber: string;
   studentImage: string | null;
+  studentFatherName: string | null;
   teacherId: string;
   teacherName: string;
   teacherLastName: string;
