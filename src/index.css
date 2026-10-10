@@ -2,32 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Certificate Fonts */
-@font-face {
-  font-family: "Cinzel";
-  src: url("/fonts/Cinzel-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: "Cinzel";
-  src: url("/fonts/Cinzel-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-}
-@font-face {
-  font-family: "Great Vibes";
-  src: url("/fonts/GreatVibes-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-}
 
-@font-face {
-  font-family: "CertificateScript";
-  src: url("/fonts/certificatescript.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-}
 /* ============================================================
    PRINT STYLES — Result Card (2 cards per A4 page)
    ============================================================ */
