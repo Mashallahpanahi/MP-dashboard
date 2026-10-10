@@ -1,153 +1,170 @@
-
-// src/pages/Students/StudentRegister.tsx
+// src/pages/RegisterStudents/RegisterStudent.tsx
 import { FormEvent, useState, useRef } from "react";
-import { createStudent, type CreateStudentData } from "@/api/studentApi";
 import { useNavigate } from "react-router-dom";
+import { createStudent } from "@/api/studentApi";
+import { useAuthStore } from "@store/authStore";
 
-const StudentRegister = () => {
+const RegisterStudent = () => {
   const navigate = useNavigate();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const getToken = useAuthStore((s) => s.getToken);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [formData, setFormData] = useState<CreateStudentData>({
-    firstName: "",
-    lastName: "",
-    phone: "",
-    image: undefined,
-    fatherName: "",
-    fatherPhone: "",
-    gender: "Male",
-    status: "Active",
-    notes: "",
-  });
+  // Form fields
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [fatherName, setFatherName] = useState("");
+  const [fatherPhone, setFatherPhone] = useState("");
+  const [gender, setGender] = useState<"Male" | "Female">("Male");
+  const [status, setStatus] = useState<"Active" | "Inactive" | "Graduated">(
+    "Active"
+  );
+  const [notes, setNotes] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
+  // ============================================
+  // IMAGE HANDLERS
+  // ============================================
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-      if (!validTypes.includes(file.type)) {
-        setError('Please upload a valid image file (jpg, jpeg, or png)');
-        return;
-      }
+    if (!file) return;
 
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Image size must be less than 5MB');
-        return;
-      }
-
-      setError(""); // clear previous errors on valid file
-      setFormData((prev) => ({ ...prev, image: file }));
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    // Validate type
+    const validTypes = ["image/jpeg", "image/jpg", "image/png"];
+    if (!validTypes.includes(file.type)) {
+      setError("Please upload a valid image file (jpg, jpeg, or png)");
+      return;
     }
+
+    // Validate size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5MB");
+      return;
+    }
+
+    setError("");
+    setImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRemoveImage = () => {
-    setFormData((prev) => ({ ...prev, image: undefined }));
+    setImageFile(null);
     setImagePreview(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
+  // ============================================
+  // SUBMIT
+  // ============================================
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
     setSuccess("");
 
+    // ✅ Guard: must be logged in
+    if (!isAuthenticated) {
+      setError("You must be logged in to register a student.");
+      return;
+    }
+
+    // ✅ Guard: token must exist and not be expired
+    const token = getToken();
+    if (!token) {
+      setError("Your session has expired. Please login again.");
+      setTimeout(() => navigate("/login"), 1500);
+      return;
+    }
+
+    // Validation
+    if (!firstName.trim()) {
+      setError("First name is required");
+      return;
+    }
+    if (!lastName.trim()) {
+      setError("Last name is required");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Phone number is required");
+      return;
+    }
+
+    // Validate phone number format (starts with 07 and 10 digits)
+    const phoneRegex = /^07\d{8}$/;
+    if (!phoneRegex.test(phone)) {
+      setError(
+        "Phone number must start with 07 and be 10 digits (e.g., 0777123456)"
+      );
+      return;
+    }
+
+    // Validate father phone if provided
+    if (fatherPhone.trim() && !phoneRegex.test(fatherPhone)) {
+      setError(
+        "Father's phone number must start with 07 and be 10 digits (e.g., 0777123456)"
+      );
+      return;
+    }
+
     try {
-      // Validate required fields
-      if (!formData.firstName || !formData.firstName.trim()) {
-        setError("First name is required");
-        setLoading(false);
-        return;
-      }
+      setLoading(true);
 
-      if (!formData.lastName || !formData.lastName.trim()) {
-        setError("Last name is required");
-        setLoading(false);
-        return;
-      }
-
-      if (!formData.phone || !formData.phone.trim()) {
-        setError("Phone number is required");
-        setLoading(false);
-        return;
-      }
-
-      // Validate phone number format (starts with 07 and 10 digits)
-      const phoneRegex = /^07\d{8}$/;
-      if (!phoneRegex.test(formData.phone)) {
-        setError("Phone number must start with 07 and be 10 digits (e.g., 0777123456)");
-        setLoading(false);
-        return;
-      }
-
-      // Validate father phone if provided
-      if (formData.fatherPhone && formData.fatherPhone.trim()) {
-        if (!phoneRegex.test(formData.fatherPhone)) {
-          setError("Father's phone number must start with 07 and be 10 digits (e.g., 0777123456)");
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Build FormData
+      // Build FormData (matches POST /students multipart/form-data)
       const submitData = new FormData();
-      submitData.append('firstName', formData.firstName.trim());
-      submitData.append('lastName', formData.lastName.trim());
-      submitData.append('phone', formData.phone.trim());
+      submitData.append("firstName", firstName.trim());
+      submitData.append("lastName", lastName.trim());
+      submitData.append("phone", phone.trim());
 
       // ✅ Image is OPTIONAL — only append if a file was selected
-      if (formData.image instanceof File) {
-        submitData.append('image', formData.image);
+      if (imageFile instanceof File) {
+        submitData.append("image", imageFile);
       }
 
-      if (formData.fatherName && formData.fatherName.trim()) {
-        submitData.append('fatherName', formData.fatherName.trim());
-      }
-      if (formData.fatherPhone && formData.fatherPhone.trim()) {
-        submitData.append('fatherPhone', formData.fatherPhone.trim());
-      }
-      if (formData.gender) {
-        submitData.append('gender', formData.gender);
-      }
-      if (formData.status) {
-        submitData.append('status', formData.status);
-      }
-      if (formData.notes && formData.notes.trim()) {
-        submitData.append('notes', formData.notes.trim());
-      }
+      if (fatherName.trim()) submitData.append("fatherName", fatherName.trim());
+      if (fatherPhone.trim())
+        submitData.append("fatherPhone", fatherPhone.trim());
+      if (gender) submitData.append("gender", gender);
+      if (status) submitData.append("status", status);
+      if (notes.trim()) submitData.append("notes", notes.trim());
 
+      // createStudent now attaches the Bearer token automatically
       await createStudent(submitData);
+
       setSuccess("Student registered successfully!");
-      setTimeout(() => {
-        navigate("/students/all");
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to create student:", error);
+
+      // Reset form
+      setFirstName("");
+      setLastName("");
+      setPhone("");
+      setFatherName("");
+      setFatherPhone("");
+      setGender("Male");
+      setStatus("Active");
+      setNotes("");
+      setImageFile(null);
+      setImagePreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+
+      // Navigate after a short delay
+      setTimeout(() => navigate("/students/all"), 1500);
+    } catch (err) {
+      console.error("Failed to create student:", err);
       setError(
-        error instanceof Error ? error.message : "Failed to register student"
+        err instanceof Error ? err.message : "Failed to register student"
       );
     } finally {
       setLoading(false);
@@ -159,9 +176,12 @@ const StudentRegister = () => {
       <div className="mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Register Student</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Register Student
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Add a new student to the system <span className="text-red-500">*</span> indicates required field
+            Add a new student to the system{" "}
+            <span className="text-red-500">*</span> indicates required field
           </p>
         </div>
 
@@ -186,7 +206,8 @@ const StudentRegister = () => {
           {/* Personal Information */}
           <div className="mb-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Personal Information <span className="text-sm font-normal text-red-500">*</span>
+              Personal Information{" "}
+              <span className="text-sm font-normal text-red-500">*</span>
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* First Name - Required */}
@@ -195,9 +216,8 @@ const StudentRegister = () => {
                   First Name <span className="text-red-500">*</span>
                 </label>
                 <input
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Enter first name"
                   required
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -210,9 +230,8 @@ const StudentRegister = () => {
                   Last Name <span className="text-red-500">*</span>
                 </label>
                 <input
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
                   placeholder="Enter last name"
                   required
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -225,9 +244,8 @@ const StudentRegister = () => {
                   Phone <span className="text-red-500">*</span>
                 </label>
                 <input
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   placeholder="0777123456"
                   required
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -240,7 +258,8 @@ const StudentRegister = () => {
               {/* Image Upload - OPTIONAL ✅ */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Student Image <span className="text-gray-400">(Optional)</span>
+                  Student Image{" "}
+                  <span className="text-gray-400">(Optional)</span>
                 </label>
                 <div className="flex items-start gap-4">
                   <div className="flex-1">
@@ -270,7 +289,7 @@ const StudentRegister = () => {
                     <img
                       src={imagePreview}
                       alt="Student preview"
-                      className="h-24 w-24 rounded-lg object-cover border border-gray-200"
+                      className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
                     />
                   </div>
                 )}
@@ -282,9 +301,10 @@ const StudentRegister = () => {
                   Gender
                 </label>
                 <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
+                  value={gender}
+                  onChange={(e) =>
+                    setGender(e.target.value as "Male" | "Female")
+                  }
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="Male">Male</option>
@@ -301,9 +321,8 @@ const StudentRegister = () => {
                   Father's Name
                 </label>
                 <input
-                  name="fatherName"
-                  value={formData.fatherName || ""}
-                  onChange={handleChange}
+                  value={fatherName}
+                  onChange={(e) => setFatherName(e.target.value)}
                   placeholder="Enter father's name (optional)"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
@@ -318,9 +337,8 @@ const StudentRegister = () => {
                   Father's Phone
                 </label>
                 <input
-                  name="fatherPhone"
-                  value={formData.fatherPhone || ""}
-                  onChange={handleChange}
+                  value={fatherPhone}
+                  onChange={(e) => setFatherPhone(e.target.value)}
                   placeholder="0777123456 (optional)"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
@@ -334,7 +352,10 @@ const StudentRegister = () => {
           {/* Additional Information */}
           <div className="mb-8 border-t border-gray-200 pt-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Additional Information <span className="text-sm font-normal text-gray-500">(All optional)</span>
+              Additional Information{" "}
+              <span className="text-sm font-normal text-gray-500">
+                (All optional)
+              </span>
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               <div>
@@ -342,9 +363,12 @@ const StudentRegister = () => {
                   Status
                 </label>
                 <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
+                  value={status}
+                  onChange={(e) =>
+                    setStatus(
+                      e.target.value as "Active" | "Inactive" | "Graduated"
+                    )
+                  }
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="Active">Active</option>
@@ -361,9 +385,8 @@ const StudentRegister = () => {
                   Notes
                 </label>
                 <textarea
-                  name="notes"
-                  value={formData.notes || ""}
-                  onChange={handleChange}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   placeholder="Additional notes about the student (optional)"
                   className="w-full resize-none rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -399,4 +422,4 @@ const StudentRegister = () => {
   );
 };
 
-export default StudentRegister;
+export default RegisterStudent;

@@ -10,6 +10,7 @@ import type {
   LevelUpResponse,
 } from "@/types/student";
 import { ApiError } from "./teacherApi";
+import { useAuthStore } from "@/store/authStore";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -518,20 +519,45 @@ export const getStudentById = async (id: string): Promise<Student> => {
   return data;
 };
 
+
 /**
  * Create a new student with image upload
  * POST /students
- * Uses FormData for file upload
+ * Requires Bearer token in Authorization header.
  *
  * @param data - FormData containing student data + image
  */
 export const createStudent = async (data: FormData): Promise<Student> => {
+  // ✅ Get a valid (non-expired) token from the store
+  const token = useAuthStore.getState().getToken();
+
+  if (!token) {
+    throw new ApiError(
+      "You must be logged in to register a student. Please login again.",
+      401
+    );
+  }
+
   const response = await fetch(`${API_URL}/students`, {
     method: "POST",
-    body: data, // FormData - DO NOT set Content-Type header
+    headers: {
+      // ✅ DO NOT set Content-Type — browser sets it with boundary for FormData
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+    body: data,
   });
 
   if (!response.ok) {
+    // If token expired on the server side → force logout
+    if (response.status === 401) {
+      useAuthStore.getState().logout();
+      throw new ApiError(
+        "Session expired. Please login again to continue.",
+        401
+      );
+    }
+
     let errorMessage = `Failed to create student. Status: ${response.status}`;
     let errorDetails = null;
 
@@ -557,8 +583,6 @@ export const createStudent = async (data: FormData): Promise<Student> => {
         } else if (errorData.message.toLowerCase().includes("image")) {
           errorMessage =
             "Student image is required. Please upload a valid image file (jpg, jpeg, png).";
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
         } else {
           errorMessage = errorData.message;
         }

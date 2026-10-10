@@ -1,83 +1,112 @@
-/**
- * Authentication store using Zustand with persistence.
- * Session lasts for 35 days from login, then auto‑logout.
- */
+// src/store/authStore.ts
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// --- Types ---------------------------------------------------------
-interface AuthState {
-  isAuthenticated: boolean;
-  user: { name: string; email: string } | null;
-  expiryTimestamp: number | null; // when this session expires (milliseconds)
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  checkAuth: () => void; // verify expiry on app load
+// One year in milliseconds
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+export interface AuthUser {
+  id: string;
+  email: string;
 }
 
-// --- Constants ----------------------------------------------------
-const SESSION_DAYS = 35;
-const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000; // 35 days in ms
+interface AuthState {
+  token: string | null;
+  user: AuthUser | null;
+  expiresAt: number | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  /** Returns a valid token or null (auto-clears if expired) */
+  getToken: () => string | null;
+}
 
-// --- Store creation ------------------------------------------------
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // Default state (logged out)
-      isAuthenticated: false,
+      token: null,
       user: null,
-      expiryTimestamp: null,
+      expiresAt: null,
+      isAuthenticated: false,
 
-      /**
-       * Login function – accepts any email/password (mock).
-       * Sets authenticated = true, stores user and expiry timestamp.
-       * Replace with real API call later.
-       */
-      login: async (email, password) => {
-        // Mock validation: just check that fields are not empty
-        if (email && password) {
-          const expiry = Date.now() + SESSION_MS;
-          set({
-            isAuthenticated: true,
-            user: { name: 'Admin', email },
-            expiryTimestamp: expiry,
-          });
-        } else {
-          throw new Error('Invalid credentials');
+      login: async (email: string, password: string) => {
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Invalid email or password");
         }
+
+        const result = await response.json();
+
+        // Backend response shape:
+        // { success, message, data: { access_token, user: { id, email } } }
+        const accessToken: string | undefined = result?.data?.access_token;
+        const user: AuthUser | undefined = result?.data?.user;
+
+        if (!accessToken || !user) {
+          throw new Error("Invalid login response from server");
+        }
+
+        const expiresAt = Date.now() + ONE_YEAR_MS;
+
+        set({
+          token: accessToken,
+          user,
+          expiresAt,
+          isAuthenticated: true,
+        });
       },
 
-      /**
-       * Logout – clears authentication state and removes stored data.
-       */
       logout: () => {
         set({
-          isAuthenticated: false,
+          token: null,
           user: null,
-          expiryTimestamp: null,
+          expiresAt: null,
+          isAuthenticated: false,
         });
-        // Optionally clear the persisted key:
-        // localStorage.removeItem('auth-storage');
       },
 
-      /**
-       * Check authentication status on app load.
-       * If session exists but has expired, automatically log out.
-       */
-      checkAuth: () => {
-        const { isAuthenticated, expiryTimestamp, logout } = get();
-        if (isAuthenticated && expiryTimestamp) {
-          const now = Date.now();
-          if (now > expiryTimestamp) {
-            // Session expired – log out
-            logout();
-          }
+      getToken: () => {
+        const { token, expiresAt } = get();
+
+        // No token at all
+        if (!token) return null;
+
+        // Token expired → auto logout
+        if (expiresAt && Date.now() >= expiresAt) {
+          get().logout();
+          return null;
         }
+
+        return token;
       },
     }),
     {
-      name: 'auth-storage', // key in localStorage
+      name: "mp-auth-storage", // localStorage key
+      storage: createJSONStorage(() => localStorage),
+      // Persist everything we need
+      partialize: (state) => ({
+        token: state.token,
+        user: state.user,
+        expiresAt: state.expiresAt,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      // On rehydrate, validate expiry
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        if (state.expiresAt && Date.now() >= state.expiresAt) {
+          state.token = null;
+          state.user = null;
+          state.expiresAt = null;
+          state.isAuthenticated = false;
+        }
+      },
     }
   )
 );

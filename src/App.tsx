@@ -12,10 +12,10 @@ function App() {
   // --- Get the checkAuth function from the store ---
   const checkAuth = useAuthStore((state) => state.checkAuth);
 
-  // --- Run auth check once when app loads ---
-  useEffect(() => {
-    checkAuth(); // verifies expiry and logs out if 35 days have passed
-  }, [checkAuth]);
+  // // --- Run auth check once when app loads ---
+  // useEffect(() => {
+  //   checkAuth(); // verifies expiry and logs out if 35 days have passed
+  // }, [checkAuth]);
 
   // --- Language sync (RTL/LTR) ---
   useEffect(() => {
