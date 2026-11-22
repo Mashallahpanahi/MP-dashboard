@@ -4,7 +4,6 @@ import { ApiError } from "./teacherApi";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-
 // ============================================
 // ✅ Dashboard Report by Month / Date Range
 // ============================================
@@ -117,7 +116,7 @@ export const getStudentStatistics = async (): Promise<StudentStatistics> => {
   if (!response.ok) {
     throw new ApiError(
       `Failed to fetch student statistics. Status: ${response.status}`,
-      response.status
+      response.status,
     );
   }
 
@@ -131,8 +130,8 @@ export const getStudentStatistics = async (): Promise<StudentStatistics> => {
 
 // ✅ NEW: Monthly breakdown row
 export interface DashboardMonthlyBreakdown {
-  month: number;           // 1-12
-  monthName: string;       // "January", ...
+  month: number; // 1-12
+  monthName: string; // "January", ...
   income: number;
   payrollExpenses: number;
   otherExpenses: number;
@@ -140,6 +139,20 @@ export interface DashboardMonthlyBreakdown {
   benefit: number;
 }
 
+// export interface DashboardReportData {
+//   totalStudents: number;
+//   totalActiveStudents: number;
+//   totalInactiveStudents: number;
+//   totalEnrolledStudents: number;
+//   totalActiveTeachers: number;
+//   totalIncome: number;
+//   totalPayrollExpenses: number;
+//   totalOtherExpenses: number;
+//   totalExpenses: number;
+//   totalBenefit: number;
+//   // ✅ NEW
+//   monthlyBreakdown?: DashboardMonthlyBreakdown[];
+// }
 export interface DashboardReportData {
   totalStudents: number;
   totalActiveStudents: number;
@@ -151,18 +164,26 @@ export interface DashboardReportData {
   totalOtherExpenses: number;
   totalExpenses: number;
   totalBenefit: number;
-  // ✅ NEW
-  monthlyBreakdown?: DashboardMonthlyBreakdown[];
+  monthlyBreakdown?: {
+    month: number;
+    monthName: string;
+    income: number;
+    payrollExpenses: number;
+    otherExpenses: number;
+    totalExpenses: number;
+    benefit: number;
+  }[];
 }
 
-export interface DashboardReportFilters {
-  fromDate: string | null;
-  toDate: string | null;
-  effectiveFrom?: string | null;      // ✅ optional new fields
-  effectiveTo?: string | null;
-  defaultRange?: string | null;
-  breakdownYear?: number;
-}
+// export interface DashboardReportFilters {
+//   fromDate: string | null;
+//   toDate: string | null;
+//   effectiveFrom?: string | null;      // ✅ optional new fields
+//   effectiveTo?: string | null;
+//   defaultRange?: string | null;
+//   breakdownYear?: number;
+// }
+
 
 export interface DashboardReportResponse {
   success: boolean;
@@ -180,7 +201,7 @@ export interface DashboardReportResponse {
  */
 export const getDashboardReport = async (
   fromDate?: string,
-  toDate?: string
+  toDate?: string,
 ): Promise<DashboardReportResponse> => {
   const params = new URLSearchParams();
   if (fromDate) params.append("fromDate", fromDate);
