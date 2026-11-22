@@ -37,7 +37,7 @@ const TeacherRegister = () => {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
 
@@ -77,10 +77,12 @@ const TeacherRegister = () => {
       } else if (submitData.salaryType === "PerStudent") {
         submitData.salaryAmount = 0;
       }
+      const payload: Partial<CreateTeacherData> = { ...submitData };
 
-      if (!submitData.email) delete submitData.email;
-      if (!submitData.address) delete submitData.address;
+      if (!payload.email) delete payload.email;
+      if (!payload.address) delete payload.address;
 
+      await createTeacher(payload as CreateTeacherData);
       await createTeacher(submitData);
 
       setSuccess("Teacher registered successfully.");
@@ -110,9 +112,7 @@ const TeacherRegister = () => {
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Register Teacher
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Register Teacher</h1>
           <p className="mt-1 text-sm text-gray-500">
             Add a new teacher to the system
           </p>
@@ -121,9 +121,7 @@ const TeacherRegister = () => {
         {/* Success Message */}
         {success && (
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
-            <p className="text-sm font-medium text-green-700">
-              {success}
-            </p>
+            <p className="text-sm font-medium text-green-700">{success}</p>
           </div>
         )}
 
@@ -146,9 +144,7 @@ const TeacherRegister = () => {
                 />
               </svg>
               <div>
-                <p className="text-sm font-medium text-red-700">
-                  {error}
-                </p>
+                <p className="text-sm font-medium text-red-700">{error}</p>
                 {(error.includes("phone number") ||
                   error.includes("email address")) && (
                   <p className="mt-1 text-sm text-red-600">
@@ -290,11 +286,11 @@ const TeacherRegister = () => {
                   Hire Date (تاریخ شمسی) <span className="text-red-500">*</span>
                 </label>
 
-              <ShamsiDatePicker
-  value={formData.hireDate}
-  onChange={handleHireDateChange}
-  placeholder="تاریخ"
-/>
+                <ShamsiDatePicker
+                  value={formData.hireDate}
+                  onChange={handleHireDateChange}
+                  placeholder="تاریخ"
+                />
               </div>
 
               {/* Address - Optional */}
@@ -404,9 +400,7 @@ const TeacherRegister = () => {
                     max="100"
                     step="0.01"
                     value={
-                      formData.feePercentage === 0
-                        ? ""
-                        : formData.feePercentage
+                      formData.feePercentage === 0 ? "" : formData.feePercentage
                     }
                     onChange={handleChange}
                     placeholder="Enter percentage"
@@ -431,9 +425,7 @@ const TeacherRegister = () => {
 
           {/* Status */}
           <div className="mb-8 border-t border-gray-200 pt-8">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Status
-            </h2>
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Status</h2>
 
             <label className="flex cursor-pointer items-center gap-3">
               <input
