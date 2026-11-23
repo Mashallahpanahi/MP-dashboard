@@ -22,6 +22,7 @@ export interface Student {
   registrationDate: string;
   status: "Active" | "Inactive" | "Graduated";
   notes: string | null;
+  image?: string | null;
   createdAt: string;
   updatedAt: string;
 }

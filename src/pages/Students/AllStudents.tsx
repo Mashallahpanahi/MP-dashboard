@@ -1023,14 +1023,9 @@ const AllStudents = () => {
 
       <StudentEnrollmentsModal
         isOpen={showEnrollmentsModal}
-        studentId={studentForEnrollments?.id || null}
-        studentName={`${studentForEnrollments?.firstName || ""} ${
-          studentForEnrollments?.lastName || ""
-        }`}
         student={studentForEnrollments}
         onClose={handleCloseEnrollments}
       />
-
       <StudentScoresModal
         isOpen={showScoresModal}
         studentId={studentForScores?.id || null}

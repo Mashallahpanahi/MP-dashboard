@@ -67,7 +67,7 @@ const AddScores = () => {
   const [hasSearched, setHasSearched] = useState(false);
 
   // ✅ Bulk-update hook (replaces bulkUpdateStudentScores)
-  const { create: bulkUpdateStudentScores } = useBulkUpdateStudentScores();
+  const { bulkUpdate: bulkUpdateStudentScores } = useBulkUpdateStudentScores();
 
   // ✅ Hook for find-students, gated on (teacherId && bookId && hasSearched)
   const {
