@@ -1,13 +1,29 @@
 // src/pages/Classes/AddClass.tsx
 import { FormEvent, useState } from "react";
-import { createClass, type CreateClassData } from "@/api/classApi";
+import { useCreateClass, type CreateClassData } from "@/api/classApi";
 import { useNavigate } from "react-router-dom";
+
+// ✅ Preserves the original friendly-error mapping for duplicate class names
+const mapDuplicateError = (msg: string): string => {
+  if (!msg) return msg;
+  if (msg.includes("duplicate key") || msg.includes("UQ_")) {
+    return "This class name is already taken. Please use a different name.";
+  }
+  return msg;
+};
 
 const AddClass = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
+  // ✅ Hook replaces createClass + local loading/error state
+  const { create: createClass, loading, error: hookError } = useCreateClass();
+
+  // Local UI state
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Combined error: local validation first, then hook error (with mapping)
+  const error = localError || mapDuplicateError(hookError || "");
 
   const [formData, setFormData] = useState<Partial<CreateClassData>>({
     className: "",
@@ -15,9 +31,7 @@ const AddClass = () => {
     isActive: true,
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
 
     if (type === "checkbox") {
@@ -36,45 +50,33 @@ const AddClass = () => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLocalError("");
     setSuccess("");
 
-    try {
-      // Validate required fields
-      if (!formData.className || formData.className.trim() === "") {
-        setError("Class name is required");
-        setLoading(false);
-        return;
-      }
-
-      // Prepare submit data
-      const submitData: Partial<CreateClassData> = {
-        className: formData.className,
-        isActive: formData.isActive !== undefined ? formData.isActive : true,
-      };
-
-      // Only include block if it has a value
-      if (formData.block && formData.block.trim() !== "") {
-        submitData.block = formData.block;
-      }
-
-      await createClass(submitData as CreateClassData);
-      setSuccess("Class created successfully!");
-      setTimeout(() => {
-        navigate("/classes/all");
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to create class:", error);
-      const errorMsg = error instanceof Error ? error.message : "Failed to create class";
-      if (errorMsg.includes("duplicate key") || errorMsg.includes("UQ_")) {
-        setError("This class name is already taken. Please use a different name.");
-      } else {
-        setError(errorMsg);
-      }
-    } finally {
-      setLoading(false);
+    // Validate required fields (synchronous — no loading toggle needed)
+    if (!formData.className || formData.className.trim() === "") {
+      setLocalError("Class name is required");
+      return;
     }
+
+    // Prepare submit data
+    const submitData: Partial<CreateClassData> = {
+      className: formData.className,
+      isActive: formData.isActive !== undefined ? formData.isActive : true,
+    };
+
+    // Only include block if it has a value
+    if (formData.block && formData.block.trim() !== "") {
+      submitData.block = formData.block;
+    }
+
+    const ok = await createClass(submitData as CreateClassData);
+    if (!ok) return; // error surfaces via `error`
+
+    setSuccess("Class created successfully!");
+    setTimeout(() => {
+      navigate("/classes/all");
+    }, 1500);
   };
 
   return (
@@ -84,7 +86,8 @@ const AddClass = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Add New Class</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Add a new class to the system <span className="text-red-500">*</span> indicates required field
+            Add a new class to the system{" "}
+            <span className="text-red-500">*</span> indicates required field
           </p>
         </div>
 
@@ -121,9 +124,7 @@ const AddClass = () => {
               required
               className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
-            <p className="mt-1 text-xs text-gray-500">
-              This field is required
-            </p>
+            <p className="mt-1 text-xs text-gray-500">This field is required</p>
           </div>
 
           {/* Block - Optional (can be empty) */}
@@ -151,7 +152,9 @@ const AddClass = () => {
               <input
                 type="checkbox"
                 name="isActive"
-                checked={formData.isActive !== undefined ? formData.isActive : true}
+                checked={
+                  formData.isActive !== undefined ? formData.isActive : true
+                }
                 onChange={handleChange}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />

@@ -1,6 +1,6 @@
 // src/components/teacher-payroll/TeacherPayrollCreateModal.tsx
 import { useState, useEffect, useRef } from "react";
-import { createTeacherPayroll, getTeachers } from "@/api/teacherPayrollApi";
+import { useTeachers } from "@/api/teacherPayrollApi";
 import type { CreateTeacherPayrollData, Teacher } from "@/types/teacherPayroll";
 // ✅ Shamsi helpers + picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
@@ -67,9 +67,13 @@ const TeacherPayrollCreateModal = ({
     notes: "",
   });
 
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  // ✅ Teachers now come from the hook (replaces getTeachers())
+  const { data: teachersData, loading: loadingTeachers } = useTeachers();
+  const teachers: Teacher[] = Array.isArray(teachersData)
+    ? teachersData.filter((t) => t.isActive)
+    : [];
+
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
-  const [loadingTeachers, setLoadingTeachers] = useState(true);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreFilled, setIsPreFilled] = useState(false);
@@ -100,103 +104,86 @@ const TeacherPayrollCreateModal = ({
     }
   }, [shamsiMonth, shamsiYear]);
 
-  // ✅ Single useEffect: fetch teachers + apply prefill (Shamsi)
+  // ✅ Single useEffect: apply prefill once teachers have loaded
   useEffect(() => {
     if (!isOpen) {
       prefillProcessedRef.current = null;
       return;
     }
 
-    const initModal = async () => {
-      setLoadingTeachers(true);
-      setError("");
+    // Wait until teachers have loaded before applying prefill
+    if (loadingTeachers) return;
 
+    setError("");
+
+    const prefillKey = prefillData
+      ? `${prefillData.teacherId}-${prefillData.month}-${prefillData.year}`
+      : "no-prefill";
+
+    if (prefillProcessedRef.current === prefillKey) {
+      return;
+    }
+    prefillProcessedRef.current = prefillKey;
+
+    if (prefillData) {
+      const baseSalary = safeNumber(prefillData.baseSalary);
+      const paidAmount =
+        prefillData.paidAmount !== undefined
+          ? safeNumber(prefillData.paidAmount)
+          : baseSalary;
+      const remaining = baseSalary - paidAmount;
+
+      // ✅ Convert incoming Miladi month/year to Shamsi for display
+      let sMonth = defaultShamsi.month;
+      let sYear = defaultShamsi.year;
       try {
-        const data = await getTeachers();
-        const activeTeachers = Array.isArray(data)
-          ? data.filter((t) => t.isActive)
-          : [];
-        setTeachers(activeTeachers);
-
-        const prefillKey = prefillData
-          ? `${prefillData.teacherId}-${prefillData.month}-${prefillData.year}`
-          : "no-prefill";
-
-        if (prefillProcessedRef.current === prefillKey) {
-          setLoadingTeachers(false);
-          return;
-        }
-        prefillProcessedRef.current = prefillKey;
-
-        if (prefillData) {
-          const baseSalary = safeNumber(prefillData.baseSalary);
-          const paidAmount =
-            prefillData.paidAmount !== undefined
-              ? safeNumber(prefillData.paidAmount)
-              : baseSalary;
-          const remaining = baseSalary - paidAmount;
-
-          // ✅ Convert incoming Miladi month/year to Shamsi for display
-          let sMonth = defaultShamsi.month;
-          let sYear = defaultShamsi.year;
-          try {
-            const mid = `${prefillData.year}-${String(
-              prefillData.month
-            ).padStart(2, "0")}-15`;
-            const sh = convertToShamsi(mid);
-            sMonth = sh.month;
-            sYear = sh.year;
-          } catch {
-            /* keep defaults */
-          }
-          setShamsiMonth(sMonth);
-          setShamsiYear(sYear);
-
-          setFormData({
-            teacherId: prefillData.teacherId,
-            month: prefillData.month ?? defaultShamsi.month,
-            year: prefillData.year ?? defaultShamsi.year,
-            baseSalary,
-            paidAmount,
-            remainingSalary: remaining > 0 ? remaining : 0,
-            date: prefillData.date || formatMiladiISO(new Date()),
-            status: remaining <= 0 ? "Completed" : "Not Completed",
-            notes: prefillData.notes || "",
-          });
-
-          const teacher = activeTeachers.find(
-            (t) => t.id === prefillData.teacherId
-          );
-          if (teacher) setSelectedTeacher(teacher);
-          setIsPreFilled(true);
-        } else {
-          const defaults = getDefaultShamsiMonthYear();
-          setShamsiMonth(defaults.month);
-          setShamsiYear(defaults.year);
-          setFormData({
-            teacherId: "",
-            month: 1,
-            year: 2000,
-            baseSalary: 0,
-            paidAmount: 0,
-            remainingSalary: 0,
-            date: formatMiladiISO(new Date()),
-            status: "Not Completed",
-            notes: "",
-          });
-          setSelectedTeacher(null);
-          setIsPreFilled(false);
-        }
-      } catch (error) {
-        console.error("Failed to initialize modal:", error);
-        setError("Failed to load teachers");
-      } finally {
-        setLoadingTeachers(false);
+        const mid = `${prefillData.year}-${String(prefillData.month).padStart(
+          2,
+          "0",
+        )}-15`;
+        const sh = convertToShamsi(mid);
+        sMonth = sh.month;
+        sYear = sh.year;
+      } catch {
+        /* keep defaults */
       }
-    };
+      setShamsiMonth(sMonth);
+      setShamsiYear(sYear);
 
-    initModal();
-  }, [isOpen, prefillData]);
+      setFormData({
+        teacherId: prefillData.teacherId,
+        month: prefillData.month ?? defaultShamsi.month,
+        year: prefillData.year ?? defaultShamsi.year,
+        baseSalary,
+        paidAmount,
+        remainingSalary: remaining > 0 ? remaining : 0,
+        date: prefillData.date || formatMiladiISO(new Date()),
+        status: remaining <= 0 ? "Completed" : "Not Completed",
+        notes: prefillData.notes || "",
+      });
+
+      const teacher = teachers.find((t) => t.id === prefillData.teacherId);
+      if (teacher) setSelectedTeacher(teacher);
+      setIsPreFilled(true);
+    } else {
+      const defaults = getDefaultShamsiMonthYear();
+      setShamsiMonth(defaults.month);
+      setShamsiYear(defaults.year);
+      setFormData({
+        teacherId: "",
+        month: 1,
+        year: 2000,
+        baseSalary: 0,
+        paidAmount: 0,
+        remainingSalary: 0,
+        date: formatMiladiISO(new Date()),
+        status: "Not Completed",
+        notes: "",
+      });
+      setSelectedTeacher(null);
+      setIsPreFilled(false);
+    }
+  }, [isOpen, prefillData, loadingTeachers]);
 
   const handleTeacherChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const teacherId = e.target.value;
@@ -248,7 +235,7 @@ const TeacherPayrollCreateModal = ({
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
@@ -281,7 +268,7 @@ const TeacherPayrollCreateModal = ({
 
     if (!formData.baseSalary || formData.baseSalary <= 0) {
       setError(
-        "Base salary is missing for this teacher. Please update the teacher's salary first."
+        "Base salary is missing for this teacher. Please update the teacher's salary first.",
       );
       return;
     }
@@ -305,7 +292,7 @@ const TeacherPayrollCreateModal = ({
     } catch (error) {
       console.error("Failed to pay salary:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to process payment"
+        error instanceof Error ? error.message : "Failed to process payment",
       );
     } finally {
       setIsSubmitting(false);
@@ -319,7 +306,7 @@ const TeacherPayrollCreateModal = ({
   };
 
   const formatCurrency = (
-    amount: number | string | null | undefined
+    amount: number | string | null | undefined,
   ): string => {
     const num = safeNumber(amount);
     return `$${num.toFixed(2)}`;
@@ -445,9 +432,7 @@ const TeacherPayrollCreateModal = ({
                 <input
                   type="number"
                   value={shamsiYear}
-                  onChange={(e) =>
-                    setShamsiYear(parseInt(e.target.value) || 0)
-                  }
+                  onChange={(e) => setShamsiYear(parseInt(e.target.value) || 0)}
                   min="1300"
                   max="1500"
                   required

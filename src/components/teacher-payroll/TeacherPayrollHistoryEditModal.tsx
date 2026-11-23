@@ -1,7 +1,10 @@
 // src/components/teacher-payroll/TeacherPayrollHistoryEditModal.tsx
 import { useState, useEffect, useMemo } from "react";
-import { updateTeacherPayroll } from "@/api/teacherPayrollApi";
-import type { TeacherPayroll, UpdateTeacherPayrollData } from "@/types/teacherPayroll";
+import { useUpdateTeacherPayroll } from "@/api/teacherPayrollApi";
+import type {
+  TeacherPayroll,
+  UpdateTeacherPayrollData,
+} from "@/types/teacherPayroll";
 // ✅ Shamsi date picker + helpers
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import {
@@ -23,6 +26,13 @@ const TeacherPayrollHistoryEditModal = ({
   onClose,
   onSuccess,
 }: TeacherPayrollHistoryEditModalProps) => {
+  // ✅ Hook replaces updateTeacherPayroll + local loading/error state
+  const {
+    update: updateTeacherPayroll,
+    loading: updateLoading,
+    error: updateError,
+  } = useUpdateTeacherPayroll();
+
   const [formData, setFormData] = useState<UpdateTeacherPayrollData>({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -39,7 +49,7 @@ const TeacherPayrollHistoryEditModal = ({
   };
 
   const formatCurrency = (
-    amount: number | string | null | undefined
+    amount: number | string | null | undefined,
   ): string => {
     const num = safeNumber(amount);
     return `$${num.toFixed(2)}`;
@@ -65,7 +75,7 @@ const TeacherPayrollHistoryEditModal = ({
         // Use 15th of the month to avoid edge-of-month rollover issues
         const miladiMid = `${payroll.year}-${String(payroll.month).padStart(
           2,
-          "0"
+          "0",
         )}-15`;
         const sh = convertToShamsi(miladiMid);
         setShamsiMonth(sh.month);
@@ -120,7 +130,7 @@ const TeacherPayrollHistoryEditModal = ({
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
@@ -180,7 +190,11 @@ const TeacherPayrollHistoryEditModal = ({
 
       console.log("📤 Updating payroll:", payroll.id, submitData);
 
-      await updateTeacherPayroll(payroll.id, submitData);
+      // ✅ Hook returns boolean — throw to keep the existing catch block behaviour
+      const ok = await updateTeacherPayroll(payroll.id, submitData);
+      if (!ok) {
+        throw new Error(updateError || "Failed to update payroll");
+      }
 
       setSuccess("Payroll updated successfully!");
 
@@ -191,7 +205,7 @@ const TeacherPayrollHistoryEditModal = ({
     } catch (error) {
       console.error("Failed to update payroll:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to update payroll"
+        error instanceof Error ? error.message : "Failed to update payroll",
       );
     } finally {
       setIsSubmitting(false);
@@ -315,9 +329,7 @@ const TeacherPayrollHistoryEditModal = ({
                 <input
                   type="number"
                   value={shamsiYear}
-                  onChange={(e) =>
-                    setShamsiYear(parseInt(e.target.value) || 0)
-                  }
+                  onChange={(e) => setShamsiYear(parseInt(e.target.value) || 0)}
                   min="1300"
                   max="1500"
                   required

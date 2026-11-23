@@ -1,6 +1,6 @@
 // src/components/other-expenses/AddOtherExpenseModal.tsx
 import { useState, useEffect } from "react";
-import { createOtherExpense } from "@/api/otherExpenseApi";
+import { useCreateOtherExpense } from "@/api/otherExpenseApi";
 import type { CreateOtherExpenseData } from "@/types/otherExpense";
 // ✅ Shamsi date picker + miladi helper
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
@@ -17,15 +17,25 @@ const AddOtherExpenseModal = ({
   onClose,
   onSuccess,
 }: AddOtherExpenseModalProps) => {
+  // ✅ Hook replaces createOtherExpense + local loading/error state
+  const {
+    create: createOtherExpense,
+    loading,
+    error: hookError,
+  } = useCreateOtherExpense();
+
   const [formData, setFormData] = useState<CreateOtherExpenseData>({
     amount: 0,
     description: "",
     // ✅ Miladi ISO for backend — shown as Shamsi in the picker
     date: formatMiladiISO(new Date()),
   });
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Combined error: local first, then hook error
+  const error = localError || hookError || "";
 
   // Reset form when modal opens
   useEffect(() => {
@@ -35,7 +45,7 @@ const AddOtherExpenseModal = ({
         description: "",
         date: formatMiladiISO(new Date()),
       });
-      setError("");
+      setLocalError("");
       setSuccess("");
     }
   }, [isOpen]);
@@ -43,7 +53,7 @@ const AddOtherExpenseModal = ({
   if (!isOpen) return null;
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value, type } = e.target;
 
@@ -64,31 +74,36 @@ const AddOtherExpenseModal = ({
 
     // Validate
     if (!formData.amount || formData.amount <= 0) {
-      setError("Amount must be greater than 0");
+      setLocalError("Amount must be greater than 0");
       return;
     }
 
     if (!formData.description || formData.description.trim() === "") {
-      setError("Description is required");
+      setLocalError("Description is required");
       return;
     }
 
     if (!formData.date) {
-      setError("Date is required");
+      setLocalError("Date is required");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError("");
+      setLocalError("");
       setSuccess("");
 
-      await createOtherExpense({
+      const ok = await createOtherExpense({
         amount: formData.amount,
         description: formData.description.trim(),
         // ✅ formData.date is already Miladi ISO for the backend
         date: formData.date,
       });
+
+      // ✅ Hook returns boolean — throw so the existing catch block runs
+      if (!ok) {
+        throw new Error(hookError || "Failed to add expense");
+      }
 
       setSuccess("Expense added successfully!");
 
@@ -98,8 +113,8 @@ const AddOtherExpenseModal = ({
       }, 1500);
     } catch (error) {
       console.error("Failed to add expense:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to add expense"
+      setLocalError(
+        error instanceof Error ? error.message : "Failed to add expense",
       );
     } finally {
       setIsSubmitting(false);

@@ -1,11 +1,11 @@
 // src/pages/Notes/Notes.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  getNotes,
-  createNote,
-  updateNote,
-  deleteNote,
+  useNotes,
+  useCreateNote,
+  useUpdateNote,
+  useDeleteNote,
   type Note,
 } from "@/api/noteApi";
 
@@ -29,7 +29,6 @@ const formatDateTime = (dateStr: string | undefined): string => {
 
 const wasEdited = (note: Note): boolean => {
   if (!note.updatedAt || !note.createdAt) return false;
-  // Consider edited if updatedAt is more than 1 second after createdAt
   const diff =
     new Date(note.updatedAt).getTime() - new Date(note.createdAt).getTime();
   return diff > 1000;
@@ -41,14 +40,35 @@ const wasEdited = (note: Note): boolean => {
 const Notes = () => {
   const { t } = useTranslation();
 
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  // ✅ List hook (replaces getNotes + local notes/loading/error state)
+  const {
+    data: notesData,
+    loading,
+    error: fetchError,
+    refetch: refetchNotes,
+  } = useNotes();
+
+  // ✅ Mutation hooks
+  const { create: createNote, loading: creating } = useCreateNote();
+  const { update: updateNote } = useUpdateNote();
+  const { remove: deleteNote } = useDeleteNote();
+
+  // ✅ Sorted newest-first, derived from hook data (mirrors original sort in loadNotes)
+  const notes: Note[] = useMemo(() => {
+    if (!Array.isArray(notesData)) return [];
+    return [...notesData].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [notesData]);
+
+  // Local error/success (hook error surfaces via `fetchError`)
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
+  const error = localError || fetchError || "";
 
   // Create
   const [newContent, setNewContent] = useState("");
-  const [creating, setCreating] = useState(false);
 
   // Inline edit
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -60,29 +80,15 @@ const Notes = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // ============================================
-  // LOAD NOTES
+  // LOAD NOTES (Refresh button)
   // ============================================
-  const loadNotes = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getNotes();
-      // Ensure sorted newest first (in case backend doesn't)
-      const sorted = [...data].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setNotes(sorted);
-    } catch (err) {
-      console.error("Failed to load notes:", err);
-      setError(err instanceof Error ? err.message : "Failed to load notes");
-    } finally {
-      setLoading(false);
-    }
+  const loadNotes = () => {
+    setLocalError("");
+    refetchNotes();
   };
 
   useEffect(() => {
-    loadNotes();
+    setLocalError("");
   }, []);
 
   // ============================================
@@ -91,32 +97,30 @@ const Notes = () => {
   const handleCreate = async () => {
     const trimmed = newContent.trim();
     if (!trimmed) {
-      setError("Please write something before creating a note");
+      setLocalError("Please write something before creating a note");
       return;
     }
 
-    try {
-      setCreating(true);
-      setError("");
-      setSuccess("");
+    setLocalError("");
+    setSuccess("");
 
-      const created = await createNote(trimmed);
+    // ✅ Payload must be an object — backend expects { content: string }
+    const ok = await createNote({ content: trimmed });
 
-      // Prepend to list (newest first)
-      setNotes((prev) => [created, ...prev]);
-      setNewContent("");
-      setSuccess("Note created successfully!");
-      setTimeout(() => setSuccess(""), 2500);
-    } catch (err) {
-      console.error("Failed to create note:", err);
-      setError(err instanceof Error ? err.message : "Failed to create note");
-    } finally {
-      setCreating(false);
+    if (!ok) {
+      setLocalError("Failed to create note");
+      return;
     }
+
+    setNewContent("");
+    setSuccess("Note created successfully!");
+    setTimeout(() => setSuccess(""), 2500);
+    // Hook's data will re-fetch automatically if useCreate triggers a refresh
+    // or we refetch explicitly to guarantee the list updates:
+    refetchNotes();
   };
 
   const handleNewKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Ctrl/Cmd + Enter → submit
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       handleCreate();
@@ -129,7 +133,7 @@ const Notes = () => {
   const handleStartEdit = (note: Note) => {
     setEditingId(note.id);
     setEditContent(note.content);
-    setError("");
+    setLocalError("");
     setSuccess("");
   };
 
@@ -141,35 +145,34 @@ const Notes = () => {
   const handleSaveEdit = async (id: string) => {
     const trimmed = editContent.trim();
     if (!trimmed) {
-      setError("Note content cannot be empty");
+      setLocalError("Note content cannot be empty");
       return;
     }
 
-    try {
-      setSavingId(id);
-      setError("");
-      setSuccess("");
+    setSavingId(id);
+    setLocalError("");
+    setSuccess("");
 
-      const updated = await updateNote(id, trimmed);
+    // ✅ Payload must be an object — backend expects { content: string }
+    const ok = await updateNote(id, { content: trimmed });
 
-      setNotes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...updated } : n))
-      );
-      setEditingId(null);
-      setEditContent("");
-      setSuccess("Note updated successfully!");
-      setTimeout(() => setSuccess(""), 2500);
-    } catch (err) {
-      console.error("Failed to update note:", err);
-      setError(err instanceof Error ? err.message : "Failed to update note");
-    } finally {
+    if (!ok) {
+      setLocalError("Failed to update note");
       setSavingId(null);
+      return;
     }
+
+    setEditingId(null);
+    setEditContent("");
+    setSuccess("Note updated successfully!");
+    setTimeout(() => setSuccess(""), 2500);
+    setSavingId(null);
+    refetchNotes();
   };
 
   const handleEditKeyDown = (
     e: React.KeyboardEvent<HTMLTextAreaElement>,
-    id: string
+    id: string,
   ) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
@@ -193,23 +196,23 @@ const Notes = () => {
   };
 
   const handleConfirmDelete = async (id: string) => {
-    try {
-      setDeletingId(id);
-      setError("");
-      setSuccess("");
+    setDeletingId(id);
+    setLocalError("");
+    setSuccess("");
 
-      await deleteNote(id);
+    const ok = await deleteNote(id);
 
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-      setConfirmDeleteId(null);
-      setSuccess("Note deleted successfully!");
-      setTimeout(() => setSuccess(""), 2500);
-    } catch (err) {
-      console.error("Failed to delete note:", err);
-      setError(err instanceof Error ? err.message : "Failed to delete note");
-    } finally {
+    if (!ok) {
+      setLocalError("Failed to delete note");
       setDeletingId(null);
+      return;
     }
+
+    setConfirmDeleteId(null);
+    setSuccess("Note deleted successfully!");
+    setTimeout(() => setSuccess(""), 2500);
+    setDeletingId(null);
+    refetchNotes();
   };
 
   // ============================================
@@ -286,8 +289,14 @@ const Notes = () => {
         />
         <div className="mt-3 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-gray-400">
-            Tip: Press <kbd className="rounded border border-gray-300 bg-gray-50 px-1.5 py-0.5 font-mono text-[10px]">Ctrl</kbd>{" "}
-            + <kbd className="rounded border border-gray-300 bg-gray-50 px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd>{" "}
+            Tip: Press{" "}
+            <kbd className="rounded border border-gray-300 bg-gray-50 px-1.5 py-0.5 font-mono text-[10px]">
+              Ctrl
+            </kbd>{" "}
+            +{" "}
+            <kbd className="rounded border border-gray-300 bg-gray-50 px-1.5 py-0.5 font-mono text-[10px]">
+              Enter
+            </kbd>{" "}
             to save
           </p>
           <button

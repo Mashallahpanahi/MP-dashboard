@@ -1,23 +1,46 @@
 // src/components/settings/BookFeeCard.tsx
 import { useState, useEffect } from "react";
-import { 
-  getBookFees, 
-  createBookFee, 
-  updateBookFee, 
-  deleteBookFee,
-  updateBookFeeStatus
+import {
+  useBookFees,
+  useCreateBookFee,
+  useUpdateBookFee,
+  useDeleteBookFee,
+  useUpdateBookFeeStatus,
+  type BookFee,
+  type CreateBookFeeData,
 } from "@/api/bookFeeApi";
-import { getBooks } from "@/api/bookApi";
-import type { BookFee, CreateBookFeeData } from "@/types/bookFee";
-import type { Book } from "@/types/book";
+import { useBooks, type Book } from "@/api/bookApi";
 
 const BookFeeCard = () => {
-  const [bookFees, setBookFees] = useState<BookFee[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  // ✅ List hooks (replace getBookFees + getBooks + local loading/error)
+  const {
+    data: feesData,
+    loading: loadingFees,
+    error: fetchError,
+    refetch: refetchFees,
+  } = useBookFees();
+
+  const { data: booksData, loading: loadingBooks } = useBooks();
+
+  // ✅ Mutation hooks
+  const { create: createBookFee, loading: creating } = useCreateBookFee();
+  const { update: updateBookFee, loading: updating } = useUpdateBookFee();
+  const { remove: deleteBookFee } = useDeleteBookFee();
+  const { updateStatus } = useUpdateBookFeeStatus();
+
+  const saving = creating || updating;
+
+  // ✅ Derived lists
+  const bookFees: BookFee[] = Array.isArray(feesData) ? feesData : [];
+  const books: Book[] = Array.isArray(booksData) ? booksData : [];
+
+  const loading = loadingFees || loadingBooks;
+
+  // Local error/success (fetchError surfaces through `error`)
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
+  const error = localError || fetchError || "";
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -31,53 +54,36 @@ const BookFeeCard = () => {
 
   // Helper function to safely format fee
   const formatFee = (fee: any): string => {
-    if (fee === undefined || fee === null || fee === '') {
-      return '0.00';
+    if (fee === undefined || fee === null || fee === "") {
+      return "0.00";
     }
-    const numFee = typeof fee === 'string' ? parseFloat(fee) : fee;
+    const numFee = typeof fee === "string" ? parseFloat(fee) : fee;
     if (isNaN(numFee)) {
-      return '0.00';
+      return "0.00";
     }
     return numFee.toFixed(2);
   };
 
-  // Fetch data
+  // Reset local error on mount
   useEffect(() => {
-    fetchData();
+    setLocalError("");
   }, []);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      
-      const [feesData, booksData] = await Promise.all([
-        getBookFees().catch(() => []),
-        getBooks().catch(() => [])
-      ]);
-      
-      setBookFees(Array.isArray(feesData) ? feesData : []);
-      setBooks(Array.isArray(booksData) ? booksData : []);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      setError("Failed to load data");
-      setBookFees([]);
-      setBooks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
   ) => {
     const { name, value, type } = e.target;
-    
+
     if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else if (type === "number") {
-      setFormData((prev) => ({ ...prev, [name]: value === "" ? 0 : Number(value) }));
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value === "" ? 0 : Number(value),
+      }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -85,74 +91,73 @@ const BookFeeCard = () => {
 
   // Get books that don't have a fee yet
   const getAvailableBooks = () => {
-    const existingBookIds = bookFees.map(fee => fee.bookId);
-    return books.filter(book => !existingBookIds.includes(book.id));
+    const existingBookIds = bookFees.map((fee) => fee.bookId);
+    return books.filter((book) => !existingBookIds.includes(book.id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate required fields
     if (!formData.bookId) {
-      setError("Please select a book");
+      setLocalError("Please select a book");
       return;
     }
-    
+
     if (!formData.fee || formData.fee <= 0) {
-      setError("Fee must be greater than 0");
+      setLocalError("Fee must be greater than 0");
       return;
     }
 
-    try {
-      setSaving(true);
-      setError("");
-      setSuccess("");
+    setLocalError("");
+    setSuccess("");
 
-      // Prepare the data to send to backend
-      const submitData: CreateBookFeeData = {
-        bookId: formData.bookId,
-        fee: Number(formData.fee),
-        description: formData.description || "",
-        isActive: formData.isActive !== undefined ? formData.isActive : true,
-      };
+    // Prepare the data to send to backend
+    const submitData: CreateBookFeeData = {
+      bookId: formData.bookId,
+      fee: Number(formData.fee),
+      description: formData.description || "",
+      isActive: formData.isActive !== undefined ? formData.isActive : true,
+    };
 
-      console.log("Submitting data:", submitData);
+    console.log("Submitting data:", submitData);
 
-      if (editingId) {
-        await updateBookFee(editingId, submitData);
-        setSuccess("Book fee updated successfully!");
-      } else {
-        await createBookFee(submitData);
-        setSuccess("Book fee created successfully!");
+    // ✅ Branch on editingId — same as before, but call the right hook
+    if (editingId) {
+      const ok = await updateBookFee(editingId, submitData);
+      if (!ok) {
+        setLocalError("Failed to save book fee");
+        return;
       }
-
-      setTimeout(() => {
-        setShowAddForm(false);
-        setEditingId(null);
-        setFormData({ bookId: "", fee: 0, description: "", isActive: true });
-        fetchData();
-        setSuccess("");
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to save book fee:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to save book fee"
-      );
-    } finally {
-      setSaving(false);
+      setSuccess("Book fee updated successfully!");
+    } else {
+      const ok = await createBookFee(submitData);
+      if (!ok) {
+        setLocalError("Failed to save book fee");
+        return;
+      }
+      setSuccess("Book fee created successfully!");
     }
+
+    setTimeout(() => {
+      setShowAddForm(false);
+      setEditingId(null);
+      setFormData({ bookId: "", fee: 0, description: "", isActive: true });
+      refetchFees();
+      setSuccess("");
+    }, 1500);
   };
 
   const handleEdit = (fee: BookFee) => {
     setEditingId(fee.id);
     setFormData({
       bookId: fee.bookId,
-      fee: typeof fee.fee === 'string' ? parseFloat(fee.fee) : fee.fee,
+      fee: typeof fee.fee === "string" ? parseFloat(fee.fee) : fee.fee,
       description: fee.description || "",
       isActive: fee.isActive,
     });
     setShowAddForm(true);
-    setError("");
+    setLocalError("");
     setSuccess("");
   };
 
@@ -160,44 +165,47 @@ const BookFeeCard = () => {
     const newStatus = !fee.isActive;
     const action = newStatus ? "activate" : "deactivate";
 
-    if (!confirm(`Are you sure you want to ${action} the fee for "${fee.book?.name || 'this book'}"?`)) {
+    if (
+      !confirm(
+        `Are you sure you want to ${action} the fee for "${fee.book?.name || "this book"}"?`,
+      )
+    ) {
       return;
     }
 
-    try {
-      await updateBookFeeStatus(fee.id, { isActive: newStatus });
-      setSuccess(`Book fee ${action}d successfully!`);
-      fetchData();
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (error) {
-      console.error("Failed to update book fee status:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to update book fee status"
-      );
+    // ✅ Signature change: updateStatus(id, boolean) — no object wrapper
+    const ok = await updateStatus(fee.id, newStatus);
+
+    if (!ok) {
+      setLocalError("Failed to update book fee status");
+      return;
     }
+
+    setSuccess(`Book fee ${action}d successfully!`);
+    refetchFees();
+    setTimeout(() => setSuccess(""), 3000);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this book fee?")) return;
 
-    try {
-      await deleteBookFee(id);
-      setSuccess("Book fee deleted successfully!");
-      fetchData();
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (error) {
-      console.error("Failed to delete book fee:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to delete book fee"
-      );
+    const ok = await deleteBookFee(id);
+
+    if (!ok) {
+      setLocalError("Failed to delete book fee");
+      return;
     }
+
+    setSuccess("Book fee deleted successfully!");
+    refetchFees();
+    setTimeout(() => setSuccess(""), 3000);
   };
 
   const handleCancel = () => {
     setShowAddForm(false);
     setEditingId(null);
     setFormData({ bookId: "", fee: 0, description: "", isActive: true });
-    setError("");
+    setLocalError("");
     setSuccess("");
   };
 
@@ -237,7 +245,11 @@ const BookFeeCard = () => {
                 ? "cursor-not-allowed bg-gray-400"
                 : "bg-blue-600 hover:bg-blue-700"
             }`}
-            title={availableBooks.length === 0 ? "All books already have fees" : "Add a new book fee"}
+            title={
+              availableBooks.length === 0
+                ? "All books already have fees"
+                : "Add a new book fee"
+            }
           >
             Add Book Fee
             {availableBooks.length === 0 && " (All books have fees)"}
@@ -261,7 +273,10 @@ const BookFeeCard = () => {
 
       {/* Add/Edit Form */}
       {showAddForm && (
-        <form onSubmit={handleSubmit} className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <form
+          onSubmit={handleSubmit}
+          className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4"
+        >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Book Selection */}
             <div>
@@ -279,12 +294,15 @@ const BookFeeCard = () => {
                 <option value="">Select a book</option>
                 {(editingId ? books : availableBooks).map((book) => (
                   <option key={book.id} value={book.id}>
-                    {book.name} (Level: {book.level}) {book.code ? `[${book.code}]` : ''}
+                    {book.name} (Level: {book.level}){" "}
+                    {book.code ? `[${book.code}]` : ""}
                   </option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                {editingId ? 'Current book for this fee' : 'Select the book for this fee'}
+                {editingId
+                  ? "Current book for this fee"
+                  : "Select the book for this fee"}
               </p>
             </div>
 
@@ -335,12 +353,16 @@ const BookFeeCard = () => {
                 <input
                   type="checkbox"
                   name="isActive"
-                  checked={formData.isActive !== undefined ? formData.isActive : true}
+                  checked={
+                    formData.isActive !== undefined ? formData.isActive : true
+                  }
                   onChange={handleInputChange}
                   disabled={saving}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm font-medium text-gray-700">Active</span>
+                <span className="text-sm font-medium text-gray-700">
+                  Active
+                </span>
               </label>
             </div>
           </div>
@@ -371,7 +393,7 @@ const BookFeeCard = () => {
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
           <p className="text-sm text-gray-500">No book fees configured yet.</p>
           <p className="mt-1 text-xs text-gray-400">
-            {availableBooks.length > 0 
+            {availableBooks.length > 0
               ? `Click "Add Book Fee" to configure fees for ${availableBooks.length} book(s).`
               : "All books already have fees configured."}
           </p>
@@ -410,18 +432,22 @@ const BookFeeCard = () => {
                   <tr key={fee.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div>
-                        <p className="font-medium text-gray-900">{fee.book?.name || 'Unknown Book'}</p>
-                        <p className="text-xs text-gray-500">{fee.book?.code || 'No code'}</p>
+                        <p className="font-medium text-gray-900">
+                          {fee.book?.name || "Unknown Book"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {fee.book?.code || "No code"}
+                        </p>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
-                        {fee.book?.level || 'N/A'}
+                        {fee.book?.level || "N/A"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-medium text-gray-900">
-                        {fee.book?.levelOrder ?? 'N/A'}
+                        {fee.book?.levelOrder ?? "N/A"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -430,7 +456,7 @@ const BookFeeCard = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {fee.description || '—'}
+                      {fee.description || "—"}
                     </td>
                     <td className="px-4 py-3">
                       {fee.isActive ? (
@@ -461,7 +487,7 @@ const BookFeeCard = () => {
                               : "bg-green-50 text-green-600 hover:bg-green-100"
                           }`}
                         >
-                          {fee.isActive ? 'Deactivate' : 'Activate'}
+                          {fee.isActive ? "Deactivate" : "Activate"}
                         </button>
                         <button
                           onClick={() => handleDelete(fee.id)}

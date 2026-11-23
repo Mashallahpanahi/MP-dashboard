@@ -1,20 +1,34 @@
 // src/components/settings/PaymentMethodCard.tsx
 import { useState, useEffect } from "react";
-import { getPaymentMethod, createPaymentMethod } from "@/api/settingsApi";
+import { usePaymentMethod, useCreatePaymentMethod } from "@/api/settingsApi";
 import type { PaymentMethod } from "@/types/settings";
 
 interface PaymentMethodCardProps {
   onPaymentMethodChange?: () => void;
 }
 
-const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) => {
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+const PaymentMethodCard = ({
+  onPaymentMethodChange,
+}: PaymentMethodCardProps) => {
+  // ✅ Read hook (replaces getPaymentMethod + local loading/error state)
+  const {
+    data: fetchedPaymentMethod,
+    loading,
+    error: fetchError,
+    refetch: refetchPaymentMethod,
+  } = usePaymentMethod();
+
+  // ✅ Create hook (replaces createPaymentMethod + local saving state)
+  const { create: createPaymentMethod, loading: saving } =
+    useCreatePaymentMethod();
+
   const [selectedMethod, setSelectedMethod] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
   const [isConfigured, setIsConfigured] = useState(false);
+
+  // Combined error: local first, then fetch error
+  const error = localError || fetchError || "";
 
   // Payment method options - Only two options
   const paymentOptions = [
@@ -22,63 +36,53 @@ const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) =>
     { value: "per_book", label: "Per Book" },
   ];
 
-  // Fetch current payment method
+  // ✅ Sync hook data → local state (mirrors original fetchPaymentMethod success/404 branches)
   useEffect(() => {
-    fetchPaymentMethod();
-  }, []);
+    if (loading) return;
 
-  const fetchPaymentMethod = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getPaymentMethod();
-      setPaymentMethod(data);
-      setSelectedMethod(data.paymentMethod);
+    if (fetchedPaymentMethod) {
+      setSelectedMethod(fetchedPaymentMethod.paymentMethod);
       setIsConfigured(true);
-    } catch (error) {
-      console.error("Failed to fetch payment method:", error);
-      if (error instanceof Error && error.message.includes("404")) {
-        setPaymentMethod(null);
-        setSelectedMethod("");
-        setIsConfigured(false);
-      } else {
-        setError("Failed to load payment method");
-      }
-    } finally {
-      setLoading(false);
+    } else if (fetchError && !fetchError.includes("404")) {
+      // Non-404 failure — show error banner (matches original `else { setError(...) }`)
+      setLocalError("Failed to load payment method");
+    } else {
+      // No data (or 404) — treat as "not configured"
+      setSelectedMethod("");
+      setIsConfigured(false);
     }
-  };
+  }, [fetchedPaymentMethod, loading, fetchError]);
 
   const handleSave = async () => {
     if (!selectedMethod) {
-      setError("Please select a payment method");
+      setLocalError("Please select a payment method");
       return;
     }
 
-    try {
-      setSaving(true);
-      setError("");
-      setSuccess("");
+    setLocalError("");
+    setSuccess("");
 
-      const created = await createPaymentMethod({ paymentMethod: selectedMethod as any });
-      setPaymentMethod(created);
-      setIsConfigured(true);
-      setSuccess("Payment method configured successfully!");
+    const ok = await createPaymentMethod({
+      paymentMethod: selectedMethod as any,
+    });
 
-      // Notify parent component about the change
-      if (onPaymentMethodChange) {
-        onPaymentMethodChange();
-      }
-
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (error) {
-      console.error("Failed to save payment method:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to save payment method"
-      );
-    } finally {
-      setSaving(false);
+    if (!ok) {
+      setLocalError("Failed to save payment method");
+      return;
     }
+
+    setIsConfigured(true);
+    setSuccess("Payment method configured successfully!");
+
+    // Notify parent component about the change
+    if (onPaymentMethodChange) {
+      onPaymentMethodChange();
+    }
+
+    setTimeout(() => setSuccess(""), 3000);
+
+    // Refresh to pick up server-canonical state
+    refetchPaymentMethod();
   };
 
   if (loading) {
@@ -87,7 +91,9 @@ const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) =>
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
-            <p className="mt-4 text-sm text-gray-500">Loading payment method...</p>
+            <p className="mt-4 text-sm text-gray-500">
+              Loading payment method...
+            </p>
           </div>
         </div>
       </div>
@@ -103,8 +109,8 @@ const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) =>
             Select Payment Method
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {isConfigured 
-              ? "Payment method is configured and cannot be changed" 
+            {isConfigured
+              ? "Payment method is configured and cannot be changed"
               : "Choose how you want to handle payments in the system"}
           </p>
         </div>
@@ -141,9 +147,13 @@ const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) =>
           <div className="rounded-lg bg-gray-50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Configured Payment Method</p>
+                <p className="text-sm text-gray-600">
+                  Configured Payment Method
+                </p>
                 <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {paymentOptions.find(opt => opt.value === paymentMethod?.paymentMethod)?.label || paymentMethod?.paymentMethod}
+                  {paymentOptions.find(
+                    (opt) => opt.value === fetchedPaymentMethod?.paymentMethod,
+                  )?.label || fetchedPaymentMethod?.paymentMethod}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -166,12 +176,15 @@ const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) =>
             </div>
             <div className="mt-2 rounded-lg bg-blue-50 p-2">
               <p className="text-sm text-blue-700">
-                {paymentMethod?.paymentMethod === "per_month" && "Payments will be calculated on a monthly basis."}
-                {paymentMethod?.paymentMethod === "per_book" && "Payments will be calculated per book."}
+                {fetchedPaymentMethod?.paymentMethod === "per_month" &&
+                  "Payments will be calculated on a monthly basis."}
+                {fetchedPaymentMethod?.paymentMethod === "per_book" &&
+                  "Payments will be calculated per book."}
               </p>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              Payment method can only be configured once. Contact administrator to change.
+              Payment method can only be configured once. Contact administrator
+              to change.
             </p>
           </div>
         </div>
@@ -213,10 +226,16 @@ const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) =>
             <div className="rounded-lg bg-blue-50 p-3">
               <p className="text-sm text-blue-700">
                 <span className="font-semibold">
-                  {paymentOptions.find(opt => opt.value === selectedMethod)?.label}:
+                  {
+                    paymentOptions.find((opt) => opt.value === selectedMethod)
+                      ?.label
+                  }
+                  :
                 </span>{" "}
-                {selectedMethod === "per_month" && "Payments will be calculated on a monthly basis."}
-                {selectedMethod === "per_book" && "Payments will be calculated per book."}
+                {selectedMethod === "per_month" &&
+                  "Payments will be calculated on a monthly basis."}
+                {selectedMethod === "per_book" &&
+                  "Payments will be calculated per book."}
               </p>
             </div>
           )}
@@ -238,7 +257,9 @@ const PaymentMethodCard = ({ onPaymentMethodChange }: PaymentMethodCardProps) =>
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span className="font-medium">Note:</span> This setting can only be configured once. After saving, you will not be able to change it from the frontend.
+              <span className="font-medium">Note:</span> This setting can only
+              be configured once. After saving, you will not be able to change
+              it from the frontend.
             </p>
           </div>
 
