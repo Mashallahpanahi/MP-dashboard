@@ -1,6 +1,6 @@
 // src/components/books/BookUpdateModal.tsx
 import { useState, useEffect } from "react";
-import type { Book, UpdateBookData } from "@/types/book";
+import type { Book, UpdateBookData } from "@/api/bookApi";
 
 interface BookUpdateModalProps {
   isOpen: boolean;
@@ -99,28 +99,6 @@ const BookUpdateModal = ({
       const changedData: UpdateBookData = {};
       const keys = Object.keys(formData) as (keyof UpdateBookData)[];
 
-      // keys.forEach((key) => {
-      //   const currentValue = formData[key];
-      //   const originalValue = book[key as keyof Book];
-
-      //   if (
-      //     typeof currentValue === "number" &&
-      //     typeof originalValue === "number"
-      //   ) {
-      //     if (currentValue !== originalValue) {
-      //       changedData[key] = currentValue;
-      //     }
-      //   } else if (
-      //     typeof currentValue === "boolean" &&
-      //     typeof originalValue === "boolean"
-      //   ) {
-      //     if (currentValue !== originalValue) {
-      //       changedData[key] = currentValue;
-      //     }
-      //   } else if (currentValue !== originalValue) {
-      //     changedData[key] = currentValue;
-      //   }
-      // });
       keys.forEach((key) => {
         const currentValue = formData[key];
         const originalValue = book[key as keyof Book];

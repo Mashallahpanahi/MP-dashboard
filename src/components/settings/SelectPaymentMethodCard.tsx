@@ -1,7 +1,7 @@
 // src/components/settings/PaymentMethodCard.tsx
 import { useState, useEffect } from "react";
 import { usePaymentMethod, useCreatePaymentMethod } from "@/api/settingsApi";
-import type { PaymentMethod } from "@/types/settings";
+import type { PaymentMethod } from "@/api/settingsApi";
 
 interface PaymentMethodCardProps {
   onPaymentMethodChange?: () => void;

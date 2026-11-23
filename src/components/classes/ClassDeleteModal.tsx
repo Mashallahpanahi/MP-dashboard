@@ -1,5 +1,5 @@
 // src/components/classes/ClassDeleteModal.tsx
-import type { Class } from "@/types/class";
+import type { Class } from "@/api/classApi";
 
 interface ClassDeleteModalProps {
   isOpen: boolean;

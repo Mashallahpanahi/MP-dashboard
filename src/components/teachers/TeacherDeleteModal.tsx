@@ -1,5 +1,5 @@
 // src/components/teachers/TeacherDeleteModal.tsx
-import type { Teacher } from "@/types/teacher";
+import type { Teacher } from "@/api/teacherApi";
 
 interface TeacherDeleteModalProps {
   isOpen: boolean;
@@ -55,9 +55,7 @@ const TeacherDeleteModal = ({
             {teacher.firstName} {teacher.lastName}
           </p>
 
-          <p className="mt-1 text-sm text-gray-500">
-            {teacher.email}
-          </p>
+          <p className="mt-1 text-sm text-gray-500">{teacher.email}</p>
         </div>
 
         <p className="mb-6 text-sm text-red-600">

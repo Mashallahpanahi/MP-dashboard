@@ -4,7 +4,7 @@ import { useUpdateTeacherPayroll } from "@/api/teacherPayrollApi";
 import type {
   TeacherPayroll,
   UpdateTeacherPayrollData,
-} from "@/types/teacherPayroll";
+} from "@/api/teacherPayrollApi";
 // ✅ Shamsi date picker + helpers
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import {
@@ -27,8 +27,9 @@ const TeacherPayrollHistoryEditModal = ({
   onSuccess,
 }: TeacherPayrollHistoryEditModalProps) => {
   // ✅ Hook replaces updateTeacherPayroll + local loading/error state
+  // Note: teacherPayrollApi's useUpdateTeacherPayroll() exposes `.updateTeacherPayroll`
   const {
-    update: updateTeacherPayroll,
+    updateTeacherPayroll,
     loading: updateLoading,
     error: updateError,
   } = useUpdateTeacherPayroll();

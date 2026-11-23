@@ -4,7 +4,7 @@ import { useUpdateOtherExpense } from "@/api/otherExpenseApi";
 import type {
   OtherExpense,
   UpdateOtherExpenseData,
-} from "@/types/otherExpense";
+} from "@/api/otherExpenseApi";
 
 interface UpdateOtherExpenseModalProps {
   isOpen: boolean;

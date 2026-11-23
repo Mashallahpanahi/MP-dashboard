@@ -1,7 +1,10 @@
 // src/components/teacher-payroll/TeacherPayrollCreateModal.tsx
 import { useState, useEffect, useRef } from "react";
 import { useTeachers } from "@/api/teacherPayrollApi";
-import type { CreateTeacherPayrollData, Teacher } from "@/types/teacherPayroll";
+import type {
+  CreateTeacherPayrollData,
+  Teacher,
+} from "@/api/teacherPayrollApi";
 // ✅ Shamsi helpers + picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import {

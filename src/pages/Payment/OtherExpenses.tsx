@@ -6,7 +6,7 @@ import {
   useDeleteOtherExpense,
   useOtherExpenseById,
 } from "@/api/otherExpenseApi";
-import type { OtherExpense, LastMonthTotal } from "@/types/otherExpense";
+import type { OtherExpense, LastMonthTotal } from "@/api/otherExpenseApi";
 import {
   AddOtherExpenseModal,
   UpdateOtherExpenseModal,

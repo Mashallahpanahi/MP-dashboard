@@ -1,7 +1,7 @@
 // src/components/other-expenses/AddOtherExpenseModal.tsx
 import { useState, useEffect } from "react";
 import { useCreateOtherExpense } from "@/api/otherExpenseApi";
-import type { CreateOtherExpenseData } from "@/types/otherExpense";
+import type { CreateOtherExpenseData } from "@/api/otherExpenseApi";
 // ✅ Shamsi date picker + miladi helper
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import { formatMiladiISO } from "@/utils/dateConverter";

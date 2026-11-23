@@ -1,10 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { useForm } from '../../../hooks/useForm';
-import { SalaryType } from '../../../api/types/teacher.types';
-import Button from '../../common/Button/Button';
-import Input from '../../common/Input/Input';
-import Select from '../../common/Select/Select';
-import Card from '../../common/Card/Card';
+// src/components/teachers/TeacherForm.tsx
+import React, { useEffect, useState } from "react";
+import { useForm } from "../../../hooks/useForm";
+// ✅ Local SalaryType — backend only supports Fixed / PerStudent
+// (replaces the deleted src/api/types/teacher.types.ts enum)
+const SalaryType = {
+  FIXED: "Fixed",
+  PER_STUDENT: "PerStudent",
+} as const;
+type SalaryType = (typeof SalaryType)[keyof typeof SalaryType];
+
+import Button from "../../common/Button/Button";
+import Input from "../../common/Input/Input";
+import Select from "../../common/Select/Select";
+import Card from "../../common/Card/Card";
 
 interface TeacherFormProps {
   initialData?: any;
@@ -22,33 +30,34 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
   isEdit = false,
 }) => {
   const [salaryType, setSalaryType] = useState<SalaryType>(
-    initialData?.salaryType || SalaryType.FIXED
+    initialData?.salaryType || SalaryType.FIXED,
   );
 
   const { values, errors, handleChange, handleSubmit, setValues } = useForm({
     initialValues: {
-      firstName: initialData?.firstName || '',
-      lastName: initialData?.lastName || '',
-      gender: initialData?.gender || '',
-      phone: initialData?.phone || '',
-      email: initialData?.email || '',
-      address: initialData?.address || '',
+      firstName: initialData?.firstName || "",
+      lastName: initialData?.lastName || "",
+      gender: initialData?.gender || "",
+      phone: initialData?.phone || "",
+      email: initialData?.email || "",
+      address: initialData?.address || "",
       salaryType: initialData?.salaryType || SalaryType.FIXED,
-      salaryAmount: initialData?.salaryAmount || '',
+      salaryAmount: initialData?.salaryAmount || "",
       feePercentage: initialData?.feePercentage || 40,
-      hireDate: initialData?.hireDate || new Date().toISOString().split('T')[0],
-      isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
+      hireDate: initialData?.hireDate || new Date().toISOString().split("T")[0],
+      isActive:
+        initialData?.isActive !== undefined ? initialData.isActive : true,
     },
     validate: (vals) => {
       const errors: any = {};
-      if (!vals.firstName) errors.firstName = 'First name is required';
-      if (!vals.lastName) errors.lastName = 'Last name is required';
-      if (!vals.hireDate) errors.hireDate = 'Hire date is required';
-      
+      if (!vals.firstName) errors.firstName = "First name is required";
+      if (!vals.lastName) errors.lastName = "Last name is required";
+      if (!vals.hireDate) errors.hireDate = "Hire date is required";
+
       if (vals.salaryType === SalaryType.FIXED && !vals.salaryAmount) {
-        errors.salaryAmount = 'Salary amount is required for fixed salary';
+        errors.salaryAmount = "Salary amount is required for fixed salary";
       }
-      
+
       return errors;
     },
     onSubmit,
@@ -66,17 +75,14 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
   }, [initialData, setValues]);
 
   const salaryTypeOptions = [
-    { value: SalaryType.FIXED, label: 'Fixed Salary' },
-    { value: SalaryType.PER_STUDENT, label: 'Per Student' },
-    { value: SalaryType.PER_CLASS, label: 'Per Class' },
-    { value: SalaryType.PERCENTAGE, label: 'Percentage' },
-    { value: SalaryType.HYBRID, label: 'Hybrid (Base + Percentage)' },
+    { value: SalaryType.FIXED, label: "Fixed Salary" },
+    { value: SalaryType.PER_STUDENT, label: "Per Student" },
   ];
 
   const genderOptions = [
-    { value: 'Male', label: 'Male' },
-    { value: 'Female', label: 'Female' },
-    { value: 'Other', label: 'Other' },
+    { value: "Male", label: "Male" },
+    { value: "Female", label: "Female" },
+    { value: "Other", label: "Other" },
   ];
 
   const renderSalaryFields = () => {
@@ -88,7 +94,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             name="salaryAmount"
             type="number"
             value={values.salaryAmount}
-            onChange={(e) => handleChange('salaryAmount', e.target.value)}
+            onChange={(e) => handleChange("salaryAmount", e.target.value)}
             error={errors.salaryAmount}
             placeholder="e.g., 20000"
             required
@@ -102,67 +108,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             name="salaryAmount"
             type="number"
             value={values.salaryAmount}
-            onChange={(e) => handleChange('salaryAmount', e.target.value)}
+            onChange={(e) => handleChange("salaryAmount", e.target.value)}
             error={errors.salaryAmount}
             placeholder="e.g., 500"
             required
           />
-        );
-
-      case SalaryType.PER_CLASS:
-        return (
-          <Input
-            label="Amount Per Class"
-            name="salaryAmount"
-            type="number"
-            value={values.salaryAmount}
-            onChange={(e) => handleChange('salaryAmount', e.target.value)}
-            error={errors.salaryAmount}
-            placeholder="e.g., 8000"
-            required
-          />
-        );
-
-      case SalaryType.PERCENTAGE:
-        return (
-          <Input
-            label="Percentage (%)"
-            name="feePercentage"
-            type="number"
-            value={values.feePercentage}
-            onChange={(e) => handleChange('feePercentage', e.target.value)}
-            error={errors.feePercentage}
-            placeholder="e.g., 40"
-            helpText="Teacher will receive this percentage of student fees"
-            required
-          />
-        );
-
-      case SalaryType.HYBRID:
-        return (
-          <>
-            <Input
-              label="Base Salary"
-              name="salaryAmount"
-              type="number"
-              value={values.salaryAmount}
-              onChange={(e) => handleChange('salaryAmount', e.target.value)}
-              error={errors.salaryAmount}
-              placeholder="e.g., 10000"
-              required
-            />
-            <Input
-              label="Percentage (%)"
-              name="feePercentage"
-              type="number"
-              value={values.feePercentage}
-              onChange={(e) => handleChange('feePercentage', e.target.value)}
-              error={errors.feePercentage}
-              placeholder="e.g., 40"
-              helpText="Additional percentage of student fees"
-              required
-            />
-          </>
         );
 
       default:
@@ -171,7 +121,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
   };
 
   return (
-    <Card title={isEdit ? 'Edit Teacher' : 'Add New Teacher'}>
+    <Card title={isEdit ? "Edit Teacher" : "Add New Teacher"}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Personal Information */}
@@ -179,23 +129,23 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
               Personal Information
             </h3>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="First Name"
                 name="firstName"
                 value={values.firstName}
-                onChange={(e) => handleChange('firstName', e.target.value)}
+                onChange={(e) => handleChange("firstName", e.target.value)}
                 error={errors.firstName}
                 placeholder="Enter first name"
                 required
               />
-              
+
               <Input
                 label="Last Name"
                 name="lastName"
                 value={values.lastName}
-                onChange={(e) => handleChange('lastName', e.target.value)}
+                onChange={(e) => handleChange("lastName", e.target.value)}
                 error={errors.lastName}
                 placeholder="Enter last name"
                 required
@@ -207,17 +157,17 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
                 label="Gender"
                 name="gender"
                 value={values.gender}
-                onChange={(value) => handleChange('gender', value)}
+                onChange={(value) => handleChange("gender", value)}
                 options={genderOptions}
                 placeholder="Select gender"
               />
-              
+
               <Input
                 label="Phone"
                 name="phone"
                 type="tel"
                 value={values.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
+                onChange={(e) => handleChange("phone", e.target.value)}
                 placeholder="+93 700 123 456"
               />
             </div>
@@ -227,7 +177,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
               name="email"
               type="email"
               value={values.email}
-              onChange={(e) => handleChange('email', e.target.value)}
+              onChange={(e) => handleChange("email", e.target.value)}
               placeholder="teacher@example.com"
             />
 
@@ -235,7 +185,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
               label="Address"
               name="address"
               value={values.address}
-              onChange={(e) => handleChange('address', e.target.value)}
+              onChange={(e) => handleChange("address", e.target.value)}
               placeholder="Enter address"
             />
           </div>
@@ -251,7 +201,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
               name="hireDate"
               type="date"
               value={values.hireDate}
-              onChange={(e) => handleChange('hireDate', e.target.value)}
+              onChange={(e) => handleChange("hireDate", e.target.value)}
               error={errors.hireDate}
               required
             />
@@ -272,10 +222,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
                 type="checkbox"
                 id="isActive"
                 checked={values.isActive}
-                onChange={(e) => handleChange('isActive', e.target.checked)}
+                onChange={(e) => handleChange("isActive", e.target.checked)}
                 className="w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
               />
-              <label htmlFor="isActive" className="text-sm font-medium text-gray-700 cursor-pointer">
+              <label
+                htmlFor="isActive"
+                className="text-sm font-medium text-gray-700 cursor-pointer"
+              >
                 Active
               </label>
             </div>
@@ -300,7 +253,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             disabled={loading}
             className="order-1 sm:order-2"
           >
-            {isEdit ? 'Update Teacher' : 'Create Teacher'}
+            {isEdit ? "Update Teacher" : "Create Teacher"}
           </Button>
         </div>
       </form>

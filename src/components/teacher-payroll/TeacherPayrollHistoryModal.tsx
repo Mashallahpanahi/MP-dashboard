@@ -1,7 +1,7 @@
 // src/components/teacher-payroll/TeacherPayrollHistoryModal.tsx
 import { useEffect, useState } from "react";
 import { useTeachers, usePayrollsByTeacher } from "@/api/teacherPayrollApi";
-import type { TeacherPayroll, Teacher } from "@/types/teacherPayroll";
+import type { TeacherPayroll, Teacher } from "@/api/teacherPayrollApi";
 import TeacherPayrollHistoryEditModal from "./TeacherPayrollHistoryEditModal";
 // ✅ Shamsi helpers
 import {

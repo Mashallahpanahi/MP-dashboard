@@ -15,7 +15,7 @@ import type {
   CreateTeacherPayrollData,
   AddPaymentData,
   UnpaidSalaryRecord,
-} from "@/types/teacherPayroll";
+} from "@/api/teacherPayrollApi";
 import {
   TeacherPayrollCreateModal,
   TeacherPayrollHistoryModal,
@@ -49,13 +49,13 @@ const TeacherPayrollPage = () => {
     ? unpaidData
     : [];
 
-  // ✅ Mutation hooks
-  const { create: createTeacherPayroll, loading: createLoading } =
+  // ✅ Mutation hooks — destructure using the actual keys the hooks export
+  const { createTeacherPayroll, loading: createLoading } =
     useCreateTeacherPayroll();
-  const { update: updateTeacherPayroll } = useUpdateTeacherPayroll();
+  const { updateTeacherPayroll } = useUpdateTeacherPayroll();
   const { remove: deleteTeacherPayroll, loading: deleteLoading } =
     useDeleteTeacherPayroll();
-  const { addPayment: addPaymentToPayroll, loading: addPaymentLoading } =
+  const { addPaymentToPayroll, loading: addPaymentLoading } =
     useAddPaymentToPayroll();
 
   const [localError, setLocalError] = useState("");
