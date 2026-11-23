@@ -1,11 +1,16 @@
 // src/api/noteApi.ts
-import { ApiError } from "./teacherApi";
+import { useFetch } from "@/hooks/useFetch";
+import { useCreate } from "@/hooks/useCreate";
+import { useUpdate } from "@/hooks/useUpdate";
+import { useDelete } from "@/hooks/useDelete";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const NOTES_URL = `${API_URL}/nodes`; // backend route is /nodes — kept as-is
 
-// ============================================
-// TYPES
-// ============================================
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+
 export interface Note {
   id: string;
   content: string;
@@ -30,105 +35,22 @@ export interface NoteResponse {
   updatedAt?: string;
 }
 
-// ============================================
-// GET ALL NOTES
-// ============================================
-export const getNotes = async (): Promise<Note[]> => {
-  const response = await fetch(`${API_URL}/nodes`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
+/* ------------------------------------------------------------------ */
+/* Query hooks                                                         */
+/* ------------------------------------------------------------------ */
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch notes. Status: ${response.status}`,
-      response.status
-    );
-  }
+/** GET /nodes — all notes */
+export const useNotes = () => useFetch<Note[]>(NOTES_URL);
 
-  const result: NotesListResponse | Note[] = await response.json();
+/* ------------------------------------------------------------------ */
+/* Mutation hooks                                                      */
+/* ------------------------------------------------------------------ */
 
-  // Handle both shapes:
-  //   1. { success, message, data: [...] }
-  //   2. [ ... ]  (raw array)
-  if (Array.isArray(result)) return result;
-  return result.data || [];
-};
+/** POST /nodes — payload: { content: string } */
+export const useCreateNote = () => useCreate<Note>(NOTES_URL);
 
-// ============================================
-// CREATE NOTE
-// ============================================
-export const createNote = async (content: string): Promise<Note> => {
-  const response = await fetch(`${API_URL}/nodes`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
-  });
+/** PATCH /nodes/:id — payload: { content: string } */
+export const useUpdateNote = () => useUpdate<Note>(NOTES_URL);
 
-  if (!response.ok) {
-    let errorMessage = `Failed to create note. Status: ${response.status}`;
-    try {
-      const err = await response.json();
-      if (err.message) errorMessage = err.message;
-    } catch {
-      /* keep default */
-    }
-    throw new ApiError(errorMessage, response.status);
-  }
-
-  const result: NoteResponse = await response.json();
-
-  // Handle both response shapes (wrapped or raw)
-  if (result.data) return result.data;
-  return result as unknown as Note;
-};
-
-// ============================================
-// UPDATE NOTE
-// ============================================
-export const updateNote = async (
-  id: string,
-  content: string
-): Promise<Note> => {
-  const response = await fetch(`${API_URL}/nodes/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update note. Status: ${response.status}`;
-    try {
-      const err = await response.json();
-      if (err.message) errorMessage = err.message;
-    } catch {
-      /* keep default */
-    }
-    throw new ApiError(errorMessage, response.status);
-  }
-
-  const result: NoteResponse = await response.json();
-  if (result.data) return result.data;
-  return result as unknown as Note;
-};
-
-// ============================================
-// DELETE NOTE
-// ============================================
-export const deleteNote = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/nodes/${id}`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to delete note. Status: ${response.status}`;
-    try {
-      const err = await response.json();
-      if (err.message) errorMessage = err.message;
-    } catch {
-      /* keep default */
-    }
-    throw new ApiError(errorMessage, response.status);
-  }
-};
+/** DELETE /nodes/:id */
+export const useDeleteNote = () => useDelete<Note>(NOTES_URL);

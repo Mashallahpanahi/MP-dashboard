@@ -1,204 +1,267 @@
 // src/api/studentPaymentApi.ts
-import type { 
-  StudentPayment, 
-  CreateStudentPaymentData, 
-  UpdateStudentPaymentData,
-  StudentEnrollment 
-} from "@/types/studentPayment";
-import { ApiError } from "./teacherApi";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const PAYMENTS_URL = `${API_URL}/student-payments`;
+const STUDENT_ENROLLMENTS_URL = `${API_URL}/students/enrollments`;
 
-/**
- * Get all student payments
- */
-export const getStudentPayments = async (): Promise<StudentPayment[]> => {
-  const response = await fetch(`${API_URL}/student-payments`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+/* ================================================================== */
+/* Types — inlined from src/types/studentPayment.ts                   */
+/* ================================================================== */
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch student payments. Status: ${response.status}`,
-      response.status
-    );
-  }
+export interface StudentPayment {
+  id: string;
+  studentEnrollment: {
+    id: string;
+    student: {
+      id: string;
+      studentNumber: string;
+      firstName: string;
+      lastName: string;
+      gender: string;
+      phone: string;
+      parentPhone: string;
+      address: string;
+      birthDate: string;
+      registrationDate: string;
+      status: string;
+      notes: string;
+    };
+    teacher: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      gender: string;
+      phone: string;
+      email: string;
+      address: string;
+      salaryType: string;
+      salaryAmount: number;
+      feePercentage: number;
+      hireDate: string;
+      isActive: boolean;
+      createdAt: string;
+      updatedAt: string;
+    };
+    book: {
+      id: string;
+      code: string;
+      name: string;
+      description: string;
+      level: string;
+      category: string;
+      author: string;
+      publisher: string;
+      isbn: string;
+      bookPrice: number;
+      durationWeeks: number;
+      totalLessons: number;
+      totalHours: number;
+      passingScore: number;
+      isActive: boolean;
+      levelOrder: number;
+      createdAt: string;
+      updatedAt: string;
+    };
+    timetable: string;
+    tuitionFee: number;
+    discount: number;
+    finalFee: number;
+    startDate: string;
+    expectedEndDate: string;
+    completedDate: string;
+    status: string;
+    finalScore: number;
+    attendancePercentage: number;
+    remarks: string;
+  };
+  amount: number;
+  discount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  paymentDate: string;
+  paymentMethod: "Cash" | "Bank" | "Online" | "Cheque";
+  receiptNumber: string;
+  status: "Paid" | "Partial" | "Unpaid" | "Overdue";
+  notes: string;
+}
 
-  const data: StudentPayment[] = await response.json();
-  return data;
+export interface CreateStudentPaymentData {
+  studentEnrollmentId: string;
+  amount: number;
+  discount?: number;
+  paidAmount: number;
+  paymentDate: string;
+  paymentMethod: "Cash" | "Bank" | "Online" | "Cheque";
+  receiptNumber?: string;
+  status: "Paid" | "Partial" | "Unpaid" | "Overdue";
+  notes?: string;
+}
+
+export interface UpdateStudentPaymentData extends Partial<CreateStudentPaymentData> {
+  id?: string;
+}
+
+export interface StudentEnrollment {
+  id: string;
+  student: {
+    id: string;
+    studentNumber: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+  };
+  book: {
+    id: string;
+    code: string;
+    name: string;
+    level: string;
+  };
+  teacher: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+  tuitionFee: number;
+  discount: number;
+  finalFee: number;
+  status: string;
+  startDate: string;
+  expectedEndDate: string;
+}
+
+/* ================================================================== */
+/* Inline helpers (same pattern as studentApi / studentEnrollmentApi) */
+/* ================================================================== */
+
+const extractErrMessage = (err: any, fallback: string): string => {
+  const m = err?.response?.data?.message;
+  if (Array.isArray(m)) return m.join(", ");
+  if (typeof m === "string") return m;
+  return err?.message || fallback;
 };
 
-/**
- * Get a single student payment by ID
- */
-export const getStudentPaymentById = async (id: string): Promise<StudentPayment> => {
-  const response = await fetch(`${API_URL}/student-payments/${id}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+function useRawQuery<T>(url: string | null, enabled = true) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(!!url && enabled);
+  const [error, setError] = useState<string | null>(null);
+  const [trigger, setTrigger] = useState(0);
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch student payment. Status: ${response.status}`,
-      response.status
-    );
-  }
+  useEffect(() => {
+    if (!enabled || !url) {
+      setLoading(false);
+      return;
+    }
+    let alive = true;
+    setLoading(true);
+    setError(null);
 
-  const data: StudentPayment = await response.json();
-  return data;
-};
+    axios
+      .get<T>(url)
+      .then((res) => {
+        if (alive) setData(res.data);
+      })
+      .catch((err) => {
+        if (alive) setError(extractErrMessage(err, "Something went wrong"));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
 
-/**
- * Get all payments for a specific enrollment
- */
-export const getPaymentsByEnrollment = async (enrollmentId: string): Promise<StudentPayment[]> => {
-  const response = await fetch(`${API_URL}/student-payments/enrollment/${enrollmentId}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+    return () => {
+      alive = false;
+    };
+  }, [url, trigger, enabled]);
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch payments for enrollment. Status: ${response.status}`,
-      response.status
-    );
-  }
+  return { data, loading, error, refetch: () => setTrigger((n) => n + 1) };
+}
 
-  const data: StudentPayment[] = await response.json();
-  return data;
-};
+function useRawMutation<T>() {
+  const [data, setData] = useState<T | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-/**
- * Create a new student payment
- */
-export const createStudentPayment = async (
-  payment: CreateStudentPaymentData
-): Promise<StudentPayment> => {
-  const response = await fetch(`${API_URL}/student-payments`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payment),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to create student payment. Status: ${response.status}`;
-    let errorDetails = null;
+  const send = async (
+    method: "post" | "patch" | "delete",
+    url: string,
+    body?: Record<string, unknown>,
+  ): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
 
     try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
+      const res = await axios.request<T>({
+        method,
+        url,
+        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+        data: body,
+      });
+      setData(res.data);
+      setMessage((res.data as any)?.message ?? null);
+      return true;
+    } catch (err: any) {
+      setError(extractErrMessage(err, "Something went wrong"));
+      return false;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
+  return { data, message, loading, error, send };
+}
 
-  const data: StudentPayment = await response.json();
-  return data;
+/* ================================================================== */
+/* Query hooks                                                        */
+/* ================================================================== */
+
+/** GET /student-payments */
+export const useStudentPayments = () =>
+  useRawQuery<StudentPayment[]>(PAYMENTS_URL);
+
+/** GET /student-payments/:id */
+export const useStudentPaymentById = (id: string, enabled = true) =>
+  useRawQuery<StudentPayment>(
+    id ? `${PAYMENTS_URL}/${id}` : null,
+    enabled && !!id,
+  );
+
+/** GET /student-payments/enrollment/:enrollmentId */
+export const usePaymentsByEnrollment = (enrollmentId: string, enabled = true) =>
+  useRawQuery<StudentPayment[]>(
+    enrollmentId ? `${PAYMENTS_URL}/enrollment/${enrollmentId}` : null,
+    enabled && !!enrollmentId,
+  );
+
+/** GET /students/enrollments — for dropdown selection */
+export const useStudentEnrollments = () =>
+  useRawQuery<StudentEnrollment[]>(STUDENT_ENROLLMENTS_URL);
+
+/* ================================================================== */
+/* Mutation hooks                                                     */
+/* ================================================================== */
+
+/** POST /student-payments */
+export const useCreateStudentPayment = () => {
+  const { data, message, loading, error, send } = useRawMutation<StudentPayment>();
+  const createStudentPayment = (payment: CreateStudentPaymentData) =>
+    send("post", PAYMENTS_URL, payment);
+  return { createData: data, message, loading, error, createStudentPayment };
 };
 
-/**
- * Update a student payment by ID
- */
-export const updateStudentPayment = async (
-  id: string,
-  payment: UpdateStudentPaymentData
-): Promise<StudentPayment> => {
-  const response = await fetch(`${API_URL}/student-payments/${id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payment),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update student payment. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const data: StudentPayment = await response.json();
-  return data;
+/** PATCH /student-payments/:id */
+export const useUpdateStudentPayment = () => {
+  const { data, message, loading, error, send } = useRawMutation<StudentPayment>();
+  const updateStudentPayment = (id: string, payment: UpdateStudentPaymentData) =>
+    send("patch", `${PAYMENTS_URL}/${id}`, payment);
+  return { updateData: data, message, loading, error, updateStudentPayment };
 };
 
-/**
- * Delete a student payment by ID
- */
-export const deleteStudentPayment = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/student-payments/${id}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to delete student payment. Status: ${response.status}`;
-
-    try {
-      const errorData = await response.json();
-      if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status);
-  }
-};
-
-/**
- * Get student enrollments (for dropdown selection)
- */
-export const getStudentEnrollments = async (): Promise<StudentEnrollment[]> => {
-  const response = await fetch(`${API_URL}/students/enrollments`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch student enrollments. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: StudentEnrollment[] = await response.json();
-  return data;
+/** DELETE /student-payments/:id */
+export const useDeleteStudentPayment = () => {
+  const { data, message, loading, error, send } = useRawMutation<void>();
+  const remove = (id: string) => send("delete", `${PAYMENTS_URL}/${id}`);
+  return { deleteData: data, message, loading, error, remove };
 };

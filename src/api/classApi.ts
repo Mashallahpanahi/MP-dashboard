@@ -1,234 +1,73 @@
 // src/api/classApi.ts
-import type { Class, CreateClassData, UpdateClassData } from "@/types/class";
-import { ApiError } from "./teacherApi";
+import { useFetch } from "@/hooks/useFetch";
+import { useCreate } from "@/hooks/useCreate";
+import { useUpdate } from "@/hooks/useUpdate";
+import { useDelete } from "@/hooks/useDelete";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const CLASSES_URL = `${API_URL}/classes`;
+
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface Class {
+  id: string;
+  className: string;
+  block: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateClassData {
+  className: string;
+  block?: string | null;
+  isActive?: boolean;
+}
+
+export interface UpdateClassData extends Partial<CreateClassData> {
+  id?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Query hooks                                                         */
+/* ------------------------------------------------------------------ */
+
+/** GET /classes — all classes */
+export const useClasses = () => useFetch<Class[]>(CLASSES_URL);
+
+/** GET /classes/active — active classes only */
+export const useActiveClasses = () => useFetch<Class[]>(`${CLASSES_URL}/active`);
+
+/** GET /classes/:id */
+export const useClassById = (id: string, enabled = true) =>
+  useFetch<Class>(`${CLASSES_URL}/${id}`, enabled && !!id);
+
+/* ------------------------------------------------------------------ */
+/* Mutation hooks                                                      */
+/* ------------------------------------------------------------------ */
+
+/** POST /classes */
+export const useCreateClass = () => useCreate<Class>(CLASSES_URL);
+
+/** PATCH /classes/:id */
+export const useUpdateClass = () => useUpdate<Class>(CLASSES_URL);
+
+/** DELETE /classes/:id */
+export const useDeleteClass = () => useDelete<Class>(CLASSES_URL);
 
 /**
- * Get all classes
- * GET /classes
+ * PATCH /classes/:id/status
+ *
+ * `useUpdate` builds `${url}/${id}`, so pass `"<id>/status"` as the "id"
+ * to hit the status endpoint.
  */
-export const getClasses = async (): Promise<Class[]> => {
-  const response = await fetch(`${API_URL}/classes`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+export const useUpdateClassStatus = () => {
+  const { update, ...rest } = useUpdate<Class>(CLASSES_URL);
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch classes. Status: ${response.status}`,
-      response.status
-    );
-  }
+  const updateStatus = (id: string, isActive: boolean) =>
+    update(`${id}/status`, { isActive });
 
-  const data: Class[] = await response.json();
-  return data;
-};
-
-/**
- * Get all active classes
- * GET /classes/active
- */
-export const getActiveClasses = async (): Promise<Class[]> => {
-  const response = await fetch(`${API_URL}/classes/active`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch active classes. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Class[] = await response.json();
-  return data;
-};
-
-/**
- * Get a class by ID
- * GET /classes/{id}
- */
-export const getClassById = async (id: string): Promise<Class> => {
-  const response = await fetch(`${API_URL}/classes/${id}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch class. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Class = await response.json();
-  return data;
-};
-
-/**
- * Create a new class
- * POST /classes
- */
-export const createClass = async (classData: CreateClassData): Promise<Class> => {
-  const response = await fetch(`${API_URL}/classes`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(classData),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to create class. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === 'string') {
-        if (errorData.message.includes('duplicate') && 
-            errorData.message.toLowerCase().includes('classname')) {
-          errorMessage = 'This class name is already registered. Please use a different name.';
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const data: Class = await response.json();
-  return data;
-};
-
-/**
- * Update a class
- * PATCH /classes/{id}
- */
-export const updateClass = async (
-  id: string,
-  classData: UpdateClassData
-): Promise<Class> => {
-  const response = await fetch(`${API_URL}/classes/${id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(classData),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update class. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === 'string') {
-        if (errorData.message.includes('duplicate') && 
-            errorData.message.toLowerCase().includes('classname')) {
-          errorMessage = 'This class name is already registered by another class. Please use a different name.';
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const data: Class = await response.json();
-  return data;
-};
-
-/**
- * Delete a class
- * DELETE /classes/{id}
- */
-export const deleteClass = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/classes/${id}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to delete class. Status: ${response.status}`;
-
-    try {
-      const errorData = await response.json();
-      if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status);
-  }
-};
-
-/**
- * Update class activation status
- * PATCH /classes/{id}/status
- */
-export const updateClassStatus = async (
-  id: string,
-  data: { isActive: boolean }
-): Promise<Class> => {
-  const response = await fetch(`${API_URL}/classes/${id}/status`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update class status. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: Class = await response.json();
-  return result;
+  return { ...rest, updateStatus };
 };

@@ -1,4 +1,4 @@
-
+// src/hooks/useFetch.ts
 import { useEffect, useState } from "react";
 import axios from "axios";
 
@@ -15,11 +15,12 @@ interface UseFetchResult<T> {
   refetch: () => void;
 }
 
-export function useFetch<T>(
+export function useFetch<T = unknown, R = T>(
   url: string,
   enabled = true,
-): UseFetchResult<T> {
-  const [data, setData] = useState<T | null>(null);
+  transform?: (rawBody: any) => R,
+): UseFetchResult<R> {
+  const [data, setData] = useState<R | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
@@ -32,36 +33,41 @@ export function useFetch<T>(
     }
 
     let alive = true;
-
     setLoading(true);
     setError(null);
 
     axios
-      .get<ApiResponse<T>>(url)
+      .get(url)
       .then((response) => {
         if (!alive) return;
+        const raw = response.data;
 
-        setData(response.data.data);
-        setMessage(response.data.message);
+        // 1) Custom transform, OR
+        // 2) unwrap .data if present, OR
+        // 3) fall back to the raw body (for endpoints without a wrapper)
+        const value: R = transform
+          ? transform(raw)
+          : ((raw && typeof raw === "object" && "data" in raw
+              ? raw.data
+              : raw) as unknown as R);
+
+        setData(value);
+        setMessage(raw?.message ?? null);
       })
       .catch((err) => {
         if (!alive) return;
-
         setError(
-          err.response?.data?.message ||
-          err.message ||
-          "Something went wrong",
+          err.response?.data?.message || err.message || "Something went wrong",
         );
       })
       .finally(() => {
-        if (alive) {
-          setLoading(false);
-        }
+        if (alive) setLoading(false);
       });
 
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, trigger, enabled]);
 
   const refetch = () => {

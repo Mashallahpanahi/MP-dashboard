@@ -1,12 +1,43 @@
 // src/api/dashboardApi.ts
-import type { StudentStatistics } from "@/types/dashboard";
-import { ApiError } from "./teacherApi";
+import { useFetch } from "@/hooks/useFetch";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// ============================================
-// ✅ Dashboard Report by Month / Date Range
-// ============================================
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface ActiveStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  image: string | null;
+  fatherName: string;
+  fatherPhone: string | null;
+  gender: "Male" | "Female";
+  status: "Active" | "Inactive" | "Graduated";
+  studentNumber: string;
+  registrationDate: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentStatistics {
+  totalStudents: number;
+  totalActive: number;
+  totalGraduated: number;
+  totalInactive: number;
+  activeStudents: ActiveStudent[];
+}
+
+/** UI-state helper (kept here because types/ is being removed). */
+export interface DashboardStats {
+  studentStats: StudentStatistics | null;
+  loading: boolean;
+  error: string;
+}
 
 export interface DashboardByMonthFilters {
   month?: number;
@@ -30,6 +61,16 @@ export interface DashboardReportFilters {
   mode?: string;
 }
 
+export interface DashboardMonthlyBreakdown {
+  month: number;
+  monthName: string;
+  income: number;
+  payrollExpenses: number;
+  otherExpenses: number;
+  totalExpenses: number;
+  benefit: number;
+}
+
 export interface DashboardReportData {
   totalStudents: number;
   totalActiveStudents: number;
@@ -41,15 +82,7 @@ export interface DashboardReportData {
   totalOtherExpenses: number;
   totalExpenses: number;
   totalBenefit: number;
-  monthlyBreakdown?: {
-    month: number;
-    monthName: string;
-    income: number;
-    payrollExpenses: number;
-    otherExpenses: number;
-    totalExpenses: number;
-    benefit: number;
-  }[];
+  monthlyBreakdown?: DashboardMonthlyBreakdown[];
 }
 
 export interface DashboardByMonthResponse {
@@ -59,132 +92,6 @@ export interface DashboardByMonthResponse {
   data: DashboardReportData;
 }
 
-/**
- * Get dashboard report by month number OR date range
- * GET /dashboard-report/by-month
- *
- * Priority:
- *   1. fromDate + toDate → range
- *   2. month (+ year)   → month
- *   3. else             → error
- */
-export const getDashboardReportByMonth = async (params: {
-  month?: number;
-  year?: number;
-  fromDate?: string;
-  toDate?: string;
-}): Promise<DashboardByMonthResponse> => {
-  const query = new URLSearchParams();
-  if (params.fromDate && params.toDate) {
-    query.append("fromDate", params.fromDate);
-    query.append("toDate", params.toDate);
-  } else if (params.month) {
-    query.append("month", String(params.month));
-    if (params.year) query.append("year", String(params.year));
-  }
-
-  const url = `${API_URL}/dashboard-report/by-month?${query.toString()}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to fetch report. Status: ${response.status}`;
-    try {
-      const err = await response.json();
-      if (err.message) errorMessage = err.message;
-    } catch {
-      /* keep default */
-    }
-    throw new ApiError(errorMessage, response.status);
-  }
-
-  return response.json();
-};
-/**
- * Get student statistics (existing)
- * GET /students/statistics
- */
-export const getStudentStatistics = async (): Promise<StudentStatistics> => {
-  const response = await fetch(`${API_URL}/students/statistics`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch student statistics. Status: ${response.status}`,
-      response.status,
-    );
-  }
-
-  const result = await response.json();
-  return result.data || result;
-};
-
-// ============================================
-// ✅ Dashboard Report
-// ============================================
-
-// ✅ NEW: Monthly breakdown row
-export interface DashboardMonthlyBreakdown {
-  month: number; // 1-12
-  monthName: string; // "January", ...
-  income: number;
-  payrollExpenses: number;
-  otherExpenses: number;
-  totalExpenses: number;
-  benefit: number;
-}
-
-// export interface DashboardReportData {
-//   totalStudents: number;
-//   totalActiveStudents: number;
-//   totalInactiveStudents: number;
-//   totalEnrolledStudents: number;
-//   totalActiveTeachers: number;
-//   totalIncome: number;
-//   totalPayrollExpenses: number;
-//   totalOtherExpenses: number;
-//   totalExpenses: number;
-//   totalBenefit: number;
-//   // ✅ NEW
-//   monthlyBreakdown?: DashboardMonthlyBreakdown[];
-// }
-export interface DashboardReportData {
-  totalStudents: number;
-  totalActiveStudents: number;
-  totalInactiveStudents: number;
-  totalEnrolledStudents: number;
-  totalActiveTeachers: number;
-  totalIncome: number;
-  totalPayrollExpenses: number;
-  totalOtherExpenses: number;
-  totalExpenses: number;
-  totalBenefit: number;
-  monthlyBreakdown?: {
-    month: number;
-    monthName: string;
-    income: number;
-    payrollExpenses: number;
-    otherExpenses: number;
-    totalExpenses: number;
-    benefit: number;
-  }[];
-}
-
-// export interface DashboardReportFilters {
-//   fromDate: string | null;
-//   toDate: string | null;
-//   effectiveFrom?: string | null;      // ✅ optional new fields
-//   effectiveTo?: string | null;
-//   defaultRange?: string | null;
-//   breakdownYear?: number;
-// }
-
-
 export interface DashboardReportResponse {
   success: boolean;
   message: string;
@@ -192,41 +99,94 @@ export interface DashboardReportResponse {
   data: DashboardReportData;
 }
 
-/**
- * Get dashboard report
- * GET /dashboard-report
- *
- * @param fromDate - Optional start date (YYYY-MM-DD)
- * @param toDate - Optional end date (YYYY-MM-DD)
- */
-export const getDashboardReport = async (
-  fromDate?: string,
-  toDate?: string,
-): Promise<DashboardReportResponse> => {
-  const params = new URLSearchParams();
-  if (fromDate) params.append("fromDate", fromDate);
-  if (toDate) params.append("toDate", toDate);
+export interface DashboardByMonthParams {
+  month?: number;
+  year?: number;
+  fromDate?: string;
+  toDate?: string;
+}
 
-  const queryString = params.toString();
-  const url = queryString
-    ? `${API_URL}/dashboard-report?${queryString}`
-    : `${API_URL}/dashboard-report`;
+export interface DashboardReportParams {
+  fromDate?: string;
+  toDate?: string;
+}
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
+/* ------------------------------------------------------------------ */
+/* URL builders                                                        */
+/* ------------------------------------------------------------------ */
 
-  if (!response.ok) {
-    let errorMessage = `Failed to fetch dashboard report. Status: ${response.status}`;
-    try {
-      const errorData = await response.json();
-      if (errorData.message) errorMessage = errorData.message;
-    } catch {
-      /* keep default */
-    }
-    throw new ApiError(errorMessage, response.status);
+const buildByMonthUrl = (params: DashboardByMonthParams): string => {
+  const q = new URLSearchParams();
+
+  if (params.fromDate && params.toDate) {
+    q.append("fromDate", params.fromDate);
+    q.append("toDate", params.toDate);
+  } else if (params.month) {
+    q.append("month", String(params.month));
+    if (params.year) q.append("year", String(params.year));
   }
 
-  return response.json();
+  const qs = q.toString();
+  return `${API_URL}/dashboard-report/by-month${qs ? `?${qs}` : ""}`;
+};
+
+const buildReportUrl = (params: DashboardReportParams): string => {
+  const q = new URLSearchParams();
+  if (params.fromDate) q.append("fromDate", params.fromDate);
+  if (params.toDate) q.append("toDate", params.toDate);
+
+  const qs = q.toString();
+  return `${API_URL}/dashboard-report${qs ? `?${qs}` : ""}`;
+};
+
+/* ------------------------------------------------------------------ */
+/* Hooks                                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * GET /students/statistics
+ * Works whether the backend returns raw `StudentStatistics`
+ * or `{ data: StudentStatistics }` — `useFetch`'s fallback handles both.
+ */
+export const useStudentStatistics = (enabled = true) =>
+  useFetch<StudentStatistics>(`${API_URL}/students/statistics`, enabled);
+
+/**
+ * GET /dashboard-report/by-month
+ *
+ * Priority (server-side):
+ *   1. fromDate + toDate → range
+ *   2. month (+ year)    → single month
+ *
+ * `params` becomes part of the URL — the hook refetches automatically
+ * when any of its values change.
+ */
+export const useDashboardReportByMonth = (
+  params: DashboardByMonthParams,
+  enabled = true,
+) => {
+  const url = buildByMonthUrl(params);
+  return useFetch<DashboardByMonthResponse>(
+    url,
+    enabled,
+    (raw) => raw as DashboardByMonthResponse,
+  );
+};
+
+/**
+ * GET /dashboard-report
+ *
+ * Pass `{ fromDate, toDate }` for a custom range, or `{}` for the
+ * server default range.
+ */
+export const useDashboardReport = (
+  params: DashboardReportParams = {},
+  enabled = true,
+) => {
+  const url = buildReportUrl(params);
+  return useFetch<DashboardReportResponse>(
+    url,
+    enabled,
+    (raw) => raw as DashboardReportResponse,
+  );
 };
