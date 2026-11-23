@@ -121,9 +121,11 @@ const AddBook = () => {
     ];
 
     fields.forEach((key) => {
-      const value = formData[key as keyof CreateBookData];
+      const typedKey = key as keyof CreateBookData;
+      const value = formData[typedKey];
+
       if (value !== undefined && value !== null && value !== "") {
-        submitData[key as keyof CreateBookData] = value;
+        (submitData as Record<string, unknown>)[typedKey] = value;
       }
     });
 

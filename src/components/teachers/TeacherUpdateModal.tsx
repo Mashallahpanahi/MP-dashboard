@@ -1,7 +1,7 @@
 // src/components/teachers/TeacherUpdateModal.tsx
 import { useState, useEffect } from "react";
-import type { Teacher } from "@/api/teacherApi";
-import type { UpdateTeacherData, ApiError } from "@/api/teacherApi";
+import { ApiError } from "@/api/teacherApi";
+import type { Teacher, UpdateTeacherData } from "@/api/teacherApi";
 // ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 

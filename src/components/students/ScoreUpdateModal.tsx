@@ -23,7 +23,7 @@ const ScoreUpdateModal = ({
 }: ScoreUpdateModalProps) => {
   // ✅ Hook replaces updateStudentScore + local saving/error state
   const {
-    updateStudentScore,
+    update: updateStudentScore,
     loading: saving,
     error: updateError,
   } = useUpdateStudentScore();

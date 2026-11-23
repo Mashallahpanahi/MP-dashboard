@@ -57,11 +57,11 @@ const ScoreAddModal = ({
   );
 
   // ✅ Create hook
-  const {
-    createStudentScore,
-    loading: saving,
-    error: createError,
-  } = useCreateStudentScore();
+ const {
+  create: createStudentScore,
+  loading: saving,
+  error: createError,
+} = useCreateStudentScore();
 
   // Local UI state
   const [localError, setLocalError] = useState("");

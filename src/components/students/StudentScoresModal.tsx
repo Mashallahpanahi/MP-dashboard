@@ -42,7 +42,6 @@ const StudentScoresModal = ({
     loading: deletingId,
     error: deleteError,
   } = useDeleteStudentScore();
-
   // Normalize scores — hook may return raw array or { data: [...] }
   const scores: StudentScore[] = useMemo(() => {
     if (!rawScores) return [];
@@ -379,7 +378,7 @@ const StudentScoresModal = ({
                         <td className="px-4 py-3">
                           <span
                             className={`text-sm ${getScoreColor(
-                              parseFloat(formatNumber(score.totalScore))
+                              parseFloat(formatNumber(score.totalScore)),
                             )}`}
                           >
                             {formatNumber(score.totalScore)}
@@ -402,12 +401,10 @@ const StudentScoresModal = ({
 
                             <button
                               onClick={() => handleDeleteClick(score)}
-                              disabled={deletingId === score.id}
+                              disabled={deletingId}
                               className="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {deletingId === score.id
-                                ? "Deleting..."
-                                : "Delete"}
+                              {deletingId ? "Deleting..." : "Delete"}
                             </button>
                           </div>
                         </td>

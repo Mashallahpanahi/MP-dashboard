@@ -678,7 +678,9 @@ const Dashboard = () => {
                   }
                 />
                 <Tooltip
-                  formatter={(value: number) => `AF ${value.toLocaleString()}`}
+                  formatter={(value) =>
+                    `AF ${Number(value ?? 0).toLocaleString("en-US")}`
+                  }
                   contentStyle={{
                     borderRadius: 8,
                     border: "1px solid #e5e7eb",
