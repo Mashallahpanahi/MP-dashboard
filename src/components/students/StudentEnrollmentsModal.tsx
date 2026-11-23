@@ -1,15 +1,14 @@
 // src/components/students/StudentEnrollmentModal.tsx
 import { useState, useEffect } from "react";
 import {
-  createEnrollmentWithPayment,
-  getStudentEnrollmentHistory,
+  useCreateEnrollmentWithPayment,
+  useEnrollmentHistory,
   type CreateEnrollmentWithPaymentData,
-  type EnrollmentHistoryResponse,
 } from "@/api/studentEnrollmentApi";
-import type { Student } from "@/types/student";
-import { getTeachers, type Teacher } from "@/api/teacherApi";
-import { getBooks, type Book } from "@/api/bookApi";
-import { getClasses, type Class } from "@/api/classApi";
+import type { Student } from "@/api/studentApi";
+import { useActiveTeachers } from "@/api/teacherApi";
+import { useActiveBooks } from "@/api/bookApi";
+import { useClasses } from "@/api/classApi";
 // ✅ Shamsi date picker + formatter
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import { formatShamsi, formatMiladiISO } from "@/utils/dateConverter";
@@ -89,6 +88,13 @@ const formatDate = (dateStr: string | undefined): string => {
   }
 };
 
+// ✅ Date one month later, as MILADI ISO for the backend
+const getOneMonthLater = (date: Date): string => {
+  const newDate = new Date(date);
+  newDate.setMonth(newDate.getMonth() + 1);
+  return formatMiladiISO(newDate);
+};
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -99,31 +105,43 @@ const StudentEnrollmentModal = ({
   onClose,
   onSuccess,
 }: StudentEnrollmentModalProps) => {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [successData, setSuccessData] = useState<any>(null);
-
   const [viewMode, setViewMode] = useState<"form" | "history">("form");
 
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState("");
-  const [historyData, setHistoryData] =
-    useState<EnrollmentHistoryResponse | null>(null);
+  // ✅ Dropdown data hooks (auto-fetch on mount)
+  const { data: teachersData, loading: teachersLoading } = useActiveTeachers();
+  const { data: booksData, loading: booksLoading } = useActiveBooks();
+  const { data: classesData, loading: classesLoading } = useClasses();
 
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const teachers = teachersData || [];
+  const books = booksData || [];
+  const classes = classesData || [];
+  const loadingData = teachersLoading || booksLoading || classesLoading;
 
-  // ✅ Helper: date one month later, as MILADI ISO for the backend
-  const getOneMonthLater = (date: Date): string => {
-    const newDate = new Date(date);
-    newDate.setMonth(newDate.getMonth() + 1);
-    return formatMiladiISO(newDate);
-  };
+  // ✅ History hook — fires only when viewMode === "history"
+  const {
+    data: historyData,
+    loading: historyLoading,
+    error: historyError,
+  } = useEnrollmentHistory(
+    student?.id ?? "",
+    viewMode === "history" && !!student?.id
+  );
 
-  // Form state — start/end/date kept as MILADI ISO for backend
+  // ✅ Create hook
+  const {
+    createEnrollmentWithPayment,
+    loading: saving,
+    error: createError,
+  } = useCreateEnrollmentWithPayment();
+
+  // ✅ Local error + success (form validation, PDF-style state)
+  const [localError, setLocalError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Combined error shown to the user
+  const error = localError || createError || "";
+
+  // Form state
   const [formData, setFormData] = useState<
     Partial<CreateEnrollmentWithPaymentData>
   >({
@@ -143,47 +161,45 @@ const StudentEnrollmentModal = ({
     paymentStatus: "Paid",
   });
 
-  // Fetch data when modal opens
+  // Reset when modal opens
   useEffect(() => {
     if (isOpen && student) {
-      fetchDropdownData();
       const today = formatMiladiISO(new Date());
       const oneMonthLater = getOneMonthLater(new Date());
-      setFormData((prev) => ({
-        ...prev,
+      setFormData({
         studentId: student.id,
+        bookId: "",
+        classId: "",
+        teacherId: "",
         startDate: today,
         endDate: oneMonthLater,
+        time: "",
+        status: "Studying",
+        result: "In Progress",
+        fee: 0,
+        discount: 0,
+        finalFee: 0,
         date: today,
         paymentStatus: "Paid",
-        time: "",
-      }));
+      });
       setSuccess("");
-      setError("");
-      setSuccessData(null);
+      setLocalError("");
       setViewMode("form");
-      setHistoryData(null);
-      setHistoryError("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, student]);
 
-  const fetchDropdownData = async () => {
-    try {
-      setLoadingData(true);
-      const [teachersData, booksData, classesData] = await Promise.all([
-        getTeachers(),
-        getBooks(),
-        getClasses(),
-      ]);
-      setTeachers(teachersData.filter((t) => t.isActive));
-      setBooks(booksData.filter((b) => b.isActive));
-      setClasses(classesData);
-    } catch (error) {
-      console.error("Failed to fetch dropdown data:", error);
-    } finally {
-      setLoadingData(false);
-    }
-  };
+  // Auto-calculate final fee
+  useEffect(() => {
+    const fee = formData.fee || 0;
+    const discount = formData.discount || 0;
+    const finalFee = fee - discount;
+    setFormData((prev) => ({
+      ...prev,
+      finalFee: finalFee > 0 ? finalFee : 0,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.fee, formData.discount]);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -206,158 +222,6 @@ const StudentEnrollmentModal = ({
     }));
   };
 
-  // Auto-calculate final fee
-  useEffect(() => {
-    const fee = formData.fee || 0;
-    const discount = formData.discount || 0;
-    const finalFee = fee - discount;
-    setFormData((prev) => ({
-      ...prev,
-      finalFee: finalFee > 0 ? finalFee : 0,
-    }));
-  }, [formData.fee, formData.discount]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    setSuccess("");
-    setSuccessData(null);
-
-    try {
-      if (!formData.bookId) {
-        setError("Please select a book");
-        setSaving(false);
-        return;
-      }
-      if (!formData.classId) {
-        setError("Please select a class");
-        setSaving(false);
-        return;
-      }
-      if (!formData.teacherId) {
-        setError("Please select a teacher");
-        setSaving(false);
-        return;
-      }
-      if (!formData.startDate) {
-        setError("Please select start date");
-        setSaving(false);
-        return;
-      }
-      if (!formData.endDate) {
-        setError("Please select end date");
-        setSaving(false);
-        return;
-      }
-      if (!formData.fee || formData.fee <= 0) {
-        setError("Please enter a valid fee amount");
-        setSaving(false);
-        return;
-      }
-      if (!formData.date) {
-        setError("Please select payment date");
-        setSaving(false);
-        return;
-      }
-
-      const submitData: CreateEnrollmentWithPaymentData = {
-        studentId: formData.studentId!,
-        bookId: formData.bookId,
-        classId: formData.classId,
-        teacherId: formData.teacherId,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        time: formData.time || "",
-        status: formData.status as
-          | "Studying"
-          | "Completed"
-          | "Dropped"
-          | "Pending",
-        result: formData.result as
-          | "Passed"
-          | "Failed"
-          | "Pending"
-          | "In Progress",
-        fee: formData.fee,
-        discount: formData.discount || 0,
-        finalFee: formData.finalFee || formData.fee,
-        date: formData.date,
-        paymentStatus: formData.paymentStatus as
-          | "Paid"
-          | "Pending"
-          | "Partially Paid"
-          | "Overdue",
-      };
-
-      console.log("📤 Enrolling with data:", submitData);
-
-      const response = await createEnrollmentWithPayment(submitData);
-
-      const successMessage =
-        response?.message || "Student enrolled successfully!";
-      setSuccess(successMessage);
-
-      if (response?.data) {
-        setSuccessData(response.data);
-      }
-
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-        onClose();
-        resetForm();
-      }, 3000);
-    } catch (error) {
-      console.error("Failed to enroll student:", error);
-      let errorMsg = "Failed to enroll student";
-      if (error instanceof Error) {
-        errorMsg = error.message;
-        try {
-          const parsed = JSON.parse(error.message);
-          if (parsed?.message) {
-            errorMsg = parsed.message;
-          }
-        } catch {
-          /* keep as is */
-        }
-      }
-      setError(errorMsg);
-      setSaving(false);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const fetchHistory = async () => {
-    if (!student) return;
-    try {
-      setHistoryLoading(true);
-      setHistoryError("");
-      setHistoryData(null);
-
-      const response = await getStudentEnrollmentHistory(student.id);
-      setHistoryData(response);
-    } catch (err) {
-      console.error("Failed to fetch enrollment history:", err);
-      setHistoryError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load enrollment history"
-      );
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  const handleOpenHistory = () => {
-    setViewMode("history");
-    fetchHistory();
-  };
-
-  const handleBackToForm = () => {
-    setViewMode("form");
-  };
-
   const resetForm = () => {
     const today = formatMiladiISO(new Date());
     const oneMonthLater = getOneMonthLater(new Date());
@@ -377,12 +241,94 @@ const StudentEnrollmentModal = ({
       date: today,
       paymentStatus: "Paid",
     });
-    setError("");
+    setLocalError("");
     setSuccess("");
-    setSuccessData(null);
     setViewMode("form");
-    setHistoryData(null);
-    setHistoryError("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError("");
+    setSuccess("");
+
+    // Validation
+    if (!formData.bookId) {
+      setLocalError("Please select a book");
+      return;
+    }
+    if (!formData.classId) {
+      setLocalError("Please select a class");
+      return;
+    }
+    if (!formData.teacherId) {
+      setLocalError("Please select a teacher");
+      return;
+    }
+    if (!formData.startDate) {
+      setLocalError("Please select start date");
+      return;
+    }
+    if (!formData.endDate) {
+      setLocalError("Please select end date");
+      return;
+    }
+    if (!formData.fee || formData.fee <= 0) {
+      setLocalError("Please enter a valid fee amount");
+      return;
+    }
+    if (!formData.date) {
+      setLocalError("Please select payment date");
+      return;
+    }
+
+    const submitData: CreateEnrollmentWithPaymentData = {
+      studentId: formData.studentId!,
+      bookId: formData.bookId,
+      classId: formData.classId,
+      teacherId: formData.teacherId,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      time: formData.time || "",
+      status: formData.status as
+        | "Studying"
+        | "Completed"
+        | "Dropped"
+        | "Pending",
+      result: formData.result as
+        | "Passed"
+        | "Failed"
+        | "Pending"
+        | "In Progress",
+      fee: formData.fee,
+      discount: formData.discount || 0,
+      finalFee: formData.finalFee || formData.fee,
+      date: formData.date,
+      paymentStatus: formData.paymentStatus as
+        | "Paid"
+        | "Pending"
+        | "Partially Paid"
+        | "Overdue",
+    };
+
+    const ok = await createEnrollmentWithPayment(submitData);
+    if (!ok) return; // error surfaces via `error`
+
+    setSuccess("Student enrolled successfully!");
+
+    setTimeout(() => {
+      if (onSuccess) onSuccess();
+      onClose();
+      resetForm();
+    }, 3000);
+  };
+
+  const handleOpenHistory = () => {
+    setViewMode("history");
+    // useEnrollmentHistory fires automatically when viewMode flips
+  };
+
+  const handleBackToForm = () => {
+    setViewMode("form");
   };
 
   const handleClose = () => {
@@ -390,11 +336,19 @@ const StudentEnrollmentModal = ({
     onClose();
   };
 
-  if (!isOpen) return null;
-
+  // History display derivation
+  const isInHistory = viewMode === "history";
+  const isHistoryInitialLoading =
+    isInHistory && !historyData && !historyError;
+  const isHistoryLoadingForDisplay =
+    isInHistory && (historyLoading || isHistoryInitialLoading);
+  const displayHistory = isHistoryLoadingForDisplay
+    ? []
+    : historyData?.data?.history || [];
   const summary = historyData?.data?.summary;
-  const history = historyData?.data?.history || [];
   const studentInfo = historyData?.data?.student;
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -466,7 +420,7 @@ const StudentEnrollmentModal = ({
           {/* HISTORY VIEW */}
           {viewMode === "history" && (
             <>
-              {historyLoading && (
+              {isHistoryLoadingForDisplay && (
                 <div className="flex items-center justify-center py-16">
                   <div className="text-center">
                     <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
@@ -477,7 +431,7 @@ const StudentEnrollmentModal = ({
                 </div>
               )}
 
-              {historyError && !historyLoading && (
+              {!isHistoryLoadingForDisplay && historyError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                   <p className="text-sm font-medium text-red-700">
                     {historyError}
@@ -485,9 +439,9 @@ const StudentEnrollmentModal = ({
                 </div>
               )}
 
-              {!historyLoading &&
+              {!isHistoryLoadingForDisplay &&
                 !historyError &&
-                history.length === 0 && (
+                displayHistory.length === 0 && (
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-10 text-center">
                     <h3 className="text-base font-semibold text-gray-900">
                       No Enrollment History
@@ -498,9 +452,9 @@ const StudentEnrollmentModal = ({
                   </div>
                 )}
 
-              {!historyLoading &&
+              {!isHistoryLoadingForDisplay &&
                 !historyError &&
-                history.length > 0 && (
+                displayHistory.length > 0 && (
                   <>
                     {summary && (
                       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -586,7 +540,7 @@ const StudentEnrollmentModal = ({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 bg-white">
-                            {history.map((record, idx) => (
+                            {displayHistory.map((record, idx) => (
                               <tr
                                 key={record.enrollmentId}
                                 className="transition hover:bg-gray-50"
@@ -682,7 +636,7 @@ const StudentEnrollmentModal = ({
                               </td>
                               <td className="px-3 py-3 text-right text-xs font-semibold text-gray-900">
                                 {formatCurrency(
-                                  history.reduce(
+                                  displayHistory.reduce(
                                     (sum, r) =>
                                       sum + (parseFloat(String(r.fee)) || 0),
                                     0
@@ -692,7 +646,7 @@ const StudentEnrollmentModal = ({
                               <td className="px-3 py-3 text-right text-xs font-semibold text-orange-600">
                                 -
                                 {formatCurrency(
-                                  history.reduce(
+                                  displayHistory.reduce(
                                     (sum, r) =>
                                       sum +
                                       (parseFloat(String(r.discount)) || 0),
@@ -702,7 +656,7 @@ const StudentEnrollmentModal = ({
                               </td>
                               <td className="px-3 py-3 text-right text-xs font-bold text-blue-700">
                                 {formatCurrency(
-                                  history.reduce(
+                                  displayHistory.reduce(
                                     (sum, r) =>
                                       sum +
                                       (parseFloat(String(r.finalFee)) || 0),
@@ -775,7 +729,7 @@ const StudentEnrollmentModal = ({
                           <option value="">Select class</option>
                           {classes.map((classItem) => (
                             <option key={classItem.id} value={classItem.id}>
-                              {classItem.name} -{" "}
+                              {classItem.className} -{" "}
                               {classItem.block || "No block"}
                             </option>
                           ))}
@@ -838,7 +792,7 @@ const StudentEnrollmentModal = ({
                     </div>
                   </div>
 
-                  {/* ✅ Course Schedule — Shamsi pickers */}
+                  {/* Course Schedule — Shamsi pickers */}
                   <div className="mb-6 border-t border-gray-200 pt-6">
                     <h4 className="mb-3 font-semibold text-gray-900">
                       Course Schedule
@@ -949,7 +903,7 @@ const StudentEnrollmentModal = ({
                         </p>
                       </div>
 
-                      {/* ✅ Payment Date — Shamsi picker */}
+                      {/* Payment Date — Shamsi picker */}
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700">
                           Payment Date{" "}
@@ -1011,29 +965,9 @@ const StudentEnrollmentModal = ({
                               d="M5 13l4 4L19 7"
                             />
                           </svg>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-green-800">
-                              {success}
-                            </p>
-                            {successData && successData.enrollment && (
-                              <div className="mt-1 text-xs text-green-700">
-                                <span className="font-medium">Status:</span>{" "}
-                                {successData.enrollment.status} |
-                                <span className="font-medium ml-2">
-                                  Result:
-                                </span>{" "}
-                                {successData.enrollment.result}
-                                {successData.payment && (
-                                  <span className="ml-2">
-                                    <span className="font-medium">
-                                      Payment:
-                                    </span>{" "}
-                                    {successData.payment.status}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <p className="text-sm font-medium text-green-800">
+                            {success}
+                          </p>
                         </div>
                       </div>
                     )}
