@@ -1,14 +1,14 @@
 // src/pages/Students/EnrollStudent.tsx
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  createEnrollmentWithPayment,
+  useCreateEnrollmentWithPayment,
   type CreateEnrollmentWithPaymentData,
 } from "@/api/studentEnrollmentApi";
-import { getStudentById } from "@/api/studentApi";
-import { getTeachers, type Teacher } from "@/api/teacherApi";
-import { getBooks, type Book } from "@/api/bookApi";
-import { getClasses, type Class } from "@/api/classApi";
+import { useStudentById } from "@/api/studentApi";
+import { useActiveTeachers, type Teacher } from "@/api/teacherApi";
+import { useActiveBooks, type Book } from "@/api/bookApi";
+import { useClasses, type Class } from "@/api/classApi";
 // ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import { formatMiladiISO } from "@/utils/dateConverter";
@@ -16,20 +16,47 @@ import { formatMiladiISO } from "@/utils/dateConverter";
 const EnrollStudent = () => {
   const navigate = useNavigate();
   const { studentId } = useParams<{ studentId: string }>();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
+  // ✅ Hooks replace every imperative fetch
+  const { data: studentData, loading: studentLoading } = useStudentById(
+    studentId ?? "",
+    !!studentId,
+  );
+
+  const { data: teachersData, loading: teachersLoading } = useActiveTeachers();
+  const { data: booksData, loading: booksLoading } = useActiveBooks();
+  const { data: classesData, loading: classesLoading } = useClasses();
+
+  const {
+    createEnrollmentWithPayment,
+    loading: creatingEnrollment,
+    error: createError,
+  } = useCreateEnrollmentWithPayment();
+
+  // Local state
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
-  const [studentName, setStudentName] = useState("");
+
+  // Combined error shown to the user
+  const error = localError || createError || "";
 
   // Data for dropdowns
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const teachers: Teacher[] = teachersData || [];
+  const books: Book[] = booksData || [];
+  const classes: Class[] = classesData || [];
 
+  const loadingData = teachersLoading || booksLoading || classesLoading;
+
+  // Student name (derived)
+  const studentName =
+    studentData && studentData.id === studentId
+      ? `${studentData.firstName} ${studentData.lastName || ""}`
+      : "";
+
+  // ✅ Form state — initial `date` set to today (Miladi ISO for backend)
   const [formData, setFormData] = useState<
     Partial<CreateEnrollmentWithPaymentData>
-  >({
+  >(() => ({
     studentId: studentId || "",
     bookId: "",
     classId: "",
@@ -41,48 +68,27 @@ const EnrollStudent = () => {
     fee: 0,
     discount: 0,
     finalFee: 0,
-    date: "",
+    date: formatMiladiISO(new Date()),
     paymentStatus: "Pending",
     score: undefined,
     scoreDate: "",
     scoreTime: "",
     scoreNotes: "",
-  });
+  }));
 
-  // Fetch data for dropdowns
+  // ✅ Keep formData.studentId in sync if URL param changes
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoadingData(true);
-        const [teachersData, booksData, classesData] = await Promise.all([
-          getTeachers(),
-          getBooks(),
-          getClasses(),
-        ]);
-        setTeachers(teachersData.filter((t) => t.isActive));
-        setBooks(booksData.filter((b) => b.isActive));
-        setClasses(classesData);
-
-        // Fetch student name
-        if (studentId) {
-          const student = await getStudentById(studentId);
-          setStudentName(`${student.firstName} ${student.lastName || ""}`);
-        }
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-        setError("Failed to load required data");
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    fetchData();
+    if (studentId) {
+      setFormData((prev) =>
+        prev.studentId === studentId ? prev : { ...prev, studentId },
+      );
+    }
   }, [studentId]);
 
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
@@ -110,111 +116,87 @@ const EnrollStudent = () => {
       ...prev,
       finalFee: finalFee > 0 ? finalFee : 0,
     }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.fee, formData.discount]);
-
-  // Set payment date to today when not set (Miladi ISO for the backend)
-  useEffect(() => {
-    if (!formData.date) {
-      setFormData((prev) => ({
-        ...prev,
-        date: formatMiladiISO(new Date()),
-      }));
-    }
-  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLocalError("");
     setSuccess("");
 
-    try {
-      // Validate required fields
-      if (!formData.bookId) {
-        setError("Please select a book");
-        setLoading(false);
-        return;
-      }
-      if (!formData.classId) {
-        setError("Please select a class");
-        setLoading(false);
-        return;
-      }
-      if (!formData.teacherId) {
-        setError("Please select a teacher");
-        setLoading(false);
-        return;
-      }
-      if (!formData.startDate) {
-        setError("Please select start date");
-        setLoading(false);
-        return;
-      }
-      if (!formData.endDate) {
-        setError("Please select end date");
-        setLoading(false);
-        return;
-      }
-      if (!formData.fee || formData.fee <= 0) {
-        setError("Please enter a valid fee amount");
-        setLoading(false);
-        return;
-      }
-      if (!formData.date) {
-        setError("Please select payment date");
-        setLoading(false);
-        return;
-      }
-
-      // Prepare data for submission
-      const submitData: CreateEnrollmentWithPaymentData = {
-        studentId: formData.studentId!,
-        bookId: formData.bookId,
-        classId: formData.classId,
-        teacherId: formData.teacherId,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        status: formData.status as
-          | "Studying"
-          | "Completed"
-          | "Dropped"
-          | "Pending",
-        result: formData.result as
-          | "Passed"
-          | "Failed"
-          | "Pending"
-          | "In Progress",
-        fee: formData.fee,
-        discount: formData.discount || 0,
-        finalFee: formData.finalFee || formData.fee,
-        date: formData.date,
-        paymentStatus: formData.paymentStatus as
-          | "Paid"
-          | "Pending"
-          | "Partially Paid"
-          | "Overdue",
-        score: formData.score || undefined,
-        scoreDate: formData.scoreDate || undefined,
-        scoreTime: formData.scoreTime || undefined,
-        scoreNotes: formData.scoreNotes || undefined,
-      };
-
-      await createEnrollmentWithPayment(submitData);
-      setSuccess("Student enrolled successfully!");
-      setTimeout(() => {
-        navigate("/students/all");
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to enroll student:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to enroll student"
-      );
-    } finally {
-      setLoading(false);
+    // Validate required fields
+    if (!formData.bookId) {
+      setLocalError("Please select a book");
+      return;
     }
+    if (!formData.classId) {
+      setLocalError("Please select a class");
+      return;
+    }
+    if (!formData.teacherId) {
+      setLocalError("Please select a teacher");
+      return;
+    }
+    if (!formData.startDate) {
+      setLocalError("Please select start date");
+      return;
+    }
+    if (!formData.endDate) {
+      setLocalError("Please select end date");
+      return;
+    }
+    if (!formData.fee || formData.fee <= 0) {
+      setLocalError("Please enter a valid fee amount");
+      return;
+    }
+    if (!formData.date) {
+      setLocalError("Please select payment date");
+      return;
+    }
+
+    // Prepare data for submission
+    const submitData: CreateEnrollmentWithPaymentData = {
+      studentId: formData.studentId!,
+      bookId: formData.bookId,
+      classId: formData.classId,
+      teacherId: formData.teacherId,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      status: formData.status as
+        | "Studying"
+        | "Completed"
+        | "Dropped"
+        | "Pending",
+      result: formData.result as
+        | "Passed"
+        | "Failed"
+        | "Pending"
+        | "In Progress",
+      fee: formData.fee,
+      discount: formData.discount || 0,
+      finalFee: formData.finalFee || formData.fee,
+      date: formData.date,
+      paymentStatus: formData.paymentStatus as
+        | "Paid"
+        | "Pending"
+        | "Partially Paid"
+        | "Overdue",
+      score: formData.score || undefined,
+      scoreDate: formData.scoreDate || undefined,
+      scoreTime: formData.scoreTime || undefined,
+      scoreNotes: formData.scoreNotes || undefined,
+    };
+
+    const ok = await createEnrollmentWithPayment(submitData);
+    if (!ok) return; // error surfaces via `error`
+
+    setSuccess("Student enrolled successfully!");
+    setTimeout(() => {
+      navigate("/students/all");
+    }, 1500);
   };
 
-  if (loadingData) {
+  if (loadingData || (studentLoading && studentId)) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
@@ -297,7 +279,7 @@ const EnrollStudent = () => {
                   <option value="">Select class</option>
                   {classes.map((classItem) => (
                     <option key={classItem.id} value={classItem.id}>
-                      {classItem.name} - {classItem.block}
+                      {classItem.className} - {classItem.block}
                     </option>
                   ))}
                 </select>
@@ -362,13 +344,12 @@ const EnrollStudent = () => {
             </div>
           </div>
 
-          {/* ✅ Course Dates — Shamsi pickers */}
+          {/* Course Dates — Shamsi pickers */}
           <div className="mb-8 border-t border-gray-200 pt-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
               Course Dates
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* Start Date */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Start Date *
@@ -385,7 +366,6 @@ const EnrollStudent = () => {
                 />
               </div>
 
-              {/* End Date */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   End Date *
@@ -456,7 +436,6 @@ const EnrollStudent = () => {
                 </p>
               </div>
 
-              {/* ✅ Payment Date — Shamsi picker */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Payment Date *
@@ -515,7 +494,6 @@ const EnrollStudent = () => {
                 />
               </div>
 
-              {/* ✅ Score Date — Shamsi picker */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Score Date
@@ -562,17 +540,17 @@ const EnrollStudent = () => {
             <button
               type="button"
               onClick={() => navigate("/students/all")}
-              disabled={loading}
+              disabled={creatingEnrollment}
               className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={creatingEnrollment}
               className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Enrolling..." : "Enroll Student"}
+              {creatingEnrollment ? "Enrolling..." : "Enroll Student"}
             </button>
           </div>
         </form>

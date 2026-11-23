@@ -1,19 +1,21 @@
 // src/pages/RegisterStudents/RegisterStudent.tsx
 import { FormEvent, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { createStudent } from "@/api/studentApi";
-import { useAuthStore } from "@store/authStore";
+import { useCreateStudent } from "@/api/studentApi";
 
 const RegisterStudent = () => {
   const navigate = useNavigate();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const getToken = useAuthStore((s) => s.getToken);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // ✅ Hook replaces createStudent + local loading/error state
+  const { createStudent, loading, error: hookError } = useCreateStudent();
+
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Combined error shown to the user
+  const error = localError || hookError || "";
 
   // Form fields
   const [firstName, setFirstName] = useState("");
@@ -23,7 +25,7 @@ const RegisterStudent = () => {
   const [fatherPhone, setFatherPhone] = useState("");
   const [gender, setGender] = useState<"Male" | "Female">("Male");
   const [status, setStatus] = useState<"Active" | "Inactive" | "Graduated">(
-    "Active"
+    "Active",
   );
   const [notes, setNotes] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -38,17 +40,17 @@ const RegisterStudent = () => {
     // Validate type
     const validTypes = ["image/jpeg", "image/jpg", "image/png"];
     if (!validTypes.includes(file.type)) {
-      setError("Please upload a valid image file (jpg, jpeg, or png)");
+      setLocalError("Please upload a valid image file (jpg, jpeg, or png)");
       return;
     }
 
     // Validate size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError("Image size must be less than 5MB");
+      setLocalError("Image size must be less than 5MB");
       return;
     }
 
-    setError("");
+    setLocalError("");
     setImageFile(file);
 
     // Create preview
@@ -72,103 +74,79 @@ const RegisterStudent = () => {
   // ============================================
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
+    setLocalError("");
     setSuccess("");
-
-    // ✅ Guard: must be logged in
-    if (!isAuthenticated) {
-      setError("You must be logged in to register a student.");
-      return;
-    }
-
-    // ✅ Guard: token must exist and not be expired
-    const token = getToken();
-    if (!token) {
-      setError("Your session has expired. Please login again.");
-      setTimeout(() => navigate("/login"), 1500);
-      return;
-    }
 
     // Validation
     if (!firstName.trim()) {
-      setError("First name is required");
+      setLocalError("First name is required");
       return;
     }
     if (!lastName.trim()) {
-      setError("Last name is required");
+      setLocalError("Last name is required");
       return;
     }
     if (!phone.trim()) {
-      setError("Phone number is required");
+      setLocalError("Phone number is required");
       return;
     }
 
     // Validate phone number format (starts with 07 and 10 digits)
     const phoneRegex = /^07\d{8}$/;
     if (!phoneRegex.test(phone)) {
-      setError(
-        "Phone number must start with 07 and be 10 digits (e.g., 0777123456)"
+      setLocalError(
+        "Phone number must start with 07 and be 10 digits (e.g., 0777123456)",
       );
       return;
     }
 
     // Validate father phone if provided
     if (fatherPhone.trim() && !phoneRegex.test(fatherPhone)) {
-      setError(
-        "Father's phone number must start with 07 and be 10 digits (e.g., 0777123456)"
+      setLocalError(
+        "Father's phone number must start with 07 and be 10 digits (e.g., 0777123456)",
       );
       return;
     }
 
-    try {
-      setLoading(true);
+    // Build FormData (matches POST /students multipart/form-data)
+    const submitData = new FormData();
+    submitData.append("firstName", firstName.trim());
+    submitData.append("lastName", lastName.trim());
+    submitData.append("phone", phone.trim());
 
-      // Build FormData (matches POST /students multipart/form-data)
-      const submitData = new FormData();
-      submitData.append("firstName", firstName.trim());
-      submitData.append("lastName", lastName.trim());
-      submitData.append("phone", phone.trim());
-
-      // ✅ Image is OPTIONAL — only append if a file was selected
-      if (imageFile instanceof File) {
-        submitData.append("image", imageFile);
-      }
-
-      if (fatherName.trim()) submitData.append("fatherName", fatherName.trim());
-      if (fatherPhone.trim())
-        submitData.append("fatherPhone", fatherPhone.trim());
-      if (gender) submitData.append("gender", gender);
-      if (status) submitData.append("status", status);
-      if (notes.trim()) submitData.append("notes", notes.trim());
-
-      // createStudent now attaches the Bearer token automatically
-      await createStudent(submitData);
-
-      setSuccess("Student registered successfully!");
-
-      // Reset form
-      setFirstName("");
-      setLastName("");
-      setPhone("");
-      setFatherName("");
-      setFatherPhone("");
-      setGender("Male");
-      setStatus("Active");
-      setNotes("");
-      setImageFile(null);
-      setImagePreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-
-      // Navigate after a short delay
-      setTimeout(() => navigate("/students/all"), 1500);
-    } catch (err) {
-      console.error("Failed to create student:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to register student"
-      );
-    } finally {
-      setLoading(false);
+    // ✅ Image is OPTIONAL — only append if a file was selected
+    if (imageFile instanceof File) {
+      submitData.append("image", imageFile);
     }
+
+    if (fatherName.trim()) submitData.append("fatherName", fatherName.trim());
+    if (fatherPhone.trim())
+      submitData.append("fatherPhone", fatherPhone.trim());
+    if (gender) submitData.append("gender", gender);
+    if (status) submitData.append("status", status);
+    if (notes.trim()) submitData.append("notes", notes.trim());
+
+    // ✅ Hook handles Bearer token + 401 logout internally
+    const ok = await createStudent(submitData);
+    if (!ok) return; // error surfaces via `error` (hookError)
+
+    setSuccess("Student registered successfully!");
+
+    // Reset form
+    setFirstName("");
+    setLastName("");
+    setPhone("");
+    setFatherName("");
+    setFatherPhone("");
+    setGender("Male");
+    setStatus("Active");
+    setNotes("");
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // Navigate after a short delay
+    setTimeout(() => navigate("/students/all"), 1500);
   };
 
   return (
@@ -176,9 +154,7 @@ const RegisterStudent = () => {
       <div className="mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Register Student
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Register Student</h1>
           <p className="mt-1 text-sm text-gray-500">
             Add a new student to the system{" "}
             <span className="text-red-500">*</span> indicates required field
@@ -366,7 +342,7 @@ const RegisterStudent = () => {
                   value={status}
                   onChange={(e) =>
                     setStatus(
-                      e.target.value as "Active" | "Inactive" | "Graduated"
+                      e.target.value as "Active" | "Inactive" | "Graduated",
                     )
                   }
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"

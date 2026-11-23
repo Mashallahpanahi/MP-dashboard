@@ -1,9 +1,7 @@
 // src/components/students/MoreFilterModal.tsx
 import { useEffect, useState } from "react";
-import type { Teacher } from "@/types/teacher";
-import type { Book } from "@/types/book";
-import { getTeachers } from "@/api/teacherApi";
-import { getBooks } from "@/api/bookApi";
+import { useTeachers, type Teacher } from "@/api/teacherApi";
+import { useBooks, type Book } from "@/api/bookApi";
 // ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
@@ -41,10 +39,12 @@ const MoreFilterModal = ({
   initialValues = {},
   loading = false,
 }: MoreFilterModalProps) => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [teachersLoading, setTeachersLoading] = useState(false);
-  const [booksLoading, setBooksLoading] = useState(false);
+  // ✅ Hooks replace getTeachers() / getBooks() + local state
+  const { data: rawTeachers, loading: teachersLoading } = useTeachers();
+  const { data: rawBooks, loading: booksLoading } = useBooks();
+
+  const teachers: Teacher[] = rawTeachers || [];
+  const books: Book[] = rawBooks || [];
 
   // Form values — fromDate / toDate kept as MILADI ISO for the backend
   const [teacherId, setTeacherId] = useState(initialValues.teacherId || "");
@@ -62,35 +62,7 @@ const MoreFilterModal = ({
       setFromDate(initialValues.fromDate || "");
       setToDate(initialValues.toDate || "");
     }
-  }, [isOpen, initialValues]);
-
-  // Fetch teachers and books on open
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const fetchData = async () => {
-      try {
-        setTeachersLoading(true);
-        const teacherData = await getTeachers();
-        setTeachers(teacherData || []);
-      } catch (err) {
-        console.error("Failed to fetch teachers:", err);
-      } finally {
-        setTeachersLoading(false);
-      }
-
-      try {
-        setBooksLoading(true);
-        const bookData = await getBooks();
-        setBooks(bookData || []);
-      } catch (err) {
-        console.error("Failed to fetch books:", err);
-      } finally {
-        setBooksLoading(false);
-      }
-    };
-
-    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const handleApply = () => {

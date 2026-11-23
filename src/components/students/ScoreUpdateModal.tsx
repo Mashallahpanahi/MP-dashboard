@@ -1,7 +1,10 @@
 // src/components/students/ScoreUpdateModal.tsx
 import { useState, useEffect } from "react";
-import { updateStudentScore } from "@/api/scoreApi";
-import type { StudentScore, UpdateStudentScoreData } from "@/api/scoreApi";
+import {
+  useUpdateStudentScore,
+  type StudentScore,
+  type UpdateStudentScoreData,
+} from "@/api/scoreApi";
 // ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
@@ -18,9 +21,19 @@ const ScoreUpdateModal = ({
   onClose,
   onUpdate,
 }: ScoreUpdateModalProps) => {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  // ✅ Hook replaces updateStudentScore + local saving/error state
+  const {
+    updateStudentScore,
+    loading: saving,
+    error: updateError,
+  } = useUpdateStudentScore();
+
+  // Local state (validation errors + success message)
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Combined error shown to the user
+  const error = localError || updateError || "";
 
   const [formData, setFormData] = useState<UpdateStudentScoreData>({
     midtermScore: 0,
@@ -51,7 +64,7 @@ const ScoreUpdateModal = ({
         time: score.time || "",
         notes: score.notes || "",
       });
-      setError("");
+      setLocalError("");
       setSuccess("");
     }
   }, [score]);
@@ -69,7 +82,7 @@ const ScoreUpdateModal = ({
   if (!isOpen || !score) return null;
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value, type } = e.target;
 
@@ -88,58 +101,45 @@ const ScoreUpdateModal = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    setError("");
+    setLocalError("");
     setSuccess("");
 
-    try {
-      if (
-        formData.midtermScore !== undefined &&
-        (formData.midtermScore < 0 || formData.midtermScore > 100)
-      ) {
-        setError("Midterm score must be between 0 and 50");
-        setSaving(false);
-        return;
-      }
-
-      if (
-        formData.finalScore !== undefined &&
-        (formData.finalScore < 0 || formData.finalScore > 100)
-      ) {
-        setError("Final score must be between 0 and 50");
-        setSaving(false);
-        return;
-      }
-
-      const submitData: UpdateStudentScoreData = {
-        midtermScore: formData.midtermScore,
-        finalScore: formData.finalScore,
-        totalScore: formData.totalScore,
-        date: formData.date,
-        time: formData.time,
-        notes: formData.notes,
-      };
-
-      console.log("📤 Updating score with data:", submitData);
-
-      const response = await updateStudentScore(score.id, submitData);
-
-      console.log("✅ Update response:", response);
-
-      setSuccess("Score updated successfully!");
-
-      setTimeout(() => {
-        if (onUpdate) onUpdate();
-        onClose();
-      }, 1500);
-    } catch (error) {
-      console.error("❌ Failed to update score:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to update score"
-      );
-    } finally {
-      setSaving(false);
+    // Validation
+    if (
+      formData.midtermScore !== undefined &&
+      (formData.midtermScore < 0 || formData.midtermScore > 100)
+    ) {
+      setLocalError("Midterm score must be between 0 and 50");
+      return;
     }
+
+    if (
+      formData.finalScore !== undefined &&
+      (formData.finalScore < 0 || formData.finalScore > 100)
+    ) {
+      setLocalError("Final score must be between 0 and 50");
+      return;
+    }
+
+    const submitData: UpdateStudentScoreData = {
+      midtermScore: formData.midtermScore,
+      finalScore: formData.finalScore,
+      totalScore: formData.totalScore,
+      date: formData.date,
+      time: formData.time,
+      notes: formData.notes,
+    };
+
+    const ok = await updateStudentScore(score.id, submitData);
+
+    if (!ok) return; // error is surfaced via `error`
+
+    setSuccess("Score updated successfully!");
+
+    setTimeout(() => {
+      if (onUpdate) onUpdate();
+      onClose();
+    }, 1500);
   };
 
   const handleClose = () => {

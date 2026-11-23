@@ -1,12 +1,12 @@
 // src/components/students/EnrollmentHistoryModal.tsx
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 import {
-  getStudentEnrollmentHistory,
+  useEnrollmentHistory,
   type EnrollmentHistoryResponse,
   type EnrollmentHistoryRecord,
   type EnrollmentScore,
 } from "@/api/studentEnrollmentApi";
-import type { Student } from "@/types/student";
+import type { Student } from "@/api/studentApi";
 // ✅ Shamsi date formatter
 import { formatShamsi } from "@/utils/dateConverter";
 
@@ -108,7 +108,7 @@ const formatDate = (dateStr: string | undefined): string => {
 };
 
 const parseScore = (
-  value: string | number | null | undefined
+  value: string | number | null | undefined,
 ): number | null => {
   if (value === null || value === undefined) return null;
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -143,42 +143,27 @@ const EnrollmentHistoryModal = ({
   student,
   onClose,
 }: EnrollmentHistoryModalProps) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [historyData, setHistoryData] =
-    useState<EnrollmentHistoryResponse | null>(null);
+  const studentId = student?.id ?? "";
 
-  useEffect(() => {
-    if (!isOpen || !student) return;
+  // ✅ Hook replaces getStudentEnrollmentHistory + local loading/error state
+  const {
+    data: rawHistoryData,
+    loading: hookLoading,
+    error: hookError,
+  } = useEnrollmentHistory(studentId, isOpen && !!studentId);
 
-    const fetchHistory = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        setHistoryData(null);
+  // ✅ Only trust data that belongs to the CURRENT student.
+  // Prevents stale data flicker when switching between students.
+  const historyData: EnrollmentHistoryResponse | null =
+    rawHistoryData?.data?.student?.id === studentId ? rawHistoryData : null;
 
-        const response = await getStudentEnrollmentHistory(student.id);
-        console.log("📊 Enrollment history response:", response);
-        setHistoryData(response);
-      } catch (err) {
-        console.error("Failed to fetch enrollment history:", err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load enrollment history"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [isOpen, student]);
+  const loading = hookLoading || (!!rawHistoryData && !historyData);
+  const error = hookError || "";
 
   const sortedHistory = useMemo(() => {
     const list = historyData?.data?.history || [];
     return [...list].sort(
-      (a, b) => getRecordTimestamp(b) - getRecordTimestamp(a)
+      (a, b) => getRecordTimestamp(b) - getRecordTimestamp(a),
     );
   }, [historyData]);
 
@@ -351,7 +336,7 @@ const EnrollmentHistoryModal = ({
                     </p>
                     <p
                       className={`mt-1 text-xl font-bold ${getScoreTextColor(
-                        summary.averageTotalScore
+                        summary.averageTotalScore,
                       )}`}
                     >
                       {summary.averageTotalScore !== undefined &&
@@ -506,7 +491,7 @@ const EnrollmentHistoryModal = ({
                             <td className="border-r border-gray-100 px-4 py-3">
                               <span
                                 className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getEnrollmentStatusColor(
-                                  record.enrollmentStatus
+                                  record.enrollmentStatus,
                                 )}`}
                               >
                                 {record.enrollmentStatus}
@@ -524,7 +509,7 @@ const EnrollmentHistoryModal = ({
                             <td className="border-r border-gray-100 px-4 py-3">
                               <span
                                 className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getStatusColor(
-                                  record.paymentStatus
+                                  record.paymentStatus,
                                 )}`}
                               >
                                 {record.paymentStatus}
@@ -556,21 +541,19 @@ const EnrollmentHistoryModal = ({
                               {totalScore !== null ? (
                                 <span
                                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${getScoreBadgeColor(
-                                    totalScore
+                                    totalScore,
                                   )}`}
                                 >
                                   {totalScore.toFixed(1)}
                                 </span>
                               ) : (
-                                <span className="text-xs text-gray-400">
-                                  —
-                                </span>
+                                <span className="text-xs text-gray-400">—</span>
                               )}
                             </td>
                             <td className="bg-indigo-50/20 px-4 py-3">
                               <span
                                 className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getResultColor(
-                                  record.result
+                                  record.result,
                                 )}`}
                               >
                                 {record.result}
@@ -594,8 +577,8 @@ const EnrollmentHistoryModal = ({
                             history.reduce(
                               (sum, r) =>
                                 sum + (parseFloat(String(r.fee)) || 0),
-                              0
-                            )
+                              0,
+                            ),
                           )}
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-bold tabular-nums text-orange-600">
@@ -604,8 +587,8 @@ const EnrollmentHistoryModal = ({
                             history.reduce(
                               (sum, r) =>
                                 sum + (parseFloat(String(r.discount)) || 0),
-                              0
-                            )
+                              0,
+                            ),
                           )}
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-extrabold tabular-nums text-blue-700">
@@ -613,8 +596,8 @@ const EnrollmentHistoryModal = ({
                             history.reduce(
                               (sum, r) =>
                                 sum + (parseFloat(String(r.finalFee)) || 0),
-                              0
-                            )
+                              0,
+                            ),
                           )}
                         </td>
                         <td colSpan={5} className="text-center">
