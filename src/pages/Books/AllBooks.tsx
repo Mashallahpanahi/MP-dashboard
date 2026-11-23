@@ -1,59 +1,77 @@
 // src/pages/Books/AllBooks.tsx
 import { useEffect, useState } from "react";
 import {
-  getBooks,
-  deleteBook,
-  getBookById,
-  updateBook,
-  updateBookStatus,
+  useBooks,
+  useBookById,
+  useDeleteBook,
+  useUpdateBook,
+  useUpdateBookStatus,
+  type Book,
   type UpdateBookData,
 } from "@/api/bookApi";
-import type { Book } from "@/types/book";
 import BookUpdateModal from "@/components/books/BookUpdateModal";
 import BookDeleteModal from "@/components/books/BookDeleteModal";
 import BookDetailsModal from "@/components/books/BookDetailsModal";
 
 const AllBooks = () => {
+  // ✅ List hook (replaces getBooks + local list/loading/error state)
+  const {
+    data: fetchedBooks,
+    loading,
+    error: fetchError,
+    refetch,
+  } = useBooks();
+
+  // ✅ Mutation hooks
+  const { remove, loading: deleting } = useDeleteBook();
+  const { update } = useUpdateBook();
+  const { updateStatus } = useUpdateBookStatus();
+
+  // Local mirror (optimistic updates for status toggle)
   const [books, setBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  // Sync hook data → local mirror
+  useEffect(() => {
+    if (fetchedBooks) setBooks(fetchedBooks);
+  }, [fetchedBooks]);
+
+  // Combined error (local + fetch)
+  const error = localError || fetchError || "";
 
   // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Update state
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [bookToUpdate, setBookToUpdate] = useState<Book | null>(null);
-  const [updateLoading, setUpdateLoading] = useState(false);
+  // Update state — track ID, let the hook fetch fresh details
+  const [bookToUpdateId, setBookToUpdateId] = useState<string | null>(null);
+
+  const { data: fetchedBookToUpdate, loading: updateLoading } = useBookById(
+    bookToUpdateId ?? "",
+    !!bookToUpdateId,
+  );
+
+  // Prefer freshly-fetched book; fall back to the list copy while loading
+  const bookToUpdate: Book | null = bookToUpdateId
+    ? fetchedBookToUpdate?.id === bookToUpdateId
+      ? fetchedBookToUpdate
+      : (books.find((b) => b.id === bookToUpdateId) ?? null)
+    : null;
+
+  const showUpdateModal = !!bookToUpdateId && !!bookToUpdate;
 
   // Details state
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [bookToView, setBookToView] = useState<Book | null>(null);
 
-  // Status update state
+  // Status toggle per-row spinner
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
 
-  const fetchBooks = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getBooks();
-      setBooks(data);
-    } catch (error) {
-      console.error("Failed to fetch books:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to fetch books"
-      );
-    } finally {
-      setLoading(false);
-    }
+  // Refresh button
+  const handleRefresh = () => {
+    setLocalError("");
+    refetch();
   };
-
-  useEffect(() => {
-    fetchBooks();
-  }, []);
 
   // Status toggle handler
   const handleToggleStatus = async (book: Book) => {
@@ -64,27 +82,21 @@ const AllBooks = () => {
       return;
     }
 
-    try {
-      setStatusLoading(book.id);
-      
-      await updateBookStatus(book.id, { isActive: newStatus });
+    setStatusLoading(book.id);
+    const ok = await updateStatus(book.id, newStatus);
+    setStatusLoading(null);
 
-      // Update the book in the list
-      setBooks((prev) =>
-        prev.map((b) =>
-          b.id === book.id ? { ...b, isActive: newStatus } : b
-        )
-      );
-
-      alert(`Book ${action}d successfully!`);
-    } catch (error) {
-      console.error("Failed to update book status:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to update book status"
-      );
-    } finally {
-      setStatusLoading(null);
+    if (!ok) {
+      setLocalError(`Failed to ${action} book`);
+      return;
     }
+
+    // Optimistic local update
+    setBooks((prev) =>
+      prev.map((b) => (b.id === book.id ? { ...b, isActive: newStatus } : b)),
+    );
+
+    alert(`Book ${action}d successfully!`);
   };
 
   // Delete handlers
@@ -95,20 +107,17 @@ const AllBooks = () => {
 
   const handleConfirmDelete = async () => {
     if (!bookToDelete) return;
+    setLocalError("");
+    const ok = await remove(bookToDelete.id);
 
-    try {
-      setDeleteLoading(true);
-      await deleteBook(bookToDelete.id);
-      setBooks((prev) => prev.filter((book) => book.id !== bookToDelete.id));
+    if (ok) {
+      setBooks((prev) => prev.filter((b) => b.id !== bookToDelete.id));
       setShowDeleteModal(false);
       setBookToDelete(null);
-    } catch (error) {
-      console.error("Failed to delete book:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to delete book"
-      );
-    } finally {
-      setDeleteLoading(false);
+    } else {
+      setLocalError("Failed to delete book");
+      setShowDeleteModal(false);
+      setBookToDelete(null);
     }
   };
 
@@ -118,34 +127,23 @@ const AllBooks = () => {
   };
 
   // Update handlers
-  const handleUpdateClick = async (book: Book) => {
-    try {
-      setUpdateLoading(true);
-      const bookData = await getBookById(book.id);
-      setBookToUpdate(bookData);
-      setShowUpdateModal(true);
-    } catch (error) {
-      console.error("Failed to fetch book for update:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load book data"
-      );
-    } finally {
-      setUpdateLoading(false);
-    }
+  const handleUpdateClick = (book: Book) => {
+    // Modal opens instantly with list data; hook fetches fresh copy in background
+    setBookToUpdateId(book.id);
   };
 
   const handleUpdateBook = async (id: string, data: UpdateBookData) => {
-    const updatedBook = await updateBook(id, data);
-    setBooks((prev) =>
-      prev.map((book) =>
-        book.id === updatedBook.id ? updatedBook : book
-      )
-    );
+    const ok = await update(id, data);
+    if (!ok) {
+      // Throw to keep the modal open on failure
+      throw new Error("Failed to update book. Please try again.");
+    }
+    setBookToUpdateId(null);
+    await refetch();
   };
 
   const handleCloseUpdate = () => {
-    setShowUpdateModal(false);
-    setBookToUpdate(null);
+    setBookToUpdateId(null);
   };
 
   // Details handlers
@@ -159,25 +157,16 @@ const AllBooks = () => {
     setBookToView(null);
   };
 
-  // Helper function to format price - handles both string and number
+  // Helper: price
   const formatPrice = (price: number | string): string => {
-    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    const numPrice = typeof price === "string" ? parseFloat(price) : price;
     if (isNaN(numPrice)) {
-      return '$0.00';
+      return "$0.00";
     }
     return `$${numPrice.toFixed(2)}`;
   };
 
-  // Helper function to format date
-  const formatDate = (dateString: string): string => {
-    try {
-      return new Date(dateString).toLocaleString();
-    } catch {
-      return 'N/A';
-    }
-  };
-
-  if (loading) {
+  if (loading && books.length === 0) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
@@ -198,30 +187,49 @@ const AllBooks = () => {
             View and manage all books in the system
           </p>
         </div>
-        <button
-          onClick={() => window.location.href = "/books/add"}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
-          Add New Book
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+          <button
+            onClick={() => (window.location.href = "/books/add")}
+            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            Add New Book
+          </button>
+        </div>
       </div>
 
       {/* Error */}
       {error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-700">{error}</p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-medium text-red-700">{error}</p>
+            <button
+              onClick={handleRefresh}
+              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
       {/* Empty State */}
-      {books.length === 0 && (
+      {books.length === 0 && !loading && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">No Books Found</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            No Books Found
+          </h3>
           <p className="mt-2 text-sm text-gray-500">
             There are no books registered yet.
           </p>
           <button
-            onClick={() => window.location.href = "/books/add"}
+            onClick={() => (window.location.href = "/books/add")}
             className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             Add Your First Book
@@ -264,7 +272,7 @@ const AllBooks = () => {
                   <tr key={book.id} className="transition hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                        {book.code || 'N/A'}
+                        {book.code || "N/A"}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -281,12 +289,12 @@ const AllBooks = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700">
-                        {book.level || 'N/A'}
+                        {book.level || "N/A"}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                        {book.category || 'N/A'}
+                        {book.category || "N/A"}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -309,7 +317,7 @@ const AllBooks = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {/* View Details Button - NEW */}
+                        {/* View */}
                         <button
                           onClick={() => handleViewDetails(book)}
                           className="inline-flex items-center rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
@@ -433,7 +441,7 @@ const AllBooks = () => {
 
                         <button
                           onClick={() => handleDeleteClick(book)}
-                          disabled={deleteLoading}
+                          disabled={deleting}
                           className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <svg
@@ -468,7 +476,7 @@ const AllBooks = () => {
         book={bookToDelete}
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
-        isLoading={deleteLoading}
+        isLoading={deleting}
       />
 
       {/* Update Modal */}

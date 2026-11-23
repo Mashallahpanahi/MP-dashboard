@@ -1,13 +1,35 @@
 // src/pages/Books/AddBook.tsx
 import { FormEvent, useState } from "react";
-import { createBook, type CreateBookData } from "@/api/bookApi";
+import { useCreateBook, type CreateBookData } from "@/api/bookApi";
 import { useNavigate } from "react-router-dom";
+
+// ✅ Preserves the original friendly-error mapping for Prisma constraints
+const mapDuplicateError = (msg: string): string => {
+  if (!msg) return msg;
+  if (msg.includes("duplicate key") || msg.includes("UQ_")) {
+    if (msg.includes("code")) {
+      return "This book code is already taken. Please use a different code.";
+    }
+    if (msg.includes("isbn")) {
+      return "This ISBN is already registered. Please use a different ISBN.";
+    }
+    return "A book with this information already exists. Please check your inputs.";
+  }
+  return msg;
+};
 
 const AddBook = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
+  // ✅ Hook replaces createBook + local loading/error state
+  const { create: createBook, loading, error: hookError } = useCreateBook();
+
+  // Local UI state
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Combined error: local validation first, then hook error (with mapping)
+  const error = localError || mapDuplicateError(hookError || "");
 
   const [formData, setFormData] = useState<Partial<CreateBookData>>({
     code: "",
@@ -30,129 +52,103 @@ const AddBook = () => {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
     setFormData((prev) => ({
       ...prev,
       [name]:
-        type === "number" || 
-        name === "bookPrice" || 
-        name === "durationWeeks" || 
+        type === "number" ||
+        name === "bookPrice" ||
+        name === "durationWeeks" ||
         name === "totalLessons" ||
-        name === "totalHours" || 
+        name === "totalHours" ||
         name === "passingScore" ||
         name === "levelOrder"
-          ? value === "" ? 0 : parseFloat(value)
+          ? value === ""
+            ? 0
+            : parseFloat(value)
           : value,
     }));
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLocalError("");
     setSuccess("");
 
-    try {
-      // Prepare submit data
-      const submitData: Partial<CreateBookData> = {};
-      
-      // Validate required fields
-      if (!formData.name || formData.name.trim() === "") {
-        setError("Book name is required");
-        setLoading(false);
-        return;
-      }
-      
-      if (!formData.levelOrder || formData.levelOrder <= 0) {
-        setError("Level order is required and must be greater than 0");
-        setLoading(false);
-        return;
-      }
-      
-      if (!formData.durationWeeks || formData.durationWeeks <= 0) {
-        setError("Duration weeks is required and must be greater than 0");
-        setLoading(false);
-        return;
-      }
-      
-      if (!formData.passingScore || formData.passingScore <= 0) {
-        setError("Passing score is required and must be greater than 0");
-        setLoading(false);
-        return;
-      }
-
-      // Build submit data - only include fields that have values
-      const fields = [
-        'name',
-        'levelOrder', 
-        'durationWeeks',
-        'passingScore',
-        'code',
-        'description',
-        'level',
-        'category',
-        'author',
-        'publisher',
-        'isbn',
-        'bookPrice',
-        'totalLessons',
-        'totalHours',
-        'isActive'
-      ];
-
-      fields.forEach((key) => {
-        const value = formData[key as keyof CreateBookData];
-        if (value !== undefined && value !== null && value !== "") {
-          submitData[key as keyof CreateBookData] = value;
-        }
-      });
-
-      // Make sure required fields are included
-      if (formData.levelOrder !== undefined) {
-        submitData.levelOrder = Number(formData.levelOrder);
-      }
-      if (formData.durationWeeks !== undefined) {
-        submitData.durationWeeks = Number(formData.durationWeeks);
-      }
-      if (formData.passingScore !== undefined) {
-        submitData.passingScore = Number(formData.passingScore);
-      }
-
-      // If code is empty string, don't send it
-      if (submitData.code === "") {
-        delete submitData.code;
-      }
-
-      // If isbn is empty string, don't send it
-      if (submitData.isbn === "") {
-        delete submitData.isbn;
-      }
-
-      await createBook(submitData as CreateBookData);
-      setSuccess("Book created successfully!");
-      setTimeout(() => {
-        navigate("/books/all");
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to create book:", error);
-      const errorMsg = error instanceof Error ? error.message : "Failed to create book";
-      if (errorMsg.includes("duplicate key") || errorMsg.includes("UQ_")) {
-        if (errorMsg.includes("code")) {
-          setError("This book code is already taken. Please use a different code.");
-        } else if (errorMsg.includes("isbn")) {
-          setError("This ISBN is already registered. Please use a different ISBN.");
-        } else {
-          setError("A book with this information already exists. Please check your inputs.");
-        }
-      } else {
-        setError(errorMsg);
-      }
-    } finally {
-      setLoading(false);
+    // Validate required fields
+    if (!formData.name || formData.name.trim() === "") {
+      setLocalError("Book name is required");
+      return;
     }
+
+    if (!formData.levelOrder || formData.levelOrder <= 0) {
+      setLocalError("Level order is required and must be greater than 0");
+      return;
+    }
+
+    if (!formData.durationWeeks || formData.durationWeeks <= 0) {
+      setLocalError("Duration weeks is required and must be greater than 0");
+      return;
+    }
+
+    if (!formData.passingScore || formData.passingScore <= 0) {
+      setLocalError("Passing score is required and must be greater than 0");
+      return;
+    }
+
+    // Build submit data — only include fields that have values
+    const submitData: Partial<CreateBookData> = {};
+
+    const fields = [
+      "name",
+      "levelOrder",
+      "durationWeeks",
+      "passingScore",
+      "code",
+      "description",
+      "level",
+      "category",
+      "author",
+      "publisher",
+      "isbn",
+      "bookPrice",
+      "totalLessons",
+      "totalHours",
+      "isActive",
+    ];
+
+    fields.forEach((key) => {
+      const value = formData[key as keyof CreateBookData];
+      if (value !== undefined && value !== null && value !== "") {
+        submitData[key as keyof CreateBookData] = value;
+      }
+    });
+
+    // Make sure required numeric fields are numbers
+    if (formData.levelOrder !== undefined) {
+      submitData.levelOrder = Number(formData.levelOrder);
+    }
+    if (formData.durationWeeks !== undefined) {
+      submitData.durationWeeks = Number(formData.durationWeeks);
+    }
+    if (formData.passingScore !== undefined) {
+      submitData.passingScore = Number(formData.passingScore);
+    }
+
+    // Empty strings for unique fields should be omitted
+    if (submitData.code === "") delete submitData.code;
+    if (submitData.isbn === "") delete submitData.isbn;
+
+    const ok = await createBook(submitData as CreateBookData);
+    if (!ok) return; // error surfaces via `error`
+
+    setSuccess("Book created successfully!");
+    setTimeout(() => {
+      navigate("/books/all");
+    }, 1500);
   };
 
   // Level options for datalist
@@ -162,7 +158,7 @@ const AddBook = () => {
     "B1 - Intermediate",
     "B2 - Upper Intermediate",
     "C1 - Advanced",
-    "C2 - Proficiency"
+    "C2 - Proficiency",
   ];
 
   return (
@@ -172,7 +168,8 @@ const AddBook = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Add New Book</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Add a new book to the system <span className="text-red-500">*</span> indicates required field
+            Add a new book to the system <span className="text-red-500">*</span>{" "}
+            indicates required field
           </p>
         </div>
 
@@ -198,7 +195,8 @@ const AddBook = () => {
           {/* ===== REQUIRED FIELDS SECTION ===== */}
           <div className="mb-8">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Required Information <span className="text-sm font-normal text-red-500">*</span>
+              Required Information{" "}
+              <span className="text-sm font-normal text-red-500">*</span>
             </h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* Name - Required */}
@@ -365,7 +363,7 @@ const AddBook = () => {
                 </select>
               </div>
 
-              {/* Level - Optional with Datalist (Type + Select) */}
+              {/* Level - Optional with Datalist */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Level
@@ -447,7 +445,9 @@ const AddBook = () => {
                   type="number"
                   min="0"
                   step="1"
-                  value={formData.totalLessons === 0 ? "" : formData.totalLessons}
+                  value={
+                    formData.totalLessons === 0 ? "" : formData.totalLessons
+                  }
                   onChange={handleChange}
                   placeholder="24"
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -504,7 +504,9 @@ const AddBook = () => {
               <input
                 type="checkbox"
                 name="isActive"
-                checked={formData.isActive !== undefined ? formData.isActive : true}
+                checked={
+                  formData.isActive !== undefined ? formData.isActive : true
+                }
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
