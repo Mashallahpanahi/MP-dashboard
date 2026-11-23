@@ -186,7 +186,7 @@ function useRawMutation<T>() {
   const send = async (
     method: "post" | "patch" | "delete",
     url: string,
-    body?: Record<string, unknown>,
+    body?: object,
   ): Promise<boolean> => {
     setLoading(true);
     setError(null);
@@ -196,7 +196,10 @@ function useRawMutation<T>() {
       const res = await axios.request<T>({
         method,
         url,
-        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+        headers:
+          body !== undefined
+            ? { "Content-Type": "application/json" }
+            : undefined,
         data: body,
       });
       setData(res.data);
@@ -245,7 +248,8 @@ export const useStudentEnrollments = () =>
 
 /** POST /student-payments */
 export const useCreateStudentPayment = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentPayment>();
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentPayment>();
   const createStudentPayment = (payment: CreateStudentPaymentData) =>
     send("post", PAYMENTS_URL, payment);
   return { createData: data, message, loading, error, createStudentPayment };
@@ -253,9 +257,12 @@ export const useCreateStudentPayment = () => {
 
 /** PATCH /student-payments/:id */
 export const useUpdateStudentPayment = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentPayment>();
-  const updateStudentPayment = (id: string, payment: UpdateStudentPaymentData) =>
-    send("patch", `${PAYMENTS_URL}/${id}`, payment);
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentPayment>();
+  const updateStudentPayment = (
+    id: string,
+    payment: UpdateStudentPaymentData,
+  ) => send("patch", `${PAYMENTS_URL}/${id}`, payment);
   return { updateData: data, message, loading, error, updateStudentPayment };
 };
 

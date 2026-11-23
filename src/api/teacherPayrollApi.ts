@@ -130,7 +130,7 @@ const extractErrMessage = (err: any, fallback: string): string => {
 };
 
 // Mirrors: Array.isArray(result) ? result : (result.data || [])
-const asArray = <T>(r: any): T[] => (Array.isArray(r) ? r : r?.data ?? []);
+const asArray = <T>(r: any): T[] => (Array.isArray(r) ? r : (r?.data ?? []));
 
 // Mirrors: result.data || result
 const asSingle = <T>(r: any): T => (r?.data ?? r) as T;
@@ -184,7 +184,7 @@ function useRawMutation<T>() {
   const send = async (
     method: "post" | "patch" | "delete",
     url: string,
-    body?: Record<string, unknown>,
+    body?: object,
     opts: { select?: (raw: any) => T } = {},
   ): Promise<boolean> => {
     setLoading(true);
@@ -195,7 +195,10 @@ function useRawMutation<T>() {
       const res = await axios.request({
         method,
         url,
-        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+        headers:
+          body !== undefined
+            ? { "Content-Type": "application/json" }
+            : undefined,
         data: body,
       });
       setData(opts.select ? opts.select(res.data) : (res.data as T));
@@ -226,11 +229,7 @@ export const useUnpaidSalaries = () =>
 
 /** GET /teacher-payroll */
 export const useTeacherPayrolls = () =>
-  useRawQuery<TeacherPayroll[]>(
-    PAYROLL_URL,
-    true,
-    asArray<TeacherPayroll>,
-  );
+  useRawQuery<TeacherPayroll[]>(PAYROLL_URL, true, asArray<TeacherPayroll>);
 
 /** GET /teacher-payroll/summary */
 export const useTeacherPayrollSummary = () =>
@@ -265,8 +264,7 @@ export const usePayrollsByStatus = (status: string, enabled = true) =>
   );
 
 /** GET /teachers — for dropdown selection */
-export const useTeachers = () =>
-  useRawQuery<Teacher[]>(TEACHERS_URL); // raw array, no select needed
+export const useTeachers = () => useRawQuery<Teacher[]>(TEACHERS_URL); // raw array, no select needed
 
 /* ================================================================== */
 /* Mutation hooks                                                     */
@@ -274,7 +272,8 @@ export const useTeachers = () =>
 
 /** POST /teacher-payroll */
 export const useCreateTeacherPayroll = () => {
-  const { data, message, loading, error, send } = useRawMutation<TeacherPayroll>();
+  const { data, message, loading, error, send } =
+    useRawMutation<TeacherPayroll>();
   const createTeacherPayroll = (payload: CreateTeacherPayrollData) =>
     send("post", PAYROLL_URL, payload, { select: asSingle<TeacherPayroll> });
   return { createData: data, message, loading, error, createTeacherPayroll };
@@ -282,15 +281,22 @@ export const useCreateTeacherPayroll = () => {
 
 /** PATCH /teacher-payroll/:id */
 export const useUpdateTeacherPayroll = () => {
-  const { data, message, loading, error, send } = useRawMutation<TeacherPayroll>();
-  const updateTeacherPayroll = (id: string, payload: UpdateTeacherPayrollData) =>
-    send("patch", `${PAYROLL_URL}/${id}`, payload, { select: asSingle<TeacherPayroll> });
+  const { data, message, loading, error, send } =
+    useRawMutation<TeacherPayroll>();
+  const updateTeacherPayroll = (
+    id: string,
+    payload: UpdateTeacherPayrollData,
+  ) =>
+    send("patch", `${PAYROLL_URL}/${id}`, payload, {
+      select: asSingle<TeacherPayroll>,
+    });
   return { updateData: data, message, loading, error, updateTeacherPayroll };
 };
 
 /** PATCH /teacher-payroll/:id/add-payment */
 export const useAddPaymentToPayroll = () => {
-  const { data, message, loading, error, send } = useRawMutation<TeacherPayroll>();
+  const { data, message, loading, error, send } =
+    useRawMutation<TeacherPayroll>();
   const addPaymentToPayroll = (id: string, payload: AddPaymentData) =>
     send("patch", `${PAYROLL_URL}/${id}/add-payment`, payload, {
       select: asSingle<TeacherPayroll>,

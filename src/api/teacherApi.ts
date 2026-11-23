@@ -47,7 +47,7 @@ export interface CreateTeacherData {
   lastName: string;
   gender: string;
   phone: string;
-  email?: string;   // optional (per types/teacher.ts)
+  email?: string; // optional (per types/teacher.ts)
   address?: string; // optional (per types/teacher.ts)
   salaryType: string;
   salaryAmount: number;
@@ -115,7 +115,7 @@ function useRawMutation<T>() {
   const send = async (
     method: "post" | "patch" | "delete",
     url: string,
-    body?: Record<string, unknown>,
+    body?: object,
     opts: { customErrorMap?: (m: string) => string } = {},
   ): Promise<boolean> => {
     setLoading(true);
@@ -126,7 +126,10 @@ function useRawMutation<T>() {
       const res = await axios.request<T>({
         method,
         url,
-        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+        headers:
+          body !== undefined
+            ? { "Content-Type": "application/json" }
+            : undefined,
         data: body,
       });
       setData(res.data);
@@ -148,7 +151,10 @@ function useRawMutation<T>() {
 /* Shared error mapper — preserves the old Prisma-constraint logic   */
 /* ================================================================== */
 
-const mapTeacherConstraintError = (msg: string, verb: "registered" | "registeredByAnother"): string => {
+const mapTeacherConstraintError = (
+  msg: string,
+  verb: "registered" | "registeredByAnother",
+): string => {
   const lower = msg.toLowerCase();
   const isPhone =
     msg.includes("UQ_9c5ae9e15a042292bb8d83ca34c") ||
@@ -167,7 +173,10 @@ const mapTeacherConstraintError = (msg: string, verb: "registered" | "registered
       ? "This email address is already registered. Please use a different email address."
       : "This email address is already registered by another teacher. Please use a different email address.";
   }
-  if (lower.includes("duplicate key") && (lower.includes("phone") || lower.includes("email"))) {
+  if (
+    lower.includes("duplicate key") &&
+    (lower.includes("phone") || lower.includes("email"))
+  ) {
     return "The phone number or email address is already registered. Please use unique values.";
   }
   return msg;
@@ -210,7 +219,8 @@ export const useUpdateTeacher = () => {
 
   const updateTeacher = (id: string, teacher: Partial<CreateTeacherData>) =>
     send("patch", `${TEACHERS_URL}/${id}`, teacher, {
-      customErrorMap: (m) => mapTeacherConstraintError(m, "registeredByAnother"),
+      customErrorMap: (m) =>
+        mapTeacherConstraintError(m, "registeredByAnother"),
     });
 
   return { updateData: data, message, loading, error, updateTeacher };

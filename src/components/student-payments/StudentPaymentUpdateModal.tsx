@@ -111,17 +111,17 @@ const StudentPaymentUpdateModal = ({
         if (key === "studentEnrollmentId") {
           // Compare nested object IDs
           if (currentValue !== payment.studentEnrollment.id) {
-            changedData[key] = currentValue;
+            (changedData as Record<string, unknown>)[key] = currentValue;
           }
         } else if (
           typeof currentValue === "number" &&
           typeof originalValue === "number"
         ) {
           if (currentValue !== originalValue) {
-            changedData[key] = currentValue;
+            (changedData as Record<string, unknown>)[key] = currentValue;
           }
         } else if (currentValue !== originalValue) {
-          changedData[key] = currentValue;
+          (changedData as Record<string, unknown>)[key] = currentValue;
         }
       });
 

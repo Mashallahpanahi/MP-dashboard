@@ -221,7 +221,12 @@ export interface BulkUpdateScoresResponse {
 
 export interface FilteredStudentEnrollment {
   id: string;
-  teacher: { id: string; firstName: string; lastName: string; salaryType: string };
+  teacher: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    salaryType: string;
+  };
   book: { id: string; name: string; levelOrder: number; bookPrice: string };
   classId: string;
   time: string;
@@ -279,7 +284,12 @@ export interface PaginatedStudentsResponse {
   success: boolean;
   message: string;
   data: Student[];
-  pagination: { page: number; limit: number; total: number; totalPages: number };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface UnenrolledStudentsResponse {
@@ -354,7 +364,7 @@ function useRawMutation<T>() {
   const send = async (
     method: "post" | "patch" | "delete",
     url: string,
-    body?: FormData | Record<string, unknown>,
+    body?: FormData | object,
     opts: { auth?: boolean; customErrorMap?: (m: string) => string } = {},
   ): Promise<boolean> => {
     setLoading(true);
@@ -384,7 +394,8 @@ function useRawMutation<T>() {
       // Some endpoints return 200 with success:false (e.g. bulk-update).
       const obj = res.data as any;
       if (obj && obj.success === false) {
-        const rawMsg = typeof obj.message === "string" ? obj.message : "Request failed";
+        const rawMsg =
+          typeof obj.message === "string" ? obj.message : "Request failed";
         setError(opts.customErrorMap ? opts.customErrorMap(rawMsg) : rawMsg);
         return false;
       }
@@ -418,7 +429,10 @@ export const useStudents = () => useRawQuery<Student[]>(`${API_URL}/students`);
 
 /** GET /students/:id */
 export const useStudentById = (id: string, enabled = true) =>
-  useRawQuery<Student>(id ? `${API_URL}/students/${id}` : null, enabled && !!id);
+  useRawQuery<Student>(
+    id ? `${API_URL}/students/${id}` : null,
+    enabled && !!id,
+  );
 
 /** GET /students/search?q=... */
 export const useSearchStudents = (query: string, enabled = true) =>
@@ -443,7 +457,12 @@ export const useLevelUpInfo = (studentId: string, enabled = true) =>
 
 /** GET /filter-search-student/paginated */
 export const usePaginatedStudents = (
-  params: { page?: number; limit?: number; fromDate?: string; toDate?: string } = {},
+  params: {
+    page?: number;
+    limit?: number;
+    fromDate?: string;
+    toDate?: string;
+  } = {},
   enabled = true,
 ) => {
   const q = new URLSearchParams();
@@ -482,7 +501,10 @@ export const useSearchStudentsByName = (name: string, enabled = true) =>
   );
 
 /** GET /filter-search-student/search/student-number */
-export const useSearchStudentByNumber = (studentNumber: string, enabled = true) =>
+export const useSearchStudentByNumber = (
+  studentNumber: string,
+  enabled = true,
+) =>
   useRawQuery<UnenrolledStudentsResponse>(
     studentNumber
       ? `${API_URL}/filter-search-student/search/student-number?studentNumber=${encodeURIComponent(studentNumber)}`
@@ -582,7 +604,8 @@ export const useDeleteStudent = () => {
 
 /** POST /students/enroll */
 export const useEnrollStudent = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentEnrollment>();
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
   const enrollStudent = (enrollment: CreateEnrollmentData) =>
     send("post", `${API_URL}/students/enroll`, enrollment, {
       customErrorMap: (m) =>
@@ -595,31 +618,46 @@ export const useEnrollStudent = () => {
 
 /** PATCH /students/enrollments/:enrollmentId */
 export const useUpdateEnrollment = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentEnrollment>();
-  const updateEnrollment = (enrollmentId: string, enrollment: UpdateEnrollmentData) =>
-    send("patch", `${API_URL}/students/enrollments/${enrollmentId}`, enrollment);
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+  const updateEnrollment = (
+    enrollmentId: string,
+    enrollment: UpdateEnrollmentData,
+  ) =>
+    send(
+      "patch",
+      `${API_URL}/students/enrollments/${enrollmentId}`,
+      enrollment,
+    );
   return { updateData: data, message, loading, error, updateEnrollment };
 };
 
 /** POST /students/level-up */
 export const useLevelUpStudent = () => {
-  const { data, message, loading, error, send } = useRawMutation<LevelUpResponse>();
+  const { data, message, loading, error, send } =
+    useRawMutation<LevelUpResponse>();
   const levelUpStudent = (studentId: string) =>
-    send("post", `${API_URL}/students/level-up`, { studentId }, {
-      customErrorMap: (m) => {
-        if (m.includes("not eligible"))
-          return "Student is not eligible for level up. Please check prerequisites.";
-        if (m.includes("no next book"))
-          return "No next book available for level up.";
-        return m;
+    send(
+      "post",
+      `${API_URL}/students/level-up`,
+      { studentId },
+      {
+        customErrorMap: (m) => {
+          if (m.includes("not eligible"))
+            return "Student is not eligible for level up. Please check prerequisites.";
+          if (m.includes("no next book"))
+            return "No next book available for level up.";
+          return m;
+        },
       },
-    });
+    );
   return { levelUpData: data, message, loading, error, levelUpStudent };
 };
 
 /** POST /add-students-scores/bulk-update */
 export const useBulkUpdateStudentScores = () => {
-  const { data, message, loading, error, send } = useRawMutation<BulkUpdateScoresResponse>();
+  const { data, message, loading, error, send } =
+    useRawMutation<BulkUpdateScoresResponse>();
   const bulkUpdate = (scores: BulkScoreItem[]) =>
     send("post", `${API_URL}/add-students-scores/bulk-update`, { scores });
   return { bulkUpdateData: data, message, loading, error, bulkUpdate };

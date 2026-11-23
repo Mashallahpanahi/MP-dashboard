@@ -263,7 +263,7 @@ function useRawMutation<T>() {
   const send = async (
     method: "post" | "patch" | "delete",
     url: string,
-    body?: Record<string, unknown>,
+    body?: object,
     opts: { customErrorMap?: (m: string) => string } = {},
   ): Promise<boolean> => {
     setLoading(true);
@@ -274,7 +274,10 @@ function useRawMutation<T>() {
       const res = await axios.request<T>({
         method,
         url,
-        headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+        headers:
+          body !== undefined
+            ? { "Content-Type": "application/json" }
+            : undefined,
         data: body,
       });
       setData(res.data);
@@ -308,7 +311,10 @@ export const useEnrollments = () => useRawQuery<StudentEnrollment[]>(BASE_URL);
 
 /** GET /student-enrollment-payment/:id */
 export const useEnrollmentById = (id: string, enabled = true) =>
-  useRawQuery<StudentEnrollment>(id ? `${BASE_URL}/${id}` : null, enabled && !!id);
+  useRawQuery<StudentEnrollment>(
+    id ? `${BASE_URL}/${id}` : null,
+    enabled && !!id,
+  );
 
 /** GET /student-enrollment-payment/student/:studentId */
 export const useEnrollmentsByStudent = (studentId: string, enabled = true) =>
@@ -319,7 +325,10 @@ export const useEnrollmentsByStudent = (studentId: string, enabled = true) =>
 
 /** GET /student-enrollment-payment/:id/score */
 export const useScoreByEnrollment = (id: string, enabled = true) =>
-  useRawQuery<ScoreData>(id ? `${BASE_URL}/${id}/score` : null, enabled && !!id);
+  useRawQuery<ScoreData>(
+    id ? `${BASE_URL}/${id}/score` : null,
+    enabled && !!id,
+  );
 
 /** GET /student-enrollment-payment/scores/student/:studentId */
 export const useScoresByStudent = (studentId: string, enabled = true) =>
@@ -334,9 +343,12 @@ export const useScoresByStudent = (studentId: string, enabled = true) =>
 
 /** POST /student-enrollment-payment */
 export const useCreateEnrollmentWithPayment = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentEnrollment>();
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
 
-  const createEnrollmentWithPayment = (payload: CreateEnrollmentWithPaymentData) =>
+  const createEnrollmentWithPayment = (
+    payload: CreateEnrollmentWithPaymentData,
+  ) =>
     send("post", BASE_URL, payload, {
       customErrorMap: (m) =>
         m.includes("already enrolled")
@@ -344,7 +356,13 @@ export const useCreateEnrollmentWithPayment = () => {
           : m,
     });
 
-  return { createData: data, message, loading, error, createEnrollmentWithPayment };
+  return {
+    createData: data,
+    message,
+    loading,
+    error,
+    createEnrollmentWithPayment,
+  };
 };
 
 /** DELETE /student-enrollment-payment/:id */
@@ -356,7 +374,8 @@ export const useDeleteEnrollment = () => {
 
 /** PATCH /student-enrollment-payment/:id/enrollment */
 export const useUpdateEnrollmentOnly = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentEnrollment>();
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
   const updateEnrollmentOnly = (id: string, payload: UpdateEnrollmentData) =>
     send("patch", `${BASE_URL}/${id}/enrollment`, payload);
   return { updateData: data, message, loading, error, updateEnrollmentOnly };
@@ -364,7 +383,8 @@ export const useUpdateEnrollmentOnly = () => {
 
 /** PATCH /student-enrollment-payment/:id/payment */
 export const useUpdatePaymentOnly = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentEnrollment>();
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
   const updatePaymentOnly = (id: string, payload: UpdatePaymentData) =>
     send("patch", `${BASE_URL}/${id}/payment`, payload);
   return { updateData: data, message, loading, error, updatePaymentOnly };
@@ -372,7 +392,8 @@ export const useUpdatePaymentOnly = () => {
 
 /** PATCH /student-enrollment-payment/:id/score */
 export const useUpdateScoreOnly = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentEnrollment>();
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
   const updateScoreOnly = (id: string, payload: UpdateScoreData) =>
     send("patch", `${BASE_URL}/${id}/score`, payload);
   return { updateData: data, message, loading, error, updateScoreOnly };
@@ -380,7 +401,8 @@ export const useUpdateScoreOnly = () => {
 
 /** PATCH /student-enrollment-payment/:id/both */
 export const useUpdateBoth = () => {
-  const { data, message, loading, error, send } = useRawMutation<StudentEnrollment>();
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
   const updateBoth = (id: string, payload: UpdateBothData) =>
     send("patch", `${BASE_URL}/${id}/both`, payload);
   return { updateData: data, message, loading, error, updateBoth };
