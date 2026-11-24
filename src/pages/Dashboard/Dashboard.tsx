@@ -459,10 +459,6 @@ const Dashboard = () => {
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
       {/* TOP BAR */}
       <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
-          Welcome Back <span className="inline-block">👋</span>
-        </h1>
-
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5">
             <label className="text-xs font-medium text-gray-500">From:</label>
@@ -541,10 +537,6 @@ const Dashboard = () => {
               />
             </svg>
           </button>
-
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-semibold text-white shadow-sm">
-            JA
-          </div>
         </div>
       </div>
 
