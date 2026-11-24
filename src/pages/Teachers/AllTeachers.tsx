@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   useActiveTeachers,
+  useTeachers, // ✅ Added for "All Teachers" route
   useTeacherById,
   useDeleteTeacher,
   useUpdateTeacher,
@@ -11,17 +12,34 @@ import {
 } from "@/api/teacherApi";
 import TeacherUpdateModal from "@/components/teachers/TeacherUpdateModal";
 import TeacherDeleteModal from "@/components/teachers/TeacherDeleteModal";
-// ✅ Shamsi formatter
-import { formatShamsi } from "@/utils/dateConverter";
+// ✅ New view modal
+import TeacherViewMoreModal from "@/components/teachers/TeacherViewMoreModal";
 
 const AllTeachers = () => {
-  // ✅ Hook for the list (replaces getActiveTeachers + local loading/error)
+  // ✅ Toggle state: false = active only, true = all teachers
+  const [showAll, setShowAll] = useState(false);
+
+  // ✅ Hook for the active list
   const {
-    data: fetchedTeachers,
-    loading,
-    error: fetchError,
-    refetch,
+    data: fetchedActiveTeachers,
+    loading: loadingActive,
+    error: errorActive,
+    refetch: refetchActive,
   } = useActiveTeachers();
+
+  // ✅ Hook for the all list
+  const {
+    data: fetchedAllTeachers,
+    loading: loadingAll,
+    error: errorAll,
+    refetch: refetchAll,
+  } = useTeachers();
+
+  // Combine based on toggle
+  const fetchedTeachers = showAll ? fetchedAllTeachers : fetchedActiveTeachers;
+  const loading = showAll ? loadingAll : loadingActive;
+  const fetchError = showAll ? errorAll : errorActive;
+  const refetch = showAll ? refetchAll : refetchActive;
 
   // ✅ Mutation hooks
   const { remove, loading: deleting } = useDeleteTeacher();
@@ -36,7 +54,11 @@ const AllTeachers = () => {
   useEffect(() => {
     if (fetchedTeachers) setTeachers(fetchedTeachers);
   }, [fetchedTeachers]);
-
+  //  Refetch whenever the toggle changes so the newly selected list is fresh
+  useEffect(() => {
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAll]);
   // Combined error (local mutations + hook fetch)
   const error = localError || fetchError || "";
 
@@ -44,17 +66,19 @@ const AllTeachers = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
 
+  // View state
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [teacherToView, setTeacherToView] = useState<Teacher | null>(null);
+
   // Update state
-  // We keep the *ID* of the teacher being edited — the hook fetches fresh
-  // details, but we fall back to the list copy while the request is in flight.
   const [teacherToUpdateId, setTeacherToUpdateId] = useState<string | null>(
     null,
   );
 
-  const {
-    data: fetchedTeacherToUpdate,
-    // loading is intentionally ignored — we have list data to fall back on
-  } = useTeacherById(teacherToUpdateId ?? "", !!teacherToUpdateId);
+  const { data: fetchedTeacherToUpdate } = useTeacherById(
+    teacherToUpdateId ?? "",
+    !!teacherToUpdateId,
+  );
 
   // Prefer the freshly-fetched teacher; fall back to the list copy
   const teacherToUpdate: Teacher | null = teacherToUpdateId
@@ -63,13 +87,12 @@ const AllTeachers = () => {
       : (teachers.find((t) => t.id === teacherToUpdateId) ?? null)
     : null;
 
-  // Show the modal whenever a teacher is selected
   const showUpdateModal = !!teacherToUpdate;
 
   // Track which teacher is mid status-toggle (per-row spinner)
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
 
-  // Refresh (same effect as the old fetchTeachers button)
+  // Refresh
   const handleRefresh = () => {
     setLocalError("");
     refetch();
@@ -97,8 +120,9 @@ const AllTeachers = () => {
         return;
       }
 
-      // Optimistic local update (same as before)
-      if (!newStatus) {
+      // Optimistic local update
+      // Only remove from list if we are on the "Active" tab and deactivating
+      if (!newStatus && !showAll) {
         setTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
       } else {
         setTeachers((prev) =>
@@ -141,10 +165,19 @@ const AllTeachers = () => {
     setTeacherToDelete(null);
   };
 
+  // View handlers
+  const handleViewClick = (teacher: Teacher) => {
+    setTeacherToView(teacher);
+    setShowViewModal(true);
+  };
+
+  const handleCloseView = () => {
+    setShowViewModal(false);
+    setTeacherToView(null);
+  };
+
   // Update handlers
   const handleUpdateClick = (teacher: Teacher) => {
-    // Modal opens immediately using list data; the hook fetches fresh
-    // data in the background and the modal updates when it arrives.
     setTeacherToUpdateId(teacher.id);
   };
 
@@ -154,10 +187,8 @@ const AllTeachers = () => {
   ) => {
     const ok = await updateTeacher(id, data);
     if (!ok) {
-      // Throwing preserves the modal's "stay open on failure" behaviour
       throw new Error("Failed to update teacher. Please try again.");
     }
-    // Close the modal + refresh the list
     setTeacherToUpdateId(null);
     await refetch();
   };
@@ -172,20 +203,45 @@ const AllTeachers = () => {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">All Teachers</h1>
-
-          <p className="mt-1 text-sm text-gray-500">
-            View and manage all active teachers
-          </p>
+          <p className="mt-1 text-sm text-gray-500">View and manage teachers</p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={loading}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? "Loading..." : "Refresh"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* ✅ Toggle Button Group */}
+          <div className="flex overflow-hidden rounded-lg border border-gray-300 bg-white">
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className={`px-4 py-2.5 text-sm font-medium transition ${
+                showAll
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              All Teachers
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAll(false)}
+              className={`border-l border-gray-300 px-4 py-2.5 text-sm font-medium transition ${
+                !showAll
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Active Teachers
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {/* Error */}
@@ -196,10 +252,8 @@ const AllTeachers = () => {
               <h3 className="font-semibold text-red-800">
                 Failed to load teachers
               </h3>
-
               <p className="mt-1 text-sm text-red-600">{error}</p>
             </div>
-
             <button
               type="button"
               onClick={handleRefresh}
@@ -215,7 +269,6 @@ const AllTeachers = () => {
       {loading && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
-
           <p className="mt-4 text-sm text-gray-500">Loading teachers...</p>
         </div>
       )}
@@ -224,12 +277,12 @@ const AllTeachers = () => {
       {!loading && !error && teachers.length === 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900">
-            No Active Teachers Found
+            {showAll ? "No Teachers Found" : "No Active Teachers Found"}
           </h3>
-
           <p className="mt-2 text-sm text-gray-500">
-            There are no active teachers currently. Register a new teacher or
-            activate an existing one.
+            {showAll
+              ? "There are no teachers registered yet."
+              : "There are no active teachers currently. Register a new teacher or activate an existing one."}
           </p>
         </div>
       )}
@@ -250,16 +303,10 @@ const AllTeachers = () => {
                       Contact
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Gender
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                       Salary
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                       Fee
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Hire Date
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                       Status
@@ -283,14 +330,9 @@ const AllTeachers = () => {
                             {teacher.firstName.charAt(0)}
                             {teacher.lastName.charAt(0)}
                           </div>
-
                           <div>
                             <p className="font-semibold text-gray-900">
                               {teacher.firstName} {teacher.lastName}
-                            </p>
-
-                            <p className="mt-1 text-xs text-gray-500">
-                              ID: {teacher.id.slice(0, 8)}...
                             </p>
                           </div>
                         </div>
@@ -299,17 +341,9 @@ const AllTeachers = () => {
                       {/* Contact */}
                       <td className="px-6 py-4">
                         <p className="text-sm text-gray-900">{teacher.phone}</p>
-
                         <p className="mt-1 text-xs text-gray-500">
                           {teacher.email || "No email"}
                         </p>
-                      </td>
-
-                      {/* Gender */}
-                      <td className="px-6 py-4">
-                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                          {teacher.gender}
-                        </span>
                       </td>
 
                       {/* Salary */}
@@ -319,7 +353,6 @@ const AllTeachers = () => {
                             ? teacher.salaryAmount.toLocaleString()
                             : teacher.feePercentage + "%"}
                         </p>
-
                         <p className="mt-1 text-xs text-gray-500">
                           {teacher.salaryType}
                         </p>
@@ -332,22 +365,54 @@ const AllTeachers = () => {
                         </span>
                       </td>
 
-                      {/* ✅ Hire Date — Shamsi */}
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
-                        {formatShamsi(teacher.hireDate, "YYYY/MM/DD")}
-                      </td>
-
                       {/* Status */}
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                          <span className="mr-2 h-2 w-2 rounded-full bg-green-500" />
-                          Active
-                        </span>
+                        {teacher.isActive ? (
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                            <span className="mr-2 h-2 w-2 rounded-full bg-green-500" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                            <span className="mr-2 h-2 w-2 rounded-full bg-red-500" />
+                            Inactive
+                          </span>
+                        )}
                       </td>
 
                       {/* Actions */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
+                          {/* View */}
+                          <button
+                            type="button"
+                            onClick={() => handleViewClick(teacher)}
+                            className="inline-flex items-center rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
+                            title="View full details"
+                          >
+                            <svg
+                              className="mr-2 h-4 w-4"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                            View
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => handleUpdateClick(teacher)}
@@ -370,12 +435,16 @@ const AllTeachers = () => {
                             Edit
                           </button>
 
-                          {/* Deactivate Button */}
+                          {/* Toggle Status Button */}
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(teacher)}
                             disabled={statusLoading === teacher.id}
-                            className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                              teacher.isActive
+                                ? "bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
+                                : "bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700"
+                            }`}
                           >
                             {statusLoading === teacher.id ? (
                               <>
@@ -401,7 +470,7 @@ const AllTeachers = () => {
                                 </svg>
                                 Updating...
                               </>
-                            ) : (
+                            ) : teacher.isActive ? (
                               <>
                                 <svg
                                   className="mr-2 h-4 w-4"
@@ -418,6 +487,24 @@ const AllTeachers = () => {
                                   />
                                 </svg>
                                 Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <svg
+                                  className="mr-2 h-4 w-4"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                                Activate
                               </>
                             )}
                           </button>
@@ -444,21 +531,22 @@ const AllTeachers = () => {
                       {teacher.firstName.charAt(0)}
                       {teacher.lastName.charAt(0)}
                     </div>
-
                     <div>
                       <h2 className="font-semibold text-gray-900">
                         {teacher.firstName} {teacher.lastName}
                       </h2>
-
-                      <p className="mt-1 text-sm text-gray-500">
-                        {teacher.gender}
-                      </p>
                     </div>
                   </div>
 
-                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                    Active
-                  </span>
+                  {teacher.isActive ? (
+                    <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                      Active
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                      Inactive
+                    </span>
+                  )}
                 </div>
 
                 {/* Details */}
@@ -467,62 +555,42 @@ const AllTeachers = () => {
                     <p className="text-xs font-medium uppercase text-gray-400">
                       Phone
                     </p>
-
                     <p className="mt-1 text-sm text-gray-800">
                       {teacher.phone}
                     </p>
                   </div>
-
                   <div>
                     <p className="text-xs font-medium uppercase text-gray-400">
                       Email
                     </p>
-
                     <p className="mt-1 break-all text-sm text-gray-800">
                       {teacher.email || "No email"}
                     </p>
                   </div>
-
                   <div>
                     <p className="text-xs font-medium uppercase text-gray-400">
                       Salary
                     </p>
-
                     <p className="mt-1 text-sm font-semibold text-gray-800">
                       {teacher.salaryType === "Fixed"
                         ? teacher.salaryAmount.toLocaleString()
                         : teacher.feePercentage + "%"}
                     </p>
                   </div>
-
                   <div>
                     <p className="text-xs font-medium uppercase text-gray-400">
                       Salary Type
                     </p>
-
                     <p className="mt-1 text-sm text-gray-800">
                       {teacher.salaryType}
                     </p>
                   </div>
-
                   <div>
                     <p className="text-xs font-medium uppercase text-gray-400">
                       Fee Percentage
                     </p>
-
                     <p className="mt-1 text-sm font-semibold text-blue-600">
                       {teacher.feePercentage}%
-                    </p>
-                  </div>
-
-                  {/* ✅ Hire Date — Shamsi */}
-                  <div>
-                    <p className="text-xs font-medium uppercase text-gray-400">
-                      Hire Date
-                    </p>
-
-                    <p className="mt-1 text-sm text-gray-800">
-                      {formatShamsi(teacher.hireDate, "YYYY/MM/DD")}
                     </p>
                   </div>
                 </div>
@@ -532,12 +600,39 @@ const AllTeachers = () => {
                   <p className="text-xs font-medium uppercase text-gray-400">
                     Address
                   </p>
-
                   <p className="mt-1 text-sm text-gray-700">
                     {teacher.address || "No address provided"}
                   </p>
 
                   <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleViewClick(teacher)}
+                      className="flex-1 rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-700"
+                    >
+                      <svg
+                        className="mr-2 inline h-4 w-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                      View
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleUpdateClick(teacher)}
@@ -564,7 +659,11 @@ const AllTeachers = () => {
                       type="button"
                       onClick={() => handleToggleStatus(teacher)}
                       disabled={statusLoading === teacher.id}
-                      className="flex-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        teacher.isActive
+                          ? "bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700"
+                          : "bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700"
+                      }`}
                     >
                       {statusLoading === teacher.id ? (
                         <>
@@ -590,7 +689,7 @@ const AllTeachers = () => {
                           </svg>
                           Updating...
                         </>
-                      ) : (
+                      ) : teacher.isActive ? (
                         <>
                           <svg
                             className="mr-2 inline h-4 w-4"
@@ -608,6 +707,24 @@ const AllTeachers = () => {
                           </svg>
                           Deactivate
                         </>
+                      ) : (
+                        <>
+                          <svg
+                            className="mr-2 inline h-4 w-4"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          Activate
+                        </>
                       )}
                     </button>
                   </div>
@@ -617,6 +734,13 @@ const AllTeachers = () => {
           </div>
         </>
       )}
+
+      {/* View Modal */}
+      <TeacherViewMoreModal
+        isOpen={showViewModal}
+        teacher={teacherToView}
+        onClose={handleCloseView}
+      />
 
       {/* Modals */}
       <TeacherDeleteModal

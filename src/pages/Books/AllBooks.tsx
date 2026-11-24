@@ -157,15 +157,6 @@ const AllBooks = () => {
     setBookToView(null);
   };
 
-  // Helper: price
-  const formatPrice = (price: number | string): string => {
-    const numPrice = typeof price === "string" ? parseFloat(price) : price;
-    if (isNaN(numPrice)) {
-      return "$0.00";
-    }
-    return `$${numPrice.toFixed(2)}`;
-  };
-
   if (loading && books.length === 0) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -245,19 +236,10 @@ const AllBooks = () => {
               <thead className="bg-gray-50">
                 <tr className="border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Code
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Name
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Level
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Category
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Price
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                     Status
@@ -271,35 +253,11 @@ const AllBooks = () => {
                 {books.map((book) => (
                   <tr key={book.id} className="transition hover:bg-gray-50">
                     <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                        {book.code || "N/A"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {book.name}
-                        </p>
-                        {book.author && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            By: {book.author}
-                          </p>
-                        )}
-                      </div>
+                      <p className="font-semibold text-gray-900">{book.name}</p>
                     </td>
                     <td className="px-6 py-4">
                       <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700">
                         {book.level || "N/A"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                        {book.category || "N/A"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-gray-900">
-                        {formatPrice(book.bookPrice)}
                       </span>
                     </td>
                     <td className="px-6 py-4">

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   useClasses,
+  useActiveClasses, // ✅ Added for active-only view
   useClassById,
   useDeleteClass,
   useUpdateClass,
@@ -13,13 +14,30 @@ import ClassUpdateModal from "@/components/classes/ClassUpdateModal";
 import ClassDeleteModal from "@/components/classes/ClassDeleteModal";
 
 const AllClasses = () => {
-  // ✅ List hook
+  // ✅ Toggle state: false = active only, true = all classes
+  const [showAll, setShowAll] = useState(true);
+
+  // ✅ Hook for the all list (GET /classes)
   const {
-    data: fetchedClasses,
-    loading,
-    error: fetchError,
-    refetch,
+    data: fetchedAllClasses,
+    loading: loadingAll,
+    error: errorAll,
+    refetch: refetchAll,
   } = useClasses();
+
+  // ✅ Hook for the active list (GET /classes/active)
+  const {
+    data: fetchedActiveClasses,
+    loading: loadingActive,
+    error: errorActive,
+    refetch: refetchActive,
+  } = useActiveClasses();
+
+  // Combine based on toggle
+  const fetchedClasses = showAll ? fetchedAllClasses : fetchedActiveClasses;
+  const loading = showAll ? loadingAll : loadingActive;
+  const fetchError = showAll ? errorAll : errorActive;
+  const refetch = showAll ? refetchAll : refetchActive;
 
   // ✅ Mutation hooks
   const { remove, loading: deleting } = useDeleteClass();
@@ -34,6 +52,12 @@ const AllClasses = () => {
   useEffect(() => {
     if (fetchedClasses) setClasses(fetchedClasses);
   }, [fetchedClasses]);
+
+  // ✅ Refetch whenever the toggle changes so the newly selected list is fresh
+  useEffect(() => {
+    refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAll]);
 
   // Combined error
   const error = localError || fetchError || "";
@@ -88,11 +112,16 @@ const AllClasses = () => {
     }
 
     // Optimistic local update
-    setClasses((prev) =>
-      prev.map((c) =>
-        c.id === classItem.id ? { ...c, isActive: newStatus } : c,
-      ),
-    );
+    // Only remove from list if we are on the "Active" tab and deactivating
+    if (!newStatus && !showAll) {
+      setClasses((prev) => prev.filter((c) => c.id !== classItem.id));
+    } else {
+      setClasses((prev) =>
+        prev.map((c) =>
+          c.id === classItem.id ? { ...c, isActive: newStatus } : c,
+        ),
+      );
+    }
 
     alert(`Class ${action}d successfully!`);
   };
@@ -156,28 +185,61 @@ const AllClasses = () => {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">All Classes</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            View and manage all classes in the system
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Loading..." : "Refresh"}
-          </button>
+      {/* Modernized Header Actions */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        {/* Segmented Control for Toggle */}
+        <div className="inline-flex rounded-lg bg-gray-100 p-1">
+          {/* Add Class Button */}
           <button
             onClick={() => (window.location.href = "/classes/add")}
-            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
             Add New Class
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLocalError("");
+              setShowAll(true);
+            }}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-all duration-200 ${
+              showAll
+                ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+            }`}
+          >
+            All Classes
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLocalError("");
+              setShowAll(false);
+            }}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-all duration-200 ${
+              !showAll
+                ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+            }`}
+          >
+            Active Classes
+          </button>
         </div>
+        <div className="hidden h-6 w-px bg-gray-300 sm:block" /> {/* Divider */}
+        {/* Action Buttons */}
       </div>
 
       {/* Error */}
@@ -199,10 +261,12 @@ const AllClasses = () => {
       {classes.length === 0 && !loading && (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900">
-            No Classes Found
+            {showAll ? "No Classes Found" : "No Active Classes Found"}
           </h3>
           <p className="mt-2 text-sm text-gray-500">
-            There are no classes registered yet.
+            {showAll
+              ? "There are no classes registered yet."
+              : "There are no active classes currently. Add a new class or activate an existing one."}
           </p>
           <button
             onClick={() => (window.location.href = "/classes/add")}
@@ -409,3 +473,4 @@ const AllClasses = () => {
 };
 
 export default AllClasses;
+// new desgin
