@@ -1,33 +1,159 @@
 // src/api/studentApi.ts
-import type {
-  Student,
-  CreateStudentData,
-  UpdateStudentData,
-  StudentEnrollment,
-  CreateEnrollmentData,
-  UpdateEnrollmentData,
-  LevelUpInfo,
-  LevelUpResponse,
-} from "@/types/student";
-import { ApiError } from "./teacherApi";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+/* ================================================================== */
+/* Types — inlined from src/types/student.ts + extras                 */
+/* ================================================================== */
 
+export interface Student {
+  id: string;
+  studentNumber: string;
+  firstName: string;
+  lastName: string | null;
+  gender: "Male" | "Female";
+  phone: string;
+  parentPhone: string | null;
+  address: string | null;
+  birthDate: string | null;
+  registrationDate: string;
+  status: "Active" | "Inactive" | "Graduated";
+  notes: string | null;
+  image?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
+export interface CreateStudentData {
+  studentNumber?: string;
+  firstName: string;
+  lastName?: string | null;
+  gender: "Male" | "Female";
+  phone?: string;
+  parentPhone?: string | null;
+  address?: string | null;
+  birthDate?: string | null;
+  status?: "Active" | "Inactive" | "Graduated";
+  notes?: string | null;
+}
 
-// ============================================
-// ADD STUDENTS SCORES
-// ============================================
+export interface UpdateStudentData {
+  studentNumber?: string;
+  firstName?: string;
+  lastName?: string | null;
+  gender?: "Male" | "Female";
+  phone?: string;
+  parentPhone?: string | null;
+  address?: string | null;
+  birthDate?: string | null;
+  status?: "Active" | "Inactive" | "Graduated";
+  notes?: string | null;
+}
+
+export interface EnrollmentTeacher {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  phone: string;
+  email: string;
+  address: string;
+  salaryType: string;
+  salaryAmount: number;
+  feePercentage: number;
+  hireDate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EnrollmentBook {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  level: string;
+  category: string;
+  author: string;
+  publisher: string;
+  isbn: string;
+  bookPrice: number;
+  durationWeeks: number;
+  totalLessons: number;
+  totalHours: number;
+  passingScore: number;
+  isActive: boolean;
+  levelOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentEnrollment {
+  id: string;
+  student: Student;
+  teacher: EnrollmentTeacher;
+  book: EnrollmentBook;
+  timetable: string;
+  tuitionFee: number;
+  discount: number;
+  finalFee: number;
+  startDate: string;
+  expectedEndDate: string;
+  completedDate: string | null;
+  status: "Studying" | "Completed" | "Dropped" | "Pending";
+  finalScore: number;
+  attendancePercentage: number;
+  remarks: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateEnrollmentData {
+  studentId: string;
+  teacherId: string;
+  bookId: string;
+  timetable: string;
+  tuitionFee: number;
+  discount?: number;
+  finalFee?: number;
+  startDate: string;
+  expectedEndDate: string;
+  remarks?: string;
+}
+
+export interface UpdateEnrollmentData {
+  timetable?: string;
+  discount?: number;
+  remarks?: string;
+  status?: "Studying" | "Completed" | "Dropped" | "Pending";
+  finalScore?: number;
+  attendancePercentage?: number;
+}
+
+export interface LevelUpInfo {
+  previousEnrollment: StudentEnrollment | null;
+  isEligible: boolean;
+  nextBook: { id: string; name: string; code: string; level: string } | null;
+  message: string;
+}
+
+export interface LevelUpResponse {
+  newEnrollment: StudentEnrollment;
+  message: string;
+}
+
+/* ---------- find-students-for-scoring ---------- */
 
 export interface FindStudentsForScoringParams {
-  teacherId: string;       // required
-  bookId: string;          // required
-  classId?: string;        // optional
-  time?: string;           // optional
-  fromDate?: string;       // optional
-  toDate?: string;         // optional
+  teacherId: string;
+  bookId: string;
+  classId?: string;
+  time?: string;
+  fromDate?: string;
+  toDate?: string;
 }
 
 export interface StudentForScoring {
@@ -74,47 +200,7 @@ export interface FindStudentsForScoringResponse {
   data: StudentForScoring[];
 }
 
-/**
- * Find students for scoring
- * GET /add-students-scores/find-students
- */
-export const findStudentsForScoring = async (
-  params: FindStudentsForScoringParams
-): Promise<FindStudentsForScoringResponse> => {
-  const query = new URLSearchParams();
-  query.append("teacherId", params.teacherId);
-  query.append("bookId", params.bookId);
-  if (params.classId) query.append("classId", params.classId);
-  if (params.time) query.append("time", params.time);
-  if (params.fromDate) query.append("fromDate", params.fromDate);
-  if (params.toDate) query.append("toDate", params.toDate);
-
-  const response = await fetch(
-    `${API_URL}/add-students-scores/find-students?${query.toString()}`,
-    {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    }
-  );
-
-  if (!response.ok) {
-    let errorMessage = `Failed to find students. Status: ${response.status}`;
-    try {
-      const errorData = await response.json();
-      if (errorData.message) errorMessage = errorData.message;
-    } catch {
-      /* keep default */
-    }
-    throw new ApiError(errorMessage, response.status);
-  }
-
-  return response.json();
-};
-
-
-// ============================================
-// BULK UPDATE STUDENT SCORES
-// ============================================
+/* ---------- bulk update scores ---------- */
 
 export interface BulkScoreItem {
   studentId: string;
@@ -132,33 +218,7 @@ export interface BulkUpdateScoresResponse {
   count?: number;
 }
 
-/**
- * Bulk update (or create) student scores
- * POST /add-students-scores/bulk-update
- */
-export const bulkUpdateStudentScores = async (
-  scores: BulkScoreItem[]
-): Promise<BulkUpdateScoresResponse> => {
-  const response = await fetch(`${API_URL}/add-students-scores/bulk-update`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scores }),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok || result.success === false) {
-    const errorMessage =
-      result?.message || `Failed to update scores. Status: ${response.status}`;
-    throw new ApiError(errorMessage, response.status, result);
-  }
-
-  return result;
-};
-
-// ============================================
-// FILTERED STUDENTS (Advanced Filter)
-// ============================================
+/* ---------- filtered students ---------- */
 
 export interface FilteredStudentEnrollment {
   id: string;
@@ -168,12 +228,7 @@ export interface FilteredStudentEnrollment {
     lastName: string;
     salaryType: string;
   };
-  book: {
-    id: string;
-    name: string;
-    levelOrder: number;
-    bookPrice: string;
-  };
+  book: { id: string; name: string; levelOrder: number; bookPrice: string };
   classId: string;
   time: string;
   startDate: string;
@@ -217,46 +272,7 @@ export interface FilterStudentsParams {
   toDate?: string;
 }
 
-/**
- * Filter students with optional filters (teacher, book, time, date range)
- * GET /filter-search-student/filter
- *
- * All filters are OPTIONAL. Only students with enrollments will be returned.
- *
- * @param params - Filter parameters (all optional)
- */
-export const getFilteredStudents = async (
-  params: FilterStudentsParams
-): Promise<FilteredStudentsResponse> => {
-  const query = new URLSearchParams();
-  if (params.teacherId) query.append("teacherId", params.teacherId);
-  if (params.bookId) query.append("bookId", params.bookId);
-  if (params.time) query.append("time", params.time);
-  if (params.fromDate) query.append("fromDate", params.fromDate);
-  if (params.toDate) query.append("toDate", params.toDate);
-
-  const queryString = query.toString();
-  const url = queryString
-    ? `${API_URL}/filter-search-student/filter?${queryString}`
-    : `${API_URL}/filter-search-student/filter`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const { message, details } = await extractErrorMessage(
-      response,
-      `Failed to filter students. Status: ${response.status}`
-    );
-    throw new ApiError(message, response.status, details);
-  }
-
-  return response.json();
-};
+/* ---------- paginated / unenrolled / search ---------- */
 
 export interface SearchStudentResponse {
   success: boolean;
@@ -264,9 +280,6 @@ export interface SearchStudentResponse {
   data: Student | Student[];
   count?: number;
 }
-// ============================================
-// RESPONSE TYPES
-// ============================================
 
 export interface PaginatedStudentsResponse {
   success: boolean;
@@ -287,634 +300,366 @@ export interface UnenrolledStudentsResponse {
   count: number;
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
+/* ================================================================== */
+/* Inline helpers                                                     */
+/* ================================================================== */
+
+const extractErrMessage = (err: any, fallback: string): string => {
+  const m = err?.response?.data?.message;
+  if (Array.isArray(m)) return m.join(", ");
+  if (typeof m === "string") return m;
+  return err?.message || fallback;
+};
 
 /**
- * Extract a readable error message from an API error response
+ * Query hook that returns the FULL response body as `data`.
+ * Works for raw bodies (`Student[]`) AND wrapped bodies
+ * (`{ success, message, data, filters, count, pagination }`).
  */
-const extractErrorMessage = async (
-  response: Response,
-  defaultMessage: string
-): Promise<{ message: string; details: unknown }> => {
-  let errorMessage = defaultMessage;
-  let errorDetails = null;
+function useRawQuery<T>(url: string | null, enabled = true) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(!!url && enabled);
+  const [error, setError] = useState<string | null>(null);
+  const [trigger, setTrigger] = useState(0);
 
-  try {
-    const errorData = await response.json();
-    errorDetails = errorData;
-
-    if (errorData.message) {
-      if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      } else if (typeof errorData.message === "string") {
-        errorMessage = errorData.message;
-      }
+  useEffect(() => {
+    if (!enabled || !url) {
+      setLoading(false);
+      return;
     }
-  } catch {
-    // Keep default error message if JSON parsing fails
-  }
+    let alive = true;
+    setLoading(true);
+    setError(null);
 
-  return { message: errorMessage, details: errorDetails };
-};
+    axios
+      .get<T>(url)
+      .then((res) => {
+        if (alive) setData(res.data);
+      })
+      .catch((err) => {
+        if (alive) setError(extractErrMessage(err, "Something went wrong"));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
 
-// ============================================
-// FILTER & SEARCH OPERATIONS
-// ============================================
+    return () => {
+      alive = false;
+    };
+  }, [url, trigger, enabled]);
 
-/**
- * Get all students with pagination
- * GET /filter-search-student/paginated
- *
- * @param page - Page number (default: 1)
- * @param limit - Number of students per page (default: 20)
- * @param fromDate - Optional start date (YYYY-MM-DD)
- * @param toDate - Optional end date (YYYY-MM-DD)
- */
-export const getPaginatedStudents = async (
-  page: number = 1,
-  limit: number = 20,
-  fromDate?: string,
-  toDate?: string
-): Promise<PaginatedStudentsResponse> => {
-  const params = new URLSearchParams();
-  params.append("page", page.toString());
-  params.append("limit", limit.toString());
-  if (fromDate) params.append("fromDate", fromDate);
-  if (toDate) params.append("toDate", toDate);
-
-  const response = await fetch(
-    `${API_URL}/filter-search-student/paginated?${params.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const { message, details } = await extractErrorMessage(
-      response,
-      `Failed to fetch paginated students. Status: ${response.status}`
-    );
-    throw new ApiError(message, response.status, details);
-  }
-
-  return response.json();
-};
+  return { data, loading, error, refetch: () => setTrigger((n) => n + 1) };
+}
 
 /**
- * Get all unenrolled students (not enrolled in any course)
- * GET /filter-search-student/unenrolled
- *
- * @param fromDate - Optional start date (YYYY-MM-DD)
- * @param toDate - Optional end date (YYYY-MM-DD)
+ * Mutation hook that returns the FULL response body as `data`.
+ * Supports FormData, JSON, auth token injection, 401 logout,
+ * and "200 OK but success:false" detection.
  */
-export const getUnenrolledStudents = async (
-  fromDate?: string,
-  toDate?: string
-): Promise<UnenrolledStudentsResponse> => {
-  const params = new URLSearchParams();
-  if (fromDate) params.append("fromDate", fromDate);
-  if (toDate) params.append("toDate", toDate);
+function useRawMutation<T>() {
+  const [data, setData] = useState<T | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const queryString = params.toString();
-  const url = queryString
-    ? `${API_URL}/filter-search-student/unenrolled?${queryString}`
-    : `${API_URL}/filter-search-student/unenrolled`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const { message, details } = await extractErrorMessage(
-      response,
-      `Failed to fetch unenrolled students. Status: ${response.status}`
-    );
-    throw new ApiError(message, response.status, details);
-  }
-
-  return response.json();
-};
-
-/**
- * Search students by name (fuzzy search - handles spelling mistakes)
- * GET /filter-search-student/search/name
- *
- * @param name - Name to search for
- */
-export const searchStudentsByName = async (
-  name: string
-): Promise<UnenrolledStudentsResponse> => {
-  const response = await fetch(
-    `${API_URL}/filter-search-student/search/name?name=${encodeURIComponent(
-      name
-    )}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const { message, details } = await extractErrorMessage(
-      response,
-      `Failed to search students. Status: ${response.status}`
-    );
-    throw new ApiError(message, response.status, details);
-  }
-
-  return response.json();
-};
-
-/**
- * Search student by student number
- * GET /filter-search-student/search/student-number
- *
- * @param studentNumber - Student number to search for
- */
-export const searchStudentByNumber = async (
-  studentNumber: string
-): Promise<UnenrolledStudentsResponse> => {
-  const response = await fetch(
-    `${API_URL}/filter-search-student/search/student-number?studentNumber=${encodeURIComponent(
-      studentNumber
-    )}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const { message, details } = await extractErrorMessage(
-      response,
-      `Failed to search student. Status: ${response.status}`
-    );
-    throw new ApiError(message, response.status, details);
-  }
-
-  return response.json();
-};
-
-// ============================================
-// STUDENT CRUD OPERATIONS
-// ============================================
-
-/**
- * Get all students
- * GET /students
- */
-export const getStudents = async (): Promise<Student[]> => {
-  const response = await fetch(`${API_URL}/students`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch students. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Student[] = await response.json();
-  return data;
-};
-
-/**
- * Get a single student by ID
- * GET /students/{id}
- *
- * @param id - Student ID
- */
-export const getStudentById = async (id: string): Promise<Student> => {
-  const response = await fetch(`${API_URL}/students/${id}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch student. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Student = await response.json();
-  return data;
-};
-
-
-/**
- * Create a new student with image upload
- * POST /students
- * Requires Bearer token in Authorization header.
- *
- * @param data - FormData containing student data + image
- */
-export const createStudent = async (data: FormData): Promise<Student> => {
-  // ✅ Get a valid (non-expired) token from the store
-  const token = useAuthStore.getState().getToken();
-
-  if (!token) {
-    throw new ApiError(
-      "You must be logged in to register a student. Please login again.",
-      401
-    );
-  }
-
-  const response = await fetch(`${API_URL}/students`, {
-    method: "POST",
-    headers: {
-      // ✅ DO NOT set Content-Type — browser sets it with boundary for FormData
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-    body: data,
-  });
-
-  if (!response.ok) {
-    // If token expired on the server side → force logout
-    if (response.status === 401) {
-      useAuthStore.getState().logout();
-      throw new ApiError(
-        "Session expired. Please login again to continue.",
-        401
-      );
-    }
-
-    let errorMessage = `Failed to create student. Status: ${response.status}`;
-    let errorDetails = null;
+  const send = async (
+    method: "post" | "patch" | "delete",
+    url: string,
+    body?: FormData | object,
+    opts: { auth?: boolean; customErrorMap?: (m: string) => string } = {},
+  ): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
 
     try {
-      const errorData = await response.json();
-      errorDetails = errorData;
+      const headers: Record<string, string> = { Accept: "application/json" };
 
-      if (errorData.message && typeof errorData.message === "string") {
-        if (
-          errorData.message.includes("duplicate") &&
-          errorData.message.toLowerCase().includes("studentnumber")
-        ) {
-          errorMessage =
-            "This student number is already registered. Please use a different number.";
-        } else if (
-          errorData.message.includes("duplicate") &&
-          errorData.message.toLowerCase().includes("phone")
-        ) {
-          errorMessage =
-            "This phone number is already registered. Please use a different phone number.";
-        } else if (errorData.message.toLowerCase().includes("phone")) {
-          errorMessage = "Phone number must start with 07 and be 10 digits.";
-        } else if (errorData.message.toLowerCase().includes("image")) {
-          errorMessage =
-            "Student image is required. Please upload a valid image file (jpg, jpeg, png).";
-        } else {
-          errorMessage = errorData.message;
+      if (opts.auth) {
+        const token = useAuthStore.getState().getToken();
+        if (!token) {
+          setError("You must be logged in. Please login again.");
+          setLoading(false);
+          return false;
         }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
+        headers["Authorization"] = `Bearer ${token}`;
       }
-    } catch {
-      // Keep the default error message
-    }
 
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: Student = await response.json();
-  return result;
-};
-
-/**
- * Update a student by ID
- * PATCH /students/{id}
- * Supports both FormData (with image) and JSON
- *
- * @param id - Student ID
- * @param data - FormData (with image) or UpdateStudentData (JSON)
- */
-export const updateStudent = async (
-  id: string,
-  data: FormData | UpdateStudentData
-): Promise<Student> => {
-  const isFormData = data instanceof FormData;
-
-  console.log("🔵 updateStudent called with ID:", id);
-  console.log("🔵 isFormData:", isFormData);
-
-  // For FormData, DON'T set Content-Type header (browser sets it with boundary)
-  const headers: HeadersInit = {};
-  if (!isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  const response = await fetch(`${API_URL}/students/${id}`, {
-    method: "PATCH",
-    headers: headers,
-    body: isFormData ? data : JSON.stringify(data),
-  });
-
-  console.log("🟡 Response status:", response.status);
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update student. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      console.log("🔴 Error response:", errorData);
-
-      if (errorData.message && typeof errorData.message === "string") {
-        if (
-          errorData.message.includes("duplicate") &&
-          errorData.message.toLowerCase().includes("phone")
-        ) {
-          errorMessage =
-            "This phone number is already registered by another student. Please use a different phone number.";
-        } else if (errorData.message.includes("not found")) {
-          errorMessage = "Student not found. Please refresh and try again.";
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
+      const isFormData = body instanceof FormData;
+      if (!isFormData && body !== undefined) {
+        headers["Content-Type"] = "application/json";
       }
-    } catch {
-      // Keep the default error message
+
+      const res = await axios.request<T>({ method, url, headers, data: body });
+
+      // Some endpoints return 200 with success:false (e.g. bulk-update).
+      const obj = res.data as any;
+      if (obj && obj.success === false) {
+        const rawMsg =
+          typeof obj.message === "string" ? obj.message : "Request failed";
+        setError(opts.customErrorMap ? opts.customErrorMap(rawMsg) : rawMsg);
+        return false;
+      }
+
+      setData(res.data);
+      setMessage(obj?.message ?? null);
+      return true;
+    } catch (err: any) {
+      if (err?.response?.status === 401 && opts.auth) {
+        useAuthStore.getState().logout();
+        setError("Session expired. Please login again to continue.");
+        return false;
+      }
+      const rawMsg = extractErrMessage(err, "Something went wrong");
+      setError(opts.customErrorMap ? opts.customErrorMap(rawMsg) : rawMsg);
+      return false;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
+  return { data, message, loading, error, send };
+}
 
-  const updatedStudent: Student = await response.json();
-  console.log("🟢 Update successful:", updatedStudent);
-  return updatedStudent;
-};
+/* ================================================================== */
+/* Query hooks                                                        */
+/* ================================================================== */
 
-/**
- * Delete a student by ID
- * DELETE /students/{id}
- *
- * @param id - Student ID
- */
-export const deleteStudent = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/students/${id}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+/** GET /students */
+export const useStudents = () => useRawQuery<Student[]>(`${API_URL}/students`);
 
-  if (!response.ok) {
-    const { message } = await extractErrorMessage(
-      response,
-      `Failed to delete student. Status: ${response.status}`
-    );
-    throw new ApiError(message, response.status);
-  }
-};
-
-/**
- * Search students by name, phone, or studentNumber
- * GET /students/search
- *
- * @param query - Search query
- */
-export const searchStudents = async (query: string): Promise<Student[]> => {
-  const response = await fetch(
-    `${API_URL}/students/search?q=${encodeURIComponent(query)}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
+/** GET /students/:id */
+export const useStudentById = (id: string, enabled = true) =>
+  useRawQuery<Student>(
+    id ? `${API_URL}/students/${id}` : null,
+    enabled && !!id,
   );
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to search students. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Student[] = await response.json();
-  return data;
-};
-
-// ============================================
-// ENROLLMENT OPERATIONS
-// ============================================
-
-/**
- * Get all enrollments of a student
- * GET /students/{studentId}/enrollments
- *
- * @param studentId - Student ID
- */
-export const getStudentEnrollments = async (
-  studentId: string
-): Promise<StudentEnrollment[]> => {
-  const response = await fetch(
-    `${API_URL}/students/${studentId}/enrollments`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
+/** GET /students/search?q=... */
+export const useSearchStudents = (query: string, enabled = true) =>
+  useRawQuery<Student[]>(
+    query ? `${API_URL}/students/search?q=${encodeURIComponent(query)}` : null,
+    enabled && !!query,
   );
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch enrollments. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: StudentEnrollment[] = await response.json();
-  return data;
-};
-
-/**
- * Enroll a student in a new course (first registration)
- * POST /students/enroll
- *
- * @param enrollment - Enrollment data
- */
-export const enrollStudent = async (
-  enrollment: CreateEnrollmentData
-): Promise<StudentEnrollment> => {
-  const response = await fetch(`${API_URL}/students/enroll`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(enrollment),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to enroll student. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === "string") {
-        if (errorData.message.includes("already enrolled")) {
-          errorMessage = "This student is already enrolled in this course.";
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const data: StudentEnrollment = await response.json();
-  return data;
-};
-
-/**
- * Update an enrollment
- * PATCH /students/enrollments/{enrollmentId}
- *
- * @param enrollmentId - Enrollment ID
- * @param enrollment - Updated enrollment data
- */
-export const updateEnrollment = async (
-  enrollmentId: string,
-  enrollment: UpdateEnrollmentData
-): Promise<StudentEnrollment> => {
-  const response = await fetch(
-    `${API_URL}/students/enrollments/${enrollmentId}`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(enrollment),
-    }
+/** GET /students/:studentId/enrollments */
+export const useStudentEnrollments = (studentId: string, enabled = true) =>
+  useRawQuery<StudentEnrollment[]>(
+    studentId ? `${API_URL}/students/${studentId}/enrollments` : null,
+    enabled && !!studentId,
   );
 
-  if (!response.ok) {
-    const { message, details } = await extractErrorMessage(
-      response,
-      `Failed to update enrollment. Status: ${response.status}`
-    );
-    throw new ApiError(message, response.status, details);
-  }
-
-  const data: StudentEnrollment = await response.json();
-  return data;
-};
-
-// ============================================
-// LEVEL UP OPERATIONS
-// ============================================
-
-/**
- * Get info for level-up (previous enrollment, eligibility, next book)
- * GET /students/{studentId}/level-up-info
- *
- * @param studentId - Student ID
- */
-export const getLevelUpInfo = async (
-  studentId: string
-): Promise<LevelUpInfo> => {
-  const response = await fetch(
-    `${API_URL}/students/${studentId}/level-up-info`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
+/** GET /students/:studentId/level-up-info */
+export const useLevelUpInfo = (studentId: string, enabled = true) =>
+  useRawQuery<LevelUpInfo>(
+    studentId ? `${API_URL}/students/${studentId}/level-up-info` : null,
+    enabled && !!studentId,
   );
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to get level-up info. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: LevelUpInfo = await response.json();
-  return data;
+/** GET /filter-search-student/paginated */
+export const usePaginatedStudents = (
+  params: {
+    page?: number;
+    limit?: number;
+    fromDate?: string;
+    toDate?: string;
+  } = {},
+  enabled = true,
+) => {
+  const q = new URLSearchParams();
+  q.append("page", String(params.page ?? 1));
+  q.append("limit", String(params.limit ?? 20));
+  if (params.fromDate) q.append("fromDate", params.fromDate);
+  if (params.toDate) q.append("toDate", params.toDate);
+  return useRawQuery<PaginatedStudentsResponse>(
+    `${API_URL}/filter-search-student/paginated?${q.toString()}`,
+    enabled,
+  );
 };
 
-/**
- * Level up a student (automatically finds the next book)
- * POST /students/level-up
- *
- * @param studentId - Student ID
- */
-export const levelUpStudent = async (
-  studentId: string
-): Promise<LevelUpResponse> => {
-  const response = await fetch(`${API_URL}/students/level-up`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ studentId }),
-  });
+/** GET /filter-search-student/unenrolled */
+export const useUnenrolledStudents = (
+  params: { fromDate?: string; toDate?: string } = {},
+  enabled = true,
+) => {
+  const q = new URLSearchParams();
+  if (params.fromDate) q.append("fromDate", params.fromDate);
+  if (params.toDate) q.append("toDate", params.toDate);
+  const qs = q.toString();
+  return useRawQuery<UnenrolledStudentsResponse>(
+    `${API_URL}/filter-search-student/unenrolled${qs ? `?${qs}` : ""}`,
+    enabled,
+  );
+};
 
-  if (!response.ok) {
-    let errorMessage = `Failed to level up student. Status: ${response.status}`;
-    let errorDetails = null;
+/** GET /filter-search-student/search/name */
+export const useSearchStudentsByName = (name: string, enabled = true) =>
+  useRawQuery<UnenrolledStudentsResponse>(
+    name
+      ? `${API_URL}/filter-search-student/search/name?name=${encodeURIComponent(name)}`
+      : null,
+    enabled && !!name,
+  );
 
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
+/** GET /filter-search-student/search/student-number */
+export const useSearchStudentByNumber = (
+  studentNumber: string,
+  enabled = true,
+) =>
+  useRawQuery<UnenrolledStudentsResponse>(
+    studentNumber
+      ? `${API_URL}/filter-search-student/search/student-number?studentNumber=${encodeURIComponent(studentNumber)}`
+      : null,
+    enabled && !!studentNumber,
+  );
 
-      if (errorData.message && typeof errorData.message === "string") {
-        if (errorData.message.includes("not eligible")) {
-          errorMessage =
-            "Student is not eligible for level up. Please check prerequisites.";
-        } else if (errorData.message.includes("no next book")) {
-          errorMessage = "No next book available for level up.";
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
+/** GET /filter-search-student/filter */
+export const useFilteredStudents = (
+  params: FilterStudentsParams = {},
+  enabled = true,
+) => {
+  const q = new URLSearchParams();
+  if (params.teacherId) q.append("teacherId", params.teacherId);
+  if (params.bookId) q.append("bookId", params.bookId);
+  if (params.time) q.append("time", params.time);
+  if (params.fromDate) q.append("fromDate", params.fromDate);
+  if (params.toDate) q.append("toDate", params.toDate);
+  const qs = q.toString();
+  return useRawQuery<FilteredStudentsResponse>(
+    `${API_URL}/filter-search-student/filter${qs ? `?${qs}` : ""}`,
+    enabled,
+  );
+};
 
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
+/** GET /add-students-scores/find-students */
+export const useFindStudentsForScoring = (
+  params: FindStudentsForScoringParams,
+  enabled = true,
+) => {
+  const q = new URLSearchParams();
+  q.append("teacherId", params.teacherId);
+  q.append("bookId", params.bookId);
+  if (params.classId) q.append("classId", params.classId);
+  if (params.time) q.append("time", params.time);
+  if (params.fromDate) q.append("fromDate", params.fromDate);
+  if (params.toDate) q.append("toDate", params.toDate);
+  return useRawQuery<FindStudentsForScoringResponse>(
+    `${API_URL}/add-students-scores/find-students?${q.toString()}`,
+    enabled && !!params.teacherId && !!params.bookId,
+  );
+};
 
-  const data: LevelUpResponse = await response.json();
-  return data;
+/* ================================================================== */
+/* Mutation hooks                                                     */
+/* ================================================================== */
+
+/** POST /students  (FormData + auth + 401 logout) */
+export const useCreateStudent = () => {
+  const { data, message, loading, error, send } = useRawMutation<Student>();
+
+  const createStudent = (formData: FormData) =>
+    send("post", `${API_URL}/students`, formData, {
+      auth: true,
+      customErrorMap: (m) => {
+        const lower = m.toLowerCase();
+        if (m.includes("duplicate") && lower.includes("studentnumber"))
+          return "This student number is already registered. Please use a different number.";
+        if (m.includes("duplicate") && lower.includes("phone"))
+          return "This phone number is already registered. Please use a different phone number.";
+        if (lower.includes("phone"))
+          return "Phone number must start with 07 and be 10 digits.";
+        if (lower.includes("image"))
+          return "Student image is required. Please upload a valid image file (jpg, jpeg, png).";
+        return m;
+      },
+    });
+
+  return { createData: data, message, loading, error, createStudent };
+};
+
+/** PATCH /students/:id  (FormData or JSON) */
+export const useUpdateStudent = () => {
+  const { data, message, loading, error, send } = useRawMutation<Student>();
+
+  const updateStudent = (id: string, body: FormData | UpdateStudentData) =>
+    send("patch", `${API_URL}/students/${id}`, body, {
+      customErrorMap: (m) => {
+        const lower = m.toLowerCase();
+        if (m.includes("duplicate") && lower.includes("phone"))
+          return "This phone number is already registered by another student. Please use a different phone number.";
+        if (m.includes("not found"))
+          return "Student not found. Please refresh and try again.";
+        return m;
+      },
+    });
+
+  return { updateData: data, message, loading, error, updateStudent };
+};
+
+/** DELETE /students/:id */
+export const useDeleteStudent = () => {
+  const { data, message, loading, error, send } = useRawMutation<void>();
+  const remove = (id: string) => send("delete", `${API_URL}/students/${id}`);
+  return { deleteData: data, message, loading, error, remove };
+};
+
+/** POST /students/enroll */
+export const useEnrollStudent = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+  const enrollStudent = (enrollment: CreateEnrollmentData) =>
+    send("post", `${API_URL}/students/enroll`, enrollment, {
+      customErrorMap: (m) =>
+        m.includes("already enrolled")
+          ? "This student is already enrolled in this course."
+          : m,
+    });
+  return { createData: data, message, loading, error, enrollStudent };
+};
+
+/** PATCH /students/enrollments/:enrollmentId */
+export const useUpdateEnrollment = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+  const updateEnrollment = (
+    enrollmentId: string,
+    enrollment: UpdateEnrollmentData,
+  ) =>
+    send(
+      "patch",
+      `${API_URL}/students/enrollments/${enrollmentId}`,
+      enrollment,
+    );
+  return { updateData: data, message, loading, error, updateEnrollment };
+};
+
+/** POST /students/level-up */
+export const useLevelUpStudent = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<LevelUpResponse>();
+  const levelUpStudent = (studentId: string) =>
+    send(
+      "post",
+      `${API_URL}/students/level-up`,
+      { studentId },
+      {
+        customErrorMap: (m) => {
+          if (m.includes("not eligible"))
+            return "Student is not eligible for level up. Please check prerequisites.";
+          if (m.includes("no next book"))
+            return "No next book available for level up.";
+          return m;
+        },
+      },
+    );
+  return { levelUpData: data, message, loading, error, levelUpStudent };
+};
+
+/** POST /add-students-scores/bulk-update */
+export const useBulkUpdateStudentScores = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<BulkUpdateScoresResponse>();
+  const bulkUpdate = (scores: BulkScoreItem[]) =>
+    send("post", `${API_URL}/add-students-scores/bulk-update`, { scores });
+  return { bulkUpdateData: data, message, loading, error, bulkUpdate };
 };

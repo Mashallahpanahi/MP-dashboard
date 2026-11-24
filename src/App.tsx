@@ -1,16 +1,13 @@
-import React, { useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { useLanguageStore } from "@store/languageStore";
-import { useAuthStore } from "@store/authStore"; // 👈 import auth store
 import AppRoutes from "@routes/index";
+import { useLanguageStore } from "@store/languageStore";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import "./styles/globals.css";
 
 function App() {
   const { i18n } = useTranslation();
   const { language } = useLanguageStore();
 
-  // --- Get the checkAuth function from the store ---
-  const checkAuth = useAuthStore((state) => state.checkAuth);
 
   // // --- Run auth check once when app loads ---
   // useEffect(() => {

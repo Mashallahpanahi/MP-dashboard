@@ -1,5 +1,5 @@
 // src/components/students/StudentDetailModal.tsx
-import type { Student } from "@/types/student";
+import type { Student } from "@/api/studentApi";
 // ✅ Shamsi formatter
 import { formatShamsi } from "@/utils/dateConverter";
 
@@ -18,13 +18,21 @@ const StudentDetailModal = ({
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+  // ✅ Cast for legacy/optional fields not present on the current Student type
+  // (image, fatherName, fatherPhone) — renders "—" if missing, same as before
+  const studentAny = student as Student & {
+    image?: string | null;
+    fatherName?: string | null;
+    fatherPhone?: string | null;
+  };
+
   const getImageUrl = (imagePath: string | null | undefined) => {
     if (!imagePath) return null;
     if (imagePath.startsWith("http")) return imagePath;
     return `${API_URL}${imagePath}`;
   };
 
-  const imageUrl = getImageUrl(student.image);
+  const imageUrl = getImageUrl(studentAny.image);
 
   const InfoRow = ({ label, value }: { label: string; value: any }) => (
     <div className="flex items-start border-b border-gray-100 py-3 last:border-0">
@@ -153,9 +161,7 @@ const StudentDetailModal = ({
               <InfoRow
                 label="Birth Date"
                 value={
-                  student.birthDate
-                    ? formatShamsiDate(student.birthDate)
-                    : null
+                  student.birthDate ? formatShamsiDate(student.birthDate) : null
                 }
               />
             </div>
@@ -164,8 +170,11 @@ const StudentDetailModal = ({
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Family & Status
               </h4>
-              <InfoRow label="Father's Name" value={student.fatherName} />
-              <InfoRow label="Father's Phone" value={student.fatherPhone} />
+              <InfoRow label="Father's Name" value={studentAny.fatherName} />
+              <InfoRow
+                label="Father's Phone"
+                value={studentAny.fatherPhone ?? student.parentPhone}
+              />
               <InfoRow label="Status" value={student.status} />
               <InfoRow label="Address" value={student.address} />
               <InfoRow label="Notes" value={student.notes} />

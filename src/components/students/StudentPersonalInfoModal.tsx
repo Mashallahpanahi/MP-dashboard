@@ -1,6 +1,9 @@
 // src/components/students/StudentPersonalInfoModal.tsx
 import { useState, useEffect, useRef } from "react";
-import { getStudentById, updateStudent } from "@/api/studentApi";
+import {
+  useStudentById,
+  useUpdateStudent,
+} from "@/api/studentApi";
 
 interface StudentPersonalInfoModalProps {
   isOpen: boolean;
@@ -17,9 +20,23 @@ const StudentPersonalInfoModal = ({
   onClose,
   onUpdate,
 }: StudentPersonalInfoModalProps) => {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  // ✅ Hook: fetch student (auto-fetches when modal opens)
+  const {
+    data: studentData,
+    loading,
+    error: fetchError,
+    refetch,
+  } = useStudentById(studentId ?? "", isOpen && !!studentId);
+
+  // ✅ Hook: update student (FormData OR JSON — handled inside the hook)
+  const {
+    updateStudent,
+    loading: saving,
+    error: updateError,
+  } = useUpdateStudent();
+
+  // Local state (validation + UI)
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,56 +54,54 @@ const StudentPersonalInfoModal = ({
 
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  // Combined error
+  const error = localError || fetchError || updateError || "";
+
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-  // Helper function to get full image URL
   const getImageUrl = (imagePath: string | null | undefined) => {
     if (!imagePath) return null;
-    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith("http") || imagePath.startsWith("data:")) {
+      return imagePath;
+    }
     return `${API_URL}${imagePath}`;
   };
 
+  // Reset messages when modal opens
   useEffect(() => {
-    if (isOpen && studentId) {
-      fetchStudentData();
+    if (isOpen) {
+      setLocalError("");
+      setSuccess("");
     }
   }, [isOpen, studentId]);
 
-  const fetchStudentData = async () => {
-    if (!studentId) {
-      setError("Student ID is missing");
-      setLoading(false);
-      return;
+  // ✅ Sync fetched data → form state (runs whenever the hook delivers data)
+  useEffect(() => {
+    if (!studentData) return;
+    const anyData = studentData as any;
+
+    setFormData({
+      firstName: studentData.firstName || "",
+      lastName: studentData.lastName || "",
+      phone: studentData.phone || "",
+      fatherName: anyData.fatherName || "",
+      fatherPhone: anyData.fatherPhone || "",
+      gender: (studentData.gender as "Male" | "Female") || "Male",
+      status:
+        (studentData.status as "Active" | "Inactive" | "Graduated") ||
+        "Active",
+      notes: studentData.notes || "",
+    });
+
+    if (anyData.image) {
+      setImagePreview(anyData.image);
+    } else {
+      setImagePreview(null);
     }
-    
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getStudentById(studentId);
-      
-      setFormData({
-        firstName: data.firstName || "",
-        lastName: data.lastName || "",
-        phone: data.phone || "",
-        fatherName: data.fatherName || "",
-        fatherPhone: data.fatherPhone || "",
-        gender: data.gender || "Male",
-        status: data.status || "Active",
-        notes: data.notes || "",
-      });
-      
-      if (data.image) {
-        setImagePreview(data.image);
-      }
-    } catch (error) {
-      console.error("Failed to fetch student data:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load student data"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+
+    setImageFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [studentData]);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -100,19 +115,19 @@ const StudentPersonalInfoModal = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      const validTypes = ["image/jpeg", "image/jpg", "image/png"];
       if (!validTypes.includes(file.type)) {
-        setError('Please upload a valid image file (jpg, jpeg, or png)');
+        setLocalError("Please upload a valid image file (jpg, jpeg, or png)");
         return;
       }
-      
+
       if (file.size > 5 * 1024 * 1024) {
-        setError('Image size must be less than 5MB');
+        setLocalError("Image size must be less than 5MB");
         return;
       }
 
       setImageFile(file);
-      
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -125,132 +140,115 @@ const StudentPersonalInfoModal = ({
     setImageFile(null);
     setImagePreview(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    setError("");
+    setLocalError("");
     setSuccess("");
 
-    try {
-      if (!studentId) {
-        setError("Student ID is missing");
-        setSaving(false);
-        return;
-      }
-
-      // Validate required fields
-      if (!formData.firstName || !formData.firstName.trim()) {
-        setError("First name is required");
-        setSaving(false);
-        return;
-      }
-
-      if (!formData.lastName || !formData.lastName.trim()) {
-        setError("Last name is required");
-        setSaving(false);
-        return;
-      }
-
-      if (!formData.phone || !formData.phone.trim()) {
-        setError("Phone number is required");
-        setSaving(false);
-        return;
-      }
-
-      const phoneRegex = /^07\d{8}$/;
-      if (!phoneRegex.test(formData.phone)) {
-        setError("Phone number must start with 07 and be 10 digits (e.g., 0777123456)");
-        setSaving(false);
-        return;
-      }
-
-      if (formData.fatherPhone && formData.fatherPhone.trim()) {
-        if (!phoneRegex.test(formData.fatherPhone)) {
-          setError("Father's phone number must start with 07 and be 10 digits (e.g., 0777123456)");
-          setSaving(false);
-          return;
-        }
-      }
-
-      // Prepare data - Use FormData if there's an image, otherwise use JSON
-      let response;
-      
-      if (imageFile) {
-        // Use FormData for update with image
-        const submitData = new FormData();
-        submitData.append('firstName', formData.firstName.trim());
-        submitData.append('lastName', formData.lastName.trim());
-        submitData.append('phone', formData.phone.trim());
-        submitData.append('image', imageFile);
-        
-        if (formData.fatherName && formData.fatherName.trim()) {
-          submitData.append('fatherName', formData.fatherName.trim());
-        }
-        if (formData.fatherPhone && formData.fatherPhone.trim()) {
-          submitData.append('fatherPhone', formData.fatherPhone.trim());
-        }
-        submitData.append('gender', formData.gender);
-        submitData.append('status', formData.status);
-        if (formData.notes && formData.notes.trim()) {
-          submitData.append('notes', formData.notes.trim());
-        }
-
-        console.log('📤 Sending FormData with image');
-        for (let [key, value] of submitData.entries()) {
-          console.log(`  ${key}:`, value instanceof File ? `[File: ${value.name}]` : value);
-        }
-
-        response = await updateStudent(studentId, submitData);
-      } else {
-        // Use JSON for update without image
-        const submitData: any = {
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          phone: formData.phone.trim(),
-          gender: formData.gender,
-          status: formData.status,
-        };
-
-        if (formData.fatherName && formData.fatherName.trim()) {
-          submitData.fatherName = formData.fatherName.trim();
-        }
-        if (formData.fatherPhone && formData.fatherPhone.trim()) {
-          submitData.fatherPhone = formData.fatherPhone.trim();
-        }
-        if (formData.notes && formData.notes.trim()) {
-          submitData.notes = formData.notes.trim();
-        }
-
-        console.log('📤 Sending JSON data:', submitData);
-        response = await updateStudent(studentId, submitData);
-      }
-      
-      console.log('✅ Update response:', response);
-      
-      setSuccess("Student information updated successfully!");
-      
-      // Refresh data
-      await fetchStudentData();
-      // Clear image file after successful update
-      setImageFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      
-      setTimeout(() => {
-        if (onUpdate) onUpdate();
-        onClose();
-      }, 1500);
-    } catch (error) {
-      console.error('❌ Failed to update student:', error);
-      setError(error instanceof Error ? error.message : "Failed to update student");
-    } finally {
-      setSaving(false);
+    if (!studentId) {
+      setLocalError("Student ID is missing");
+      return;
     }
+
+    // Validate required fields
+    if (!formData.firstName || !formData.firstName.trim()) {
+      setLocalError("First name is required");
+      return;
+    }
+
+    if (!formData.lastName || !formData.lastName.trim()) {
+      setLocalError("Last name is required");
+      return;
+    }
+
+    if (!formData.phone || !formData.phone.trim()) {
+      setLocalError("Phone number is required");
+      return;
+    }
+
+    const phoneRegex = /^07\d{8}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setLocalError(
+        "Phone number must start with 07 and be 10 digits (e.g., 0777123456)"
+      );
+      return;
+    }
+
+    if (formData.fatherPhone && formData.fatherPhone.trim()) {
+      if (!phoneRegex.test(formData.fatherPhone)) {
+        setLocalError(
+          "Father's phone number must start with 07 and be 10 digits (e.g., 0777123456)"
+        );
+        return;
+      }
+    }
+
+    // Prepare payload — FormData if image, otherwise JSON
+    let ok: boolean;
+
+    if (imageFile) {
+      const submitData = new FormData();
+      submitData.append("firstName", formData.firstName.trim());
+      submitData.append("lastName", formData.lastName.trim());
+      submitData.append("phone", formData.phone.trim());
+      submitData.append("image", imageFile);
+
+      if (formData.fatherName && formData.fatherName.trim()) {
+        submitData.append("fatherName", formData.fatherName.trim());
+      }
+      if (formData.fatherPhone && formData.fatherPhone.trim()) {
+        submitData.append("fatherPhone", formData.fatherPhone.trim());
+      }
+      submitData.append("gender", formData.gender);
+      submitData.append("status", formData.status);
+      if (formData.notes && formData.notes.trim()) {
+        submitData.append("notes", formData.notes.trim());
+      }
+
+      ok = await updateStudent(studentId, submitData);
+    } else {
+      const submitData: any = {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        phone: formData.phone.trim(),
+        gender: formData.gender,
+        status: formData.status,
+      };
+
+      if (formData.fatherName && formData.fatherName.trim()) {
+        submitData.fatherName = formData.fatherName.trim();
+      }
+      if (formData.fatherPhone && formData.fatherPhone.trim()) {
+        submitData.fatherPhone = formData.fatherPhone.trim();
+      }
+      if (formData.notes && formData.notes.trim()) {
+        submitData.notes = formData.notes.trim();
+      }
+
+      ok = await updateStudent(studentId, submitData);
+    }
+
+    if (!ok) return; // error is surfaced via `error`
+
+    setSuccess("Student information updated successfully!");
+
+    // Refresh data
+    await refetch();
+
+    // Clear the pending image file (form already shows fresh preview)
+    setImageFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    setTimeout(() => {
+      if (onUpdate) onUpdate();
+      onClose();
+    }, 1500);
   };
 
   const handleClose = () => {
@@ -396,7 +394,6 @@ const StudentPersonalInfoModal = ({
                     </button>
                   )}
                 </div>
-                {/* ✅ FIXED: Display image with full URL */}
                 {imagePreview && (
                   <div className="mt-3">
                     <img
@@ -404,8 +401,7 @@ const StudentPersonalInfoModal = ({
                       alt="Student preview"
                       className="h-20 w-20 rounded-lg object-cover border border-gray-200"
                       onError={(e) => {
-                        // If image fails to load, hide it
-                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.style.display = "none";
                       }}
                     />
                   </div>

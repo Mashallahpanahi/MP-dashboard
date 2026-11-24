@@ -1,8 +1,9 @@
 // src/components/dashboard/GenerateReportModal.tsx
 import { useEffect, useRef, useState } from "react";
 import {
-  getDashboardReportByMonth,
+  useDashboardReportByMonth,
   type DashboardByMonthResponse,
+  type DashboardByMonthParams,
 } from "@/api/dashboardApi";
 // ✅ Shamsi helpers
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
@@ -52,12 +53,29 @@ const GenerateReportModal = ({
   const [rangeFrom, setRangeFrom] = useState<string>(initialFromDate || "");
   const [rangeTo, setRangeTo] = useState<string>(initialToDate || "");
 
-  const [loading, setLoading] = useState(false);
+  // ✅ Parameters that were "confirmed" by clicking Generate.
+  //    null → hook is disabled and doesn't fetch.
+  const [submittedParams, setSubmittedParams] =
+    useState<DashboardByMonthParams | null>(null);
+
+  // ✅ Local error (validation + PDF download). Fetch errors come from hook.
   const [error, setError] = useState("");
-  const [report, setReport] = useState<DashboardByMonthResponse | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // ✅ The hook replaces the old getDashboardReportByMonth() call.
+  const {
+    data: report,
+    loading,
+    error: fetchError,
+  } = useDashboardReportByMonth(
+    submittedParams || {},
+    !!submittedParams, // enabled only after user clicks Generate
+  );
+
+  // ✅ Combined error (validation / PDF / fetch)
+  const combinedError = error || fetchError || "";
 
   // Close on Escape
   useEffect(() => {
@@ -76,9 +94,8 @@ const GenerateReportModal = ({
       setShamsiYear(todayShamsi.year);
       setRangeFrom(initialFromDate || "");
       setRangeTo(initialToDate || "");
-      setLoading(false);
+      setSubmittedParams(null); // ← disables the hook
       setError("");
-      setReport(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -90,7 +107,7 @@ const GenerateReportModal = ({
   // ============================================
   const convertShamsiMonthYearToMiladi = (
     shYear: number,
-    shMonth: number
+    shMonth: number,
   ): { month: number; year: number } => {
     try {
       const m = convertToMillady({
@@ -106,55 +123,30 @@ const GenerateReportModal = ({
   };
 
   // ============================================
-  // GENERATE
+  // GENERATE — synchronous: validate then set params.
+  // The hook does the actual fetch.
   // ============================================
-  const handleGenerate = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      setReport(null);
+  const handleGenerate = () => {
+    setError("");
 
-      if (mode === "range") {
-        if (!rangeFrom || !rangeTo) {
-          setError("Please pick both From and To dates.");
-          setLoading(false);
-          return;
-        }
-        if (rangeFrom > rangeTo) {
-          setError("From date must be before To date.");
-          setLoading(false);
-          return;
-        }
+    if (mode === "range") {
+      if (!rangeFrom || !rangeTo) {
+        setError("Please pick both From and To dates.");
+        return;
       }
-
-      let response: DashboardByMonthResponse;
-
-      if (mode === "range") {
-        response = await getDashboardReportByMonth({
-          fromDate: rangeFrom,
-          toDate: rangeTo,
-        });
-      } else {
-        const miladi = convertShamsiMonthYearToMiladi(shamsiYear, shamsiMonth);
-        response = await getDashboardReportByMonth({
-          month: miladi.month,
-          year: miladi.year,
-        });
+      if (rangeFrom > rangeTo) {
+        setError("From date must be before To date.");
+        return;
       }
-
-      setReport(response);
-    } catch (err) {
-      console.error("Failed to generate report:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to generate report"
-      );
-    } finally {
-      setLoading(false);
+      setSubmittedParams({ fromDate: rangeFrom, toDate: rangeTo });
+    } else {
+      const miladi = convertShamsiMonthYearToMiladi(shamsiYear, shamsiMonth);
+      setSubmittedParams({ month: miladi.month, year: miladi.year });
     }
   };
 
   // ============================================
-  // DOWNLOAD PDF
+  // DOWNLOAD PDF — unchanged
   // ============================================
   const handleDownloadPDF = async () => {
     if (!reportRef.current || !report) return;
@@ -204,7 +196,7 @@ const GenerateReportModal = ({
           imgW,
           imgH,
           undefined,
-          "FAST"
+          "FAST",
         );
         heightLeft -= pageH;
       }
@@ -229,6 +221,9 @@ const GenerateReportModal = ({
   const data = report?.data;
   const filters = report?.filters;
 
+  // ✅ Hide preview & PDF button while a new fetch is in flight
+  const showReport = !!report && !!data && !loading;
+
   const periodLabel = filters
     ? filters.mode === "range"
       ? "Custom Range Report"
@@ -239,7 +234,7 @@ const GenerateReportModal = ({
     filters?.fromDate && filters?.toDate
       ? `${formatShamsi(filters.fromDate, "YYYY/MM/DD")} → ${formatShamsi(
           filters.toDate,
-          "YYYY/MM/DD"
+          "YYYY/MM/DD",
         )}`
       : "";
 
@@ -249,7 +244,6 @@ const GenerateReportModal = ({
     day: "numeric",
   });
 
-  // ✅ Benefit / loss logic
   const isBenefit = (data?.totalBenefit ?? 0) >= 0;
   const resultLabel = isBenefit ? "(Benefit)" : "(Loss)";
 
@@ -262,7 +256,7 @@ const GenerateReportModal = ({
         className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER */}
+        {/* HEADER — unchanged */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
@@ -418,17 +412,17 @@ const GenerateReportModal = ({
             </p>
           </div>
 
-          {/* Error */}
-          {error && (
+          {/* ✅ Combined error (validation + fetch + PDF) */}
+          {combinedError && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="text-sm font-medium text-red-700">{error}</p>
+              <p className="text-sm font-medium text-red-700">
+                {combinedError}
+              </p>
             </div>
           )}
 
-          {/* ============================================ */}
-          {/* ✅ REPORT PREVIEW — Simple Word-style text */}
-          {/* ============================================ */}
-          {report && data && (
+          {/* REPORT PREVIEW */}
+          {showReport && data && (
             <div
               ref={reportRef}
               className="bg-white p-8 text-black"
@@ -437,58 +431,42 @@ const GenerateReportModal = ({
                 lineHeight: 1.7,
               }}
             >
-              {/* Title */}
-              <h1 className="text-2xl font-bold tracking-wide">
-                CEO Report
-              </h1>
-
-              {/* Period */}
+              <h1 className="text-2xl font-bold tracking-wide">CEO Report</h1>
               <p className="mt-1 text-lg font-semibold">{periodLabel}</p>
-
-              {/* Range + generated date */}
               <p className="mt-1 text-xs text-gray-600">
                 {rangeLabel}
                 {rangeLabel && " · "}
                 Generated on {generatedOn}
               </p>
-
-              {/* Divider */}
               <hr className="my-5 border-gray-300" />
 
-              {/* Body — plain text */}
               <div className="space-y-3 text-[15px]">
                 <p>
                   <span className="font-semibold">Total Students = </span>
                   {formatNumber(data.totalStudents)}
                 </p>
-
                 <p>
                   <span className="font-semibold">Active Students = </span>
                   {formatNumber(data.totalActiveStudents)}
                 </p>
-
                 <p>
                   <span className="font-semibold">Inactive Students = </span>
                   {formatNumber(data.totalInactiveStudents)}
                 </p>
-
                 <p>
                   <span className="font-semibold">
                     All students which enrolled (Enrolled Students) ={" "}
                   </span>
                   {formatNumber(data.totalEnrolledStudents)}
                 </p>
-
                 <p>
                   <span className="font-semibold">Active Teachers = </span>
                   {formatNumber(data.totalActiveTeachers)}
                 </p>
-
                 <p>
                   <span className="font-semibold">Total Income = </span>
                   {formatCurrency(data.totalIncome)}
                 </p>
-
                 <p>
                   <span className="font-semibold">
                     The total salary we payed for our teachers (Payroll
@@ -496,21 +474,18 @@ const GenerateReportModal = ({
                   </span>
                   {formatCurrency(data.totalPayrollExpenses)}
                 </p>
-
                 <p>
                   <span className="font-semibold">
                     All other expenses in center we did (Other Expenses) ={" "}
                   </span>
                   {formatCurrency(data.totalOtherExpenses)}
                 </p>
-
                 <p>
                   <span className="font-semibold">
                     Teacher salary + other expenses (Total Expenses) ={" "}
                   </span>
                   {formatCurrency(data.totalExpenses)}
                 </p>
-
                 <p>
                   <span className="font-semibold">
                     If we subtract our expenses from our income, the result is
@@ -520,17 +495,14 @@ const GenerateReportModal = ({
                 </p>
               </div>
 
-              {/* Note */}
               <p className="mt-8 text-sm leading-relaxed text-gray-800">
-                If anything is not completely clear for you, please feel free
-                to ask — I will explain it and provide more information.
+                If anything is not completely clear for you, please feel free to
+                ask — I will explain it and provide more information.
               </p>
-
               <p className="mt-4 text-sm font-semibold text-gray-900">
                 By regard, Manager of Center.
               </p>
 
-              {/* RESULT — with benefit / loss label */}
               <div className="mt-10 border-t border-gray-300 pt-6">
                 <p className="text-sm font-bold tracking-widest text-gray-700">
                   Result
@@ -557,7 +529,8 @@ const GenerateReportModal = ({
             Cancel
           </button>
 
-          {report && (
+          {/* ✅ Same visibility rule as preview */}
+          {showReport && (
             <button
               type="button"
               onClick={handleDownloadPDF}

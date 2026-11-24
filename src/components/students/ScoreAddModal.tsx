@@ -1,10 +1,13 @@
 // src/components/students/ScoreAddModal.tsx
-import { useState, useEffect } from "react";
-import { createStudentScore, getScoresByStudent } from "@/api/scoreApi";
-import type { CreateStudentScoreData } from "@/api/scoreApi";
-import { getBooks, type Book } from "@/api/bookApi";
-import { getTeachers, type Teacher } from "@/api/teacherApi";
-import { getEnrollmentsByStudent } from "@/api/studentEnrollmentApi";
+import { useState, useEffect, useRef } from "react";
+import {
+  useCreateStudentScore,
+  useScoresByStudent,
+  type CreateStudentScoreData,
+} from "@/api/scoreApi";
+import { useBooks, type Book } from "@/api/bookApi";
+import { useTeachers, type Teacher } from "@/api/teacherApi";
+import { useEnrollmentsByStudent } from "@/api/studentEnrollmentApi";
 // ✅ Shamsi date picker + miladi helper
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import { formatMiladiISO } from "@/utils/dateConverter";
@@ -29,6 +32,13 @@ interface EnrolledBook {
   hasScore: boolean;
 }
 
+// Handle both raw array and wrapped { data: [...] } responses
+const normalizeArray = (x: any): any[] => {
+  if (Array.isArray(x)) return x;
+  if (x && typeof x === "object" && Array.isArray(x.data)) return x.data;
+  return [];
+};
+
 const ScoreAddModal = ({
   isOpen,
   studentId,
@@ -36,16 +46,38 @@ const ScoreAddModal = ({
   onClose,
   onSuccess,
 }: ScoreAddModalProps) => {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [loadingData, setLoadingData] = useState(true);
+  // ✅ Hooks replace every imperative fetch in the original
+  const { data: rawBooks, loading: booksLoading } = useBooks();
+  const { data: rawTeachers, loading: teachersLoading } = useTeachers();
+  const { data: rawEnrollments, loading: enrollmentsLoading } =
+    useEnrollmentsByStudent(studentId ?? "", isOpen && !!studentId);
+  const { data: rawScores, loading: scoresLoading } = useScoresByStudent(
+    studentId ?? "",
+    isOpen && !!studentId,
+  );
 
-  const [books, setBooks] = useState<Book[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  // ✅ Create hook
+ const {
+  create: createStudentScore,
+  loading: saving,
+  error: createError,
+} = useCreateStudentScore();
+
+  // Local UI state
+  const [localError, setLocalError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const error = localError || createError || "";
+
+  const loadingData =
+    booksLoading || teachersLoading || enrollmentsLoading || scoresLoading;
+
+  // Derived enrichment (matches original fetchData output)
   const [enrolledBooks, setEnrolledBooks] = useState<EnrolledBook[]>([]);
   const [availableBooks, setAvailableBooks] = useState<EnrolledBook[]>([]);
-  const [existingScores, setExistingScores] = useState<any[]>([]);
+
+  // Prevents auto-fill from firing more than once per open
+  const autoFilledRef = useRef(false);
 
   const [formData, setFormData] = useState<{
     bookId: string;
@@ -62,149 +94,121 @@ const ScoreAddModal = ({
     midtermScore: undefined,
     finalScore: undefined,
     totalScore: 0,
-    // ✅ Miladi ISO for the backend
     date: formatMiladiISO(new Date()),
     time: "",
     notes: "",
   });
 
+  // ✅ Reset on open
   useEffect(() => {
-    if (isOpen && studentId) {
-      fetchData();
+    if (isOpen) {
+      autoFilledRef.current = false;
+      setLocalError("");
+      setSuccess("");
+      setFormData({
+        bookId: "",
+        teacherId: "",
+        midtermScore: undefined,
+        finalScore: undefined,
+        totalScore: 0,
+        date: formatMiladiISO(new Date()),
+        time: "",
+        notes: "",
+      });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, studentId]);
 
-  const fetchData = async () => {
-    if (!studentId) return;
+  // ✅ Enrichment effect (matches original fetchData logic)
+  useEffect(() => {
+    if (!isOpen) return;
 
-    try {
-      setLoadingData(true);
-      setError("");
+    const enrollmentsData = normalizeArray(rawEnrollments);
+    const scoresArray = normalizeArray(rawScores);
+    const booksArray = Array.isArray(rawBooks) ? rawBooks : [];
+    const teachersArray = Array.isArray(rawTeachers) ? rawTeachers : [];
 
-      const [enrollmentsResponse, booksData, teachersData, scoresData] =
-        await Promise.all([
-          getEnrollmentsByStudent(studentId).catch(() => []),
-          getBooks().catch(() => []),
-          getTeachers().catch(() => []),
-          getScoresByStudent(studentId).catch(() => []),
-        ]);
+    const bookMap: Record<string, Book> = {};
+    booksArray.forEach((b: Book) => {
+      bookMap[b.id] = b;
+    });
 
-      let enrollmentsData: any[] = [];
-      if (Array.isArray(enrollmentsResponse)) {
-        enrollmentsData = enrollmentsResponse;
-      } else if (
-        enrollmentsResponse &&
-        typeof enrollmentsResponse === "object"
-      ) {
-        if (Array.isArray((enrollmentsResponse as any).data)) {
-          enrollmentsData = (enrollmentsResponse as any).data;
-        }
-      }
+    const teacherMap: Record<string, Teacher> = {};
+    teachersArray.forEach((t: Teacher) => {
+      teacherMap[t.id] = t;
+    });
 
-      let scoresArray: any[] = [];
-      if (Array.isArray(scoresData)) {
-        scoresArray = scoresData;
-      } else if (scoresData && typeof scoresData === "object") {
-        if (Array.isArray((scoresData as any).data)) {
-          scoresArray = (scoresData as any).data;
-        }
-      }
+    const enrolled: EnrolledBook[] = [];
 
-      const booksArray = Array.isArray(booksData) ? booksData : [];
-      const teachersArray = Array.isArray(teachersData) ? teachersData : [];
+    enrollmentsData.forEach((item: any) => {
+      const enrollment = item.enrollment || item;
+      if (!enrollment || !enrollment.id) return;
 
-      const bookMap: Record<string, Book> = {};
-      booksArray.forEach((b: Book) => {
-        bookMap[b.id] = b;
-      });
+      const book = bookMap[enrollment.bookId];
+      const teacher = teacherMap[enrollment.teacherId];
+      if (!book) return;
 
-      const teacherMap: Record<string, Teacher> = {};
-      teachersArray.forEach((t: Teacher) => {
-        teacherMap[t.id] = t;
-      });
-
-      const enrolled: EnrolledBook[] = [];
-
-      enrollmentsData.forEach((item: any) => {
-        const enrollment = item.enrollment || item;
-        if (!enrollment || !enrollment.id) return;
-
-        const book = bookMap[enrollment.bookId];
-        const teacher = teacherMap[enrollment.teacherId];
-
-        if (!book) return;
-
-        const hasScore = scoresArray.some(
-          (s: any) => s.bookId === enrollment.bookId
-        );
-
-        console.log("📋 Enrollment data:", {
-          id: enrollment.id,
-          bookId: enrollment.bookId,
-          teacherId: enrollment.teacherId,
-          timetable: enrollment.timetable,
-          time: enrollment.time,
-          schedule: enrollment.schedule,
-          allFields: Object.keys(enrollment),
-        });
-
-        const enrollmentTime =
-          enrollment.timetable ||
-          enrollment.time ||
-          enrollment.schedule ||
-          enrollment.classTime ||
-          "";
-
-        enrolled.push({
-          enrollmentId: enrollment.id,
-          bookId: enrollment.bookId,
-          bookName: book.name,
-          teacherId: enrollment.teacherId,
-          teacherName: teacher
-            ? `${teacher.firstName} ${teacher.lastName}`
-            : "Unknown Teacher",
-          status: enrollment.status || "Studying",
-          startDate: enrollment.startDate || new Date().toISOString(),
-          time: enrollmentTime,
-          hasScore,
-        });
-      });
-
-      enrolled.sort(
-        (a, b) =>
-          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      const hasScore = scoresArray.some(
+        (s: any) => s.bookId === enrollment.bookId,
       );
 
-      setEnrolledBooks(enrolled);
-      setBooks(booksArray);
-      setTeachers(teachersArray);
-      setExistingScores(scoresArray);
+      const enrollmentTime =
+        enrollment.timetable ||
+        enrollment.time ||
+        enrollment.schedule ||
+        enrollment.classTime ||
+        "";
 
-      const available = enrolled.filter((e) => !e.hasScore);
-      setAvailableBooks(available);
+      enrolled.push({
+        enrollmentId: enrollment.id,
+        bookId: enrollment.bookId,
+        bookName: book.name,
+        teacherId: enrollment.teacherId,
+        teacherName: teacher
+          ? `${teacher.firstName} ${teacher.lastName}`
+          : "Unknown Teacher",
+        status: enrollment.status || "Studying",
+        startDate: enrollment.startDate || new Date().toISOString(),
+        time: enrollmentTime,
+        hasScore,
+      });
+    });
 
-      if (available.length > 0) {
-        const latestEnrollment = available[0];
-        setFormData((prev) => ({
-          ...prev,
-          bookId: latestEnrollment.bookId,
-          teacherId: latestEnrollment.teacherId,
-          date: formatMiladiISO(new Date()),
-          time: latestEnrollment.time || "",
-        }));
+    enrolled.sort(
+      (a, b) =>
+        new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
+    );
 
-        console.log(
-          "✅ Auto-filled time from enrollment:",
-          latestEnrollment.time
-        );
-      }
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      setError("Failed to load data. Please try again.");
-    } finally {
-      setLoadingData(false);
+    const available = enrolled.filter((e) => !e.hasScore);
+
+    setEnrolledBooks(enrolled);
+    setAvailableBooks(available);
+
+    // Auto-fill only once per open
+    if (available.length > 0 && !autoFilledRef.current) {
+      autoFilledRef.current = true;
+      const latest = available[0];
+      setFormData((prev) => ({
+        ...prev,
+        bookId: latest.bookId,
+        teacherId: latest.teacherId,
+        date: formatMiladiISO(new Date()),
+        time: latest.time || "",
+      }));
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawEnrollments, rawScores, rawBooks, rawTeachers, isOpen]);
+
+  // ✅ Auto-calculate total score
+  useEffect(() => {
+    const midterm = formData.midtermScore || 0;
+    const final = formData.finalScore || 0;
+    setFormData((prev) => ({
+      ...prev,
+      totalScore: midterm + final,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.midtermScore, formData.finalScore]);
 
   const handleBookChange = (bookId: string) => {
     const selected = enrolledBooks.find((eb) => eb.bookId === bookId);
@@ -225,7 +229,7 @@ const ScoreAddModal = ({
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
@@ -242,107 +246,82 @@ const ScoreAddModal = ({
     }
   };
 
-  useEffect(() => {
-    const midterm = formData.midtermScore || 0;
-    const final = formData.finalScore || 0;
-    setFormData((prev) => ({
-      ...prev,
-      totalScore: midterm + final,
-    }));
-  }, [formData.midtermScore, formData.finalScore]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    setError("");
+    setLocalError("");
     setSuccess("");
 
-    try {
-      if (!studentId) {
-        setError("Student ID is missing");
-        setSaving(false);
-        return;
-      }
-
-      if (!formData.bookId) {
-        setError("Please select a book");
-        setSaving(false);
-        return;
-      }
-
-      const isEnrolled = enrolledBooks.some(
-        (eb) => eb.bookId === formData.bookId
-      );
-      if (!isEnrolled) {
-        setError("Please select a book that this student is enrolled in");
-        setSaving(false);
-        return;
-      }
-
-      const alreadyHasScore = existingScores.some(
-        (s: any) => s.bookId === formData.bookId
-      );
-      if (alreadyHasScore) {
-        setError(
-          "This book already has a score record. Please use Edit instead."
-        );
-        setSaving(false);
-        return;
-      }
-
-      if (!formData.teacherId) {
-        setError("Please select a teacher");
-        setSaving(false);
-        return;
-      }
-
-      const hasMidterm =
-        formData.midtermScore !== undefined &&
-        formData.midtermScore !== null;
-      const hasFinal =
-        formData.finalScore !== undefined && formData.finalScore !== null;
-
-      if (!hasMidterm && !hasFinal) {
-        setError("Please enter at least a midterm or final score");
-        setSaving(false);
-        return;
-      }
-
-      const submitData: CreateStudentScoreData = {
-        studentId: studentId,
-        bookId: formData.bookId,
-        teacherId: formData.teacherId,
-        totalScore: formData.totalScore,
-        // ✅ formData.date is already Miladi ISO
-        date: formData.date,
-        time: formData.time,
-        notes: formData.notes,
-      };
-
-      if (hasMidterm) {
-        submitData.midtermScore = formData.midtermScore;
-      }
-
-      if (hasFinal) {
-        submitData.finalScore = formData.finalScore;
-      }
-
-      console.log("📤 Creating score with data:", submitData);
-
-      await createStudentScore(submitData);
-
-      setSuccess("Score added successfully!");
-
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-        onClose();
-      }, 1500);
-    } catch (error) {
-      console.error("❌ Failed to add score:", error);
-      setError(error instanceof Error ? error.message : "Failed to add score");
-    } finally {
-      setSaving(false);
+    if (!studentId) {
+      setLocalError("Student ID is missing");
+      return;
     }
+
+    if (!formData.bookId) {
+      setLocalError("Please select a book");
+      return;
+    }
+
+    const isEnrolled = enrolledBooks.some(
+      (eb) => eb.bookId === formData.bookId,
+    );
+    if (!isEnrolled) {
+      setLocalError("Please select a book that this student is enrolled in");
+      return;
+    }
+
+    const scoresArray = normalizeArray(rawScores);
+    const alreadyHasScore = scoresArray.some(
+      (s: any) => s.bookId === formData.bookId,
+    );
+    if (alreadyHasScore) {
+      setLocalError(
+        "This book already has a score record. Please use Edit instead.",
+      );
+      return;
+    }
+
+    if (!formData.teacherId) {
+      setLocalError("Please select a teacher");
+      return;
+    }
+
+    const hasMidterm =
+      formData.midtermScore !== undefined && formData.midtermScore !== null;
+    const hasFinal =
+      formData.finalScore !== undefined && formData.finalScore !== null;
+
+    if (!hasMidterm && !hasFinal) {
+      setLocalError("Please enter at least a midterm or final score");
+      return;
+    }
+
+    const submitData: CreateStudentScoreData = {
+      studentId: studentId,
+      bookId: formData.bookId,
+      teacherId: formData.teacherId,
+      totalScore: formData.totalScore,
+      date: formData.date,
+      time: formData.time,
+      notes: formData.notes,
+    };
+
+    if (hasMidterm) {
+      submitData.midtermScore = formData.midtermScore;
+    }
+
+    if (hasFinal) {
+      submitData.finalScore = formData.finalScore;
+    }
+
+    const ok = await createStudentScore(submitData);
+    if (!ok) return; // error surfaces via `error`
+
+    setSuccess("Score added successfully!");
+
+    setTimeout(() => {
+      if (onSuccess) onSuccess();
+      onClose();
+    }, 1500);
   };
 
   const handleClose = () => {
@@ -441,8 +420,8 @@ const ScoreAddModal = ({
               No Enrollments Found
             </h4>
             <p className="mt-2 text-sm text-yellow-700">
-              This student is not enrolled in any courses yet. Please enroll
-              the student in a course first before adding scores.
+              This student is not enrolled in any courses yet. Please enroll the
+              student in a course first before adding scores.
             </p>
             <button
               onClick={handleClose}
@@ -639,7 +618,6 @@ const ScoreAddModal = ({
 
             {/* ✅ Date and Time */}
             <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Date — Shamsi picker */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Date

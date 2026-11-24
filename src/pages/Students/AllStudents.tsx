@@ -1,18 +1,16 @@
 // src/pages/Students/AllStudents.tsx
-
-import { useEffect, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import {
-  getStudents,
-  deleteStudent,
-  getStudentById,
-  getPaginatedStudents,
-  getUnenrolledStudents,
-  searchStudentsByName,
-  searchStudentByNumber,
-  getFilteredStudents,
+  useStudentById,
+  useDeleteStudent,
+  usePaginatedStudents,
+  useUnenrolledStudents,
+  useSearchStudentsByName,
+  useSearchStudentByNumber,
+  useFilteredStudents,
+  type Student,
   type FilteredStudent,
 } from "@/api/studentApi";
-import type { Student } from "@/types/student";
 import {
   StudentDetailModal,
   StudentDeleteModal,
@@ -46,40 +44,51 @@ type SearchType = "name" | "studentNumber";
 
 const AllStudents = () => {
   const navigate = useNavigate();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<FilteredStudent[]>(
-    []
-  );
-  const [loading, setLoading] = useState(true);
+
+  // ============================================
+  // VIEW MODE STATE (the driver for all hooks)
+  // ============================================
+  const [viewMode, setViewMode] = useState<ViewMode>("paginated");
   const [error, setError] = useState("");
 
   // ============================================
-  // FILTER & SEARCH STATE
+  // SEARCH STATE
   // ============================================
-  const [viewMode, setViewMode] = useState<ViewMode>("paginated");
   const [searchType, setSearchType] = useState<SearchType>("name");
+  const [searchInput, setSearchInput] = useState("");
   const [searchName, setSearchName] = useState("");
   const [searchNumber, setSearchNumber] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+
+  // ============================================
+  // DATE FILTER STATE
+  // ============================================
   const [useDateFilter, setUseDateFilter] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [appliedDateFilter, setAppliedDateFilter] = useState<{
+    fromDate?: string;
+    toDate?: string;
+  }>({});
 
+  // ============================================
+  // MORE FILTER STATE
+  // ============================================
   const [showMoreFilter, setShowMoreFilter] = useState(false);
   const [moreFilters, setMoreFilters] = useState<MoreFilterValues>({});
 
+  // ============================================
+  // PAGINATION STATE
+  // ============================================
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
 
+  // ============================================
+  // MODAL STATE
+  // ============================================
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [studentToView, setStudentToView] = useState<Student | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [studentToViewId, setStudentToViewId] = useState<string | null>(null);
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [studentForEdit, setStudentForEdit] = useState<Student | null>(null);
@@ -90,212 +99,185 @@ const AllStudents = () => {
 
   const [showScoresModal, setShowScoresModal] = useState(false);
   const [studentForScores, setStudentForScores] = useState<Student | null>(
-    null
+    null,
   );
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [studentForHistory, setStudentForHistory] = useState<Student | null>(
-    null
+    null,
   );
 
   // ============================================
-  // DATA FETCHING
+  // DATA HOOKS (only one fires at a time)
   // ============================================
-  const fetchPaginatedStudents = useCallback(
-    async (page: number = 1, limit: number = pageSize) => {
-      try {
-        setLoading(true);
-        setError("");
-        setFilteredStudents([]);
-
-        const response = await getPaginatedStudents(
-          page,
-          limit,
-          useDateFilter ? fromDate : undefined,
-          useDateFilter ? toDate : undefined
-        );
-
-        if (response.success) {
-          setStudents(response.data);
-          setCurrentPage(response.pagination.page);
-          setTotalPages(response.pagination.totalPages);
-          setTotalCount(response.pagination.total);
-          setViewMode("paginated");
-        }
-      } catch (error) {
-        console.error("Failed to fetch paginated students:", error);
-        setError(
-          error instanceof Error ? error.message : "Failed to fetch students"
-        );
-      } finally {
-        setLoading(false);
-      }
+  const paginated = usePaginatedStudents(
+    {
+      page: currentPage,
+      limit: pageSize,
+      fromDate: appliedDateFilter.fromDate,
+      toDate: appliedDateFilter.toDate,
     },
-    [pageSize, useDateFilter, fromDate, toDate]
+    viewMode === "paginated",
   );
 
-  const fetchUnenrolledStudents = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-      setFilteredStudents([]);
-
-      const response = await getUnenrolledStudents(
-        useDateFilter ? fromDate : undefined,
-        useDateFilter ? toDate : undefined
-      );
-
-      if (response.success) {
-        setStudents(response.data);
-        setTotalCount(response.count);
-        setTotalPages(1);
-        setCurrentPage(1);
-        setViewMode("unenrolled");
-      }
-    } catch (error) {
-      console.error("Failed to fetch unenrolled students:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch unenrolled students"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [useDateFilter, fromDate, toDate]);
-
-  const handleSearchByName = useCallback(async (name: string) => {
-    try {
-      setLoading(true);
-      setError("");
-      setSearchName(name);
-      setSearchNumber("");
-      setFilteredStudents([]);
-
-      const response = await searchStudentsByName(name);
-
-      if (response.success) {
-        const results = Array.isArray(response.data)
-          ? response.data
-          : [response.data].filter(Boolean);
-
-        setStudents(results);
-        setTotalCount(results.length);
-        setTotalPages(1);
-        setCurrentPage(1);
-        setViewMode("search-name");
-      }
-    } catch (error) {
-      console.error("Failed to search students by name:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to search students"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleSearchByNumber = useCallback(async (studentNumber: string) => {
-    try {
-      setLoading(true);
-      setError("");
-      setSearchNumber(studentNumber);
-      setSearchName("");
-      setFilteredStudents([]);
-
-      const response = await searchStudentByNumber(studentNumber);
-
-      if (response.success) {
-        const results = Array.isArray(response.data)
-          ? response.data
-          : [response.data].filter(Boolean);
-
-        setStudents(results);
-        setTotalCount(results.length);
-        setTotalPages(1);
-        setCurrentPage(1);
-        setViewMode("search-number");
-      }
-    } catch (error) {
-      console.error("Failed to search student by number:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to search student by number"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleApplyMoreFilters = useCallback(
-    async (filters: MoreFilterValues) => {
-      try {
-        setLoading(true);
-        setError("");
-        setMoreFilters(filters);
-        setShowMoreFilter(false);
-
-        const response = await getFilteredStudents(filters);
-
-        if (response.success) {
-          setFilteredStudents(response.data);
-          setStudents(response.data.map((item) => item.student));
-          setTotalCount(response.count);
-          setTotalPages(1);
-          setCurrentPage(1);
-          setViewMode("filtered");
-        }
-      } catch (error) {
-        console.error("Failed to apply filters:", error);
-        setError(
-          error instanceof Error ? error.message : "Failed to apply filters"
-        );
-      } finally {
-        setLoading(false);
-      }
+  const unenrolled = useUnenrolledStudents(
+    {
+      fromDate: appliedDateFilter.fromDate,
+      toDate: appliedDateFilter.toDate,
     },
-    []
+    viewMode === "unenrolled",
   );
 
-  const handleSearch = useCallback(async () => {
-    const trimmedInput = searchInput.trim();
+  const byName = useSearchStudentsByName(
+    searchName,
+    viewMode === "search-name",
+  );
 
-    if (!trimmedInput) {
-      fetchPaginatedStudents(1);
-      return;
-    }
+  const byNumber = useSearchStudentByNumber(
+    searchNumber,
+    viewMode === "search-number",
+  );
 
-    if (searchType === "name") {
-      await handleSearchByName(trimmedInput);
-    } else {
-      await handleSearchByNumber(trimmedInput);
+  const filtered = useFilteredStudents(moreFilters, viewMode === "filtered");
+
+  const detail = useStudentById(studentToViewId ?? "", !!studentToViewId);
+
+  const deleteHook = useDeleteStudent();
+
+  // ============================================
+  // DERIVED STATE
+  // ============================================
+  const students: Student[] = useMemo(() => {
+    switch (viewMode) {
+      case "paginated":
+        return paginated.data?.data ?? [];
+      case "unenrolled":
+        return unenrolled.data?.data ?? [];
+      case "search-name":
+        return byName.data?.data ?? [];
+      case "search-number":
+        return byNumber.data?.data ?? [];
+      case "filtered":
+        return filtered.data?.data.map((item) => item.student) ?? [];
+      default:
+        return [];
     }
   }, [
-    searchInput,
-    searchType,
-    handleSearchByName,
-    handleSearchByNumber,
-    fetchPaginatedStudents,
+    viewMode,
+    paginated.data,
+    unenrolled.data,
+    byName.data,
+    byNumber.data,
+    filtered.data,
   ]);
 
-  useEffect(() => {
-    fetchPaginatedStudents(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const filteredStudents: FilteredStudent[] = useMemo(() => {
+    if (viewMode === "filtered") return filtered.data?.data ?? [];
+    return [];
+  }, [viewMode, filtered.data]);
+
+  const loading = useMemo(() => {
+    switch (viewMode) {
+      case "paginated":
+        return paginated.loading;
+      case "unenrolled":
+        return unenrolled.loading;
+      case "search-name":
+        return byName.loading;
+      case "search-number":
+        return byNumber.loading;
+      case "filtered":
+        return filtered.loading;
+      default:
+        return false;
+    }
+  }, [
+    viewMode,
+    paginated.loading,
+    unenrolled.loading,
+    byName.loading,
+    byNumber.loading,
+    filtered.loading,
+  ]);
+
+  const hookError =
+    paginated.error ||
+    unenrolled.error ||
+    byName.error ||
+    byNumber.error ||
+    filtered.error ||
+    deleteHook.error ||
+    "";
+  const displayError = error || hookError;
+
+  const totalPages = paginated.data?.pagination.totalPages ?? 1;
+
+  const totalCount = useMemo(() => {
+    switch (viewMode) {
+      case "paginated":
+        return paginated.data?.pagination.total ?? 0;
+      case "unenrolled":
+        return unenrolled.data?.count ?? unenrolled.data?.data?.length ?? 0;
+      case "search-name":
+        return byName.data?.count ?? byName.data?.data?.length ?? 0;
+      case "search-number":
+        return byNumber.data?.count ?? byNumber.data?.data?.length ?? 0;
+      case "filtered":
+        return filtered.data?.count ?? filtered.data?.data?.length ?? 0;
+      default:
+        return 0;
+    }
+  }, [
+    viewMode,
+    paginated.data,
+    unenrolled.data,
+    byName.data,
+    byNumber.data,
+    filtered.data,
+  ]);
+
+  const deleteLoading = deleteHook.loading;
+
+  // Detail modal only shows once data has arrived for the CORRECT student
+  const showDetailModal =
+    !!studentToViewId && detail.data?.id === studentToViewId;
+  const studentToView = detail.data;
 
   // ============================================
   // HANDLERS
   // ============================================
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
-      fetchPaginatedStudents(newPage);
+      setCurrentPage(newPage);
     }
   };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
-    fetchPaginatedStudents(1, newSize);
+    setCurrentPage(1);
+  };
+
+  const handleSearch = () => {
+    const trimmedInput = searchInput.trim();
+    setError("");
+
+    if (!trimmedInput) {
+      setSearchName("");
+      setSearchNumber("");
+      setViewMode("paginated");
+      setCurrentPage(1);
+      return;
+    }
+
+    if (searchType === "name") {
+      setSearchName(trimmedInput);
+      setSearchNumber("");
+      setViewMode("search-name");
+    } else {
+      setSearchNumber(trimmedInput);
+      setSearchName("");
+      setViewMode("search-number");
+    }
   };
 
   const handleSearchClick = () => handleSearch();
@@ -314,24 +296,33 @@ const AllStudents = () => {
     setSearchName("");
     setSearchNumber("");
     setMoreFilters({});
-    fetchPaginatedStudents(1);
+    setViewMode("paginated");
+    setCurrentPage(1);
   };
 
   const handleShowAllStudents = () => {
-    setViewMode("paginated");
     setSearchInput("");
     setSearchName("");
     setSearchNumber("");
     setMoreFilters({});
-    fetchPaginatedStudents(1);
+    setViewMode("paginated");
+    setCurrentPage(1);
   };
 
   const handleShowUnenrolled = () => {
-    fetchUnenrolledStudents();
+    setViewMode("unenrolled");
+    setCurrentPage(1);
   };
 
   const handleOpenMoreFilter = () => setShowMoreFilter(true);
   const handleCloseMoreFilter = () => setShowMoreFilter(false);
+
+  const handleApplyMoreFilters = (filters: MoreFilterValues) => {
+    setMoreFilters(filters);
+    setShowMoreFilter(false);
+    setViewMode("filtered");
+    setCurrentPage(1);
+  };
 
   const hasActiveMoreFilters =
     moreFilters.teacherId ||
@@ -349,10 +340,19 @@ const AllStudents = () => {
   };
 
   const handleApplyDateFilter = () => {
-    if (viewMode === "unenrolled") {
-      fetchUnenrolledStudents();
-    } else {
-      fetchPaginatedStudents(1);
+    const newFilter = {
+      fromDate: useDateFilter ? fromDate || undefined : undefined,
+      toDate: useDateFilter ? toDate || undefined : undefined,
+    };
+    const sameAsBefore =
+      appliedDateFilter.fromDate === newFilter.fromDate &&
+      appliedDateFilter.toDate === newFilter.toDate;
+    setAppliedDateFilter(newFilter);
+
+    // If params didn't change, force a manual refresh of the active view
+    if (sameAsBefore) {
+      if (viewMode === "paginated") paginated.refetch();
+      else if (viewMode === "unenrolled") unenrolled.refetch();
     }
   };
 
@@ -363,26 +363,22 @@ const AllStudents = () => {
 
   const handleConfirmDelete = async () => {
     if (!studentToDelete) return;
+    setError("");
+    const ok = await deleteHook.remove(studentToDelete.id);
 
-    try {
-      setDeleteLoading(true);
-      await deleteStudent(studentToDelete.id);
-      setStudents((prev) =>
-        prev.filter((student) => student.id !== studentToDelete.id)
-      );
-      setFilteredStudents((prev) =>
-        prev.filter((item) => item.student.id !== studentToDelete.id)
-      );
-      setTotalCount((prev) => prev - 1);
+    if (ok) {
+      // Refetch the active view
+      if (viewMode === "paginated") paginated.refetch();
+      else if (viewMode === "unenrolled") unenrolled.refetch();
+      else if (viewMode === "search-name") byName.refetch();
+      else if (viewMode === "search-number") byNumber.refetch();
+      else if (viewMode === "filtered") filtered.refetch();
       setShowDeleteModal(false);
       setStudentToDelete(null);
-    } catch (error) {
-      console.error("Failed to delete student:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to delete student"
-      );
-    } finally {
-      setDeleteLoading(false);
+    } else {
+      setError("Failed to delete student. Please try again.");
+      setShowDeleteModal(false);
+      setStudentToDelete(null);
     }
   };
 
@@ -391,27 +387,12 @@ const AllStudents = () => {
     setStudentToDelete(null);
   };
 
-  const handleViewClick = async (student: Student) => {
-    try {
-      setDetailLoading(true);
-      const studentData = await getStudentById(student.id);
-      setStudentToView(studentData);
-      setShowDetailModal(true);
-    } catch (error) {
-      console.error("Failed to fetch student details:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load student details"
-      );
-    } finally {
-      setDetailLoading(false);
-    }
+  const handleViewClick = (student: Student) => {
+    setStudentToViewId(student.id);
   };
 
   const handleCloseDetail = () => {
-    setShowDetailModal(false);
-    setStudentToView(null);
+    setStudentToViewId(null);
   };
 
   const handleEditClick = (student: Student) => {
@@ -425,17 +406,11 @@ const AllStudents = () => {
   };
 
   const handleStudentUpdated = () => {
-    if (viewMode === "paginated") {
-      fetchPaginatedStudents(currentPage);
-    } else if (viewMode === "unenrolled") {
-      fetchUnenrolledStudents();
-    } else if (viewMode === "search-name") {
-      handleSearchByName(searchName);
-    } else if (viewMode === "search-number") {
-      handleSearchByNumber(searchNumber);
-    } else if (viewMode === "filtered") {
-      handleApplyMoreFilters(moreFilters);
-    }
+    if (viewMode === "paginated") paginated.refetch();
+    else if (viewMode === "unenrolled") unenrolled.refetch();
+    else if (viewMode === "search-name") byName.refetch();
+    else if (viewMode === "search-number") byNumber.refetch();
+    else if (viewMode === "filtered") filtered.refetch();
   };
 
   const handleViewEnrollments = (student: Student) => {
@@ -598,9 +573,7 @@ const AllStudents = () => {
 
   return (
     <div className="p-6">
-      {/* ============================================ */}
       {/* HEADER */}
-      {/* ============================================ */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">All Students</h1>
@@ -665,9 +638,7 @@ const AllStudents = () => {
         </div>
       </div>
 
-      {/* ============================================ */}
       {/* FILTER BAR */}
-      {/* ============================================ */}
       <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -813,7 +784,8 @@ const AllStudents = () => {
             <button
               onClick={() => {
                 setMoreFilters({});
-                fetchPaginatedStudents(1);
+                setViewMode("paginated");
+                setCurrentPage(1);
               }}
               className="ml-1 text-xs font-medium text-red-600 hover:underline"
             >
@@ -824,9 +796,9 @@ const AllStudents = () => {
       </div>
 
       {/* Error */}
-      {error && (
+      {displayError && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-700">{error}</p>
+          <p className="text-sm font-medium text-red-700">{displayError}</p>
         </div>
       )}
 
@@ -886,21 +858,21 @@ const AllStudents = () => {
             {viewMode === "unenrolled"
               ? "No Unenrolled Students"
               : viewMode === "search-name" || viewMode === "search-number"
-              ? "No Results Found"
-              : viewMode === "filtered"
-              ? "No Students Match Filters"
-              : "No Students Found"}
+                ? "No Results Found"
+                : viewMode === "filtered"
+                  ? "No Students Match Filters"
+                  : "No Students Found"}
           </h3>
           <p className="mt-2 text-sm text-gray-500">
             {viewMode === "unenrolled"
               ? "All students are currently enrolled in courses."
               : viewMode === "search-name"
-              ? `No students found matching name "${searchName}". Try a different name.`
-              : viewMode === "search-number"
-              ? `No student found with number "${searchNumber}". Try a different number.`
-              : viewMode === "filtered"
-              ? "No students match the selected filters. Try removing some filters."
-              : "There are no students registered yet."}
+                ? `No students found matching name "${searchName}". Try a different name.`
+                : viewMode === "search-number"
+                  ? `No student found with number "${searchNumber}". Try a different number.`
+                  : viewMode === "filtered"
+                    ? "No students match the selected filters. Try removing some filters."
+                    : "There are no students registered yet."}
           </p>
           {(viewMode === "search-name" ||
             viewMode === "search-number" ||
@@ -923,9 +895,7 @@ const AllStudents = () => {
         </div>
       )}
 
-      {/* ============================================ */}
-      {/* Students Table — Only Name + Actions */}
-      {/* ============================================ */}
+      {/* Students Table */}
       {students.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -942,11 +912,7 @@ const AllStudents = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {students.map((student) => (
-                  <tr
-                    key={student.id}
-                    className="transition hover:bg-gray-50"
-                  >
-                    {/* Student name only */}
+                  <tr key={student.id} className="transition hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {student.image ? (
@@ -958,13 +924,12 @@ const AllStudents = () => {
                               e.currentTarget.style.display = "none";
                               const parent = e.currentTarget.parentElement;
                               if (parent) {
-                                const fallback =
-                                  document.createElement("div");
+                                const fallback = document.createElement("div");
                                 fallback.className =
                                   "flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-700 text-sm";
-                                fallback.textContent = `${
-                                  student.firstName.charAt(0)
-                                }${student.lastName?.charAt(0) || ""}`;
+                                fallback.textContent = `${student.firstName.charAt(
+                                  0,
+                                )}${student.lastName?.charAt(0) || ""}`;
                                 parent.appendChild(fallback);
                               }
                             }}
@@ -981,7 +946,6 @@ const AllStudents = () => {
                       </div>
                     </td>
 
-                    {/* Actions — all buttons same width */}
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <button
@@ -1034,10 +998,7 @@ const AllStudents = () => {
         </div>
       )}
 
-      {/* ============================================ */}
       {/* MODALS */}
-      {/* ============================================ */}
-
       <StudentDetailModal
         isOpen={showDetailModal}
         student={studentToView}
@@ -1062,14 +1023,9 @@ const AllStudents = () => {
 
       <StudentEnrollmentsModal
         isOpen={showEnrollmentsModal}
-        studentId={studentForEnrollments?.id || null}
-        studentName={`${studentForEnrollments?.firstName || ""} ${
-          studentForEnrollments?.lastName || ""
-        }`}
         student={studentForEnrollments}
         onClose={handleCloseEnrollments}
       />
-
       <StudentScoresModal
         isOpen={showScoresModal}
         studentId={studentForScores?.id || null}

@@ -1,5 +1,5 @@
 // src/components/students/StudentDeleteModal.tsx
-import type { Student } from "@/types/student";
+import type { Student } from "@/api/studentApi";
 
 interface StudentDeleteModalProps {
   isOpen: boolean;
@@ -51,15 +51,16 @@ const StudentDeleteModal = ({
 
         <div className="mb-6 rounded-lg bg-gray-50 p-4">
           <p className="text-sm font-medium text-gray-900">
-            {student.firstName} {student.lastName || ''}
+            {student.firstName} {student.lastName || ""}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            {student.studentNumber || 'No ID'} • {student.phone || 'No phone'}
+            {student.studentNumber || "No ID"} • {student.phone || "No phone"}
           </p>
         </div>
 
         <p className="mb-6 text-sm text-red-600">
-          This action cannot be undone. This will permanently delete the student and all their data.
+          This action cannot be undone. This will permanently delete the student
+          and all their data.
         </p>
 
         <div className="flex gap-3">

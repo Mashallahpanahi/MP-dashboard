@@ -1,10 +1,14 @@
 // src/api/teacherApi.ts
-import type { Teacher } from "@/types/teacher";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const TEACHERS_URL = `${API_URL}/teachers`;
 
-// Custom error class for API errors
+/* ================================================================== */
+/* ApiError — KEPT HERE. Every other api file imports it.            */
+/* ================================================================== */
+
 export class ApiError extends Error {
   statusCode?: number;
   details?: any;
@@ -17,80 +21,12 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Get all teachers
- * GET /teachers
- */
-export const getTeachers = async (): Promise<Teacher[]> => {
-  const response = await fetch(`${API_URL}/teachers`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+/* ================================================================== */
+/* Types — inlined from src/types/teacher.ts                          */
+/* ================================================================== */
 
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch teachers. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Teacher[] = await response.json();
-  return data;
-};
-
-/**
- * Get all active teachers only
- * GET /teachers/active
- */
-export const getActiveTeachers = async (): Promise<Teacher[]> => {
-  const response = await fetch(`${API_URL}/teachers/active`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch active teachers. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Teacher[] = await response.json();
-  return data;
-};
-
-/**
- * Get a single teacher by ID
- * GET /teachers/{id}
- */
-export const getTeacherById = async (id: string): Promise<Teacher> => {
-  const response = await fetch(`${API_URL}/teachers/${id}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch teacher. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: Teacher = await response.json();
-  return data;
-};
-
-/**
- * Create a new teacher
- * POST /teachers
- */
-export interface CreateTeacherData {
+export interface Teacher {
+  id: string;
   firstName: string;
   lastName: string;
   gender: string;
@@ -102,184 +38,212 @@ export interface CreateTeacherData {
   feePercentage: number;
   hireDate: string;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export const createTeacher = async (
-  teacher: CreateTeacherData,
-): Promise<Teacher> => {
-  const response = await fetch(`${API_URL}/teachers`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(teacher),
-  });
+export interface CreateTeacherData {
+  firstName: string;
+  lastName: string;
+  gender: string;
+  phone: string;
+  email?: string; // optional (per types/teacher.ts)
+  address?: string; // optional (per types/teacher.ts)
+  salaryType: string;
+  salaryAmount: number;
+  feePercentage: number;
+  hireDate: string;
+  isActive: boolean;
+}
 
-  if (!response.ok) {
-    let errorMessage = `Failed to create teacher. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === 'string') {
-        if (errorData.message.includes('UQ_9c5ae9e15a042292bb8d83ca34c') || 
-            errorData.message.toLowerCase().includes('duplicate key') && 
-            errorData.message.toLowerCase().includes('phone')) {
-          errorMessage = 'This phone number is already registered. Please use a different phone number.';
-        } else if (errorData.message.includes('UQ_6c6e1c4b7c9c8e9d2f8e9d2f8e9d2f8e') || 
-                 errorData.message.toLowerCase().includes('duplicate key') && 
-                 errorData.message.toLowerCase().includes('email')) {
-          errorMessage = 'This email address is already registered. Please use a different email address.';
-        } else if (errorData.message.toLowerCase().includes('duplicate key') && 
-                 (errorData.message.toLowerCase().includes('phone') || 
-                  errorData.message.toLowerCase().includes('email'))) {
-          errorMessage = 'The phone number or email address is already registered. Please use unique values.';
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const data: Teacher = await response.json();
-  return data;
-};
-
-/**
- * Update a teacher by ID
- * PATCH /teachers/{id}
- */
 export interface UpdateTeacherData extends Partial<CreateTeacherData> {
-  id: string;
+  id?: string;
 }
 
-export const updateTeacher = async (
-  id: string,
-  teacher: Partial<CreateTeacherData>,
-): Promise<Teacher> => {
-  const response = await fetch(`${API_URL}/teachers/${id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(teacher),
-  });
+/* ================================================================== */
+/* Inline helpers (same pattern as studentApi / etc.)                 */
+/* ================================================================== */
 
-  if (!response.ok) {
-    let errorMessage = `Failed to update teacher. Status: ${response.status}`;
-    let errorDetails = null;
+const extractErrMessage = (err: any, fallback: string): string => {
+  const m = err?.response?.data?.message;
+  if (Array.isArray(m)) return m.join(", ");
+  if (typeof m === "string") return m;
+  return err?.message || fallback;
+};
+
+function useRawQuery<T>(url: string | null, enabled = true) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(!!url && enabled);
+  const [error, setError] = useState<string | null>(null);
+  const [trigger, setTrigger] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || !url) {
+      setLoading(false);
+      return;
+    }
+    let alive = true;
+    setLoading(true);
+    setError(null);
+
+    axios
+      .get<T>(url)
+      .then((res) => {
+        if (alive) setData(res.data);
+      })
+      .catch((err) => {
+        if (alive) setError(extractErrMessage(err, "Something went wrong"));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [url, trigger, enabled]);
+
+  return { data, loading, error, refetch: () => setTrigger((n) => n + 1) };
+}
+
+function useRawMutation<T>() {
+  const [data, setData] = useState<T | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = async (
+    method: "post" | "patch" | "delete",
+    url: string,
+    body?: object,
+    opts: { customErrorMap?: (m: string) => string } = {},
+  ): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
 
     try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === 'string') {
-        if (errorData.message.includes('UQ_9c5ae9e15a042292bb8d83ca34c') || 
-            errorData.message.toLowerCase().includes('duplicate key') && 
-            errorData.message.toLowerCase().includes('phone')) {
-          errorMessage = 'This phone number is already registered by another teacher. Please use a different phone number.';
-        } else if (errorData.message.includes('UQ_6c6e1c4b7c9c8e9d2f8e9d2f8e9d2f8e') || 
-                 errorData.message.toLowerCase().includes('duplicate key') && 
-                 errorData.message.toLowerCase().includes('email')) {
-          errorMessage = 'This email address is already registered by another teacher. Please use a different email address.';
-        } else if (errorData.message.toLowerCase().includes('duplicate key') && 
-                 (errorData.message.toLowerCase().includes('phone') || 
-                  errorData.message.toLowerCase().includes('email'))) {
-          errorMessage = 'The phone number or email address is already registered. Please use unique values.';
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
+      const res = await axios.request<T>({
+        method,
+        url,
+        headers:
+          body !== undefined
+            ? { "Content-Type": "application/json" }
+            : undefined,
+        data: body,
+      });
+      setData(res.data);
+      setMessage((res.data as any)?.message ?? null);
+      return true;
+    } catch (err: any) {
+      const rawMsg = extractErrMessage(err, "Something went wrong");
+      setError(opts.customErrorMap ? opts.customErrorMap(rawMsg) : rawMsg);
+      return false;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    throw new ApiError(errorMessage, response.status, errorDetails);
+  return { data, message, loading, error, send };
+}
+
+/* ================================================================== */
+/* Shared error mapper — preserves the old Prisma-constraint logic   */
+/* ================================================================== */
+
+const mapTeacherConstraintError = (
+  msg: string,
+  verb: "registered" | "registeredByAnother",
+): string => {
+  const lower = msg.toLowerCase();
+  const isPhone =
+    msg.includes("UQ_9c5ae9e15a042292bb8d83ca34c") ||
+    (lower.includes("duplicate key") && lower.includes("phone"));
+  const isEmail =
+    msg.includes("UQ_6c6e1c4b7c9c8e9d2f8e9d2f8e9d2f8e") ||
+    (lower.includes("duplicate key") && lower.includes("email"));
+
+  if (isPhone) {
+    return verb === "registered"
+      ? "This phone number is already registered. Please use a different phone number."
+      : "This phone number is already registered by another teacher. Please use a different phone number.";
   }
+  if (isEmail) {
+    return verb === "registered"
+      ? "This email address is already registered. Please use a different email address."
+      : "This email address is already registered by another teacher. Please use a different email address.";
+  }
+  if (
+    lower.includes("duplicate key") &&
+    (lower.includes("phone") || lower.includes("email"))
+  ) {
+    return "The phone number or email address is already registered. Please use unique values.";
+  }
+  return msg;
+};
 
-  const data: Teacher = await response.json();
-  return data;
+/* ================================================================== */
+/* Query hooks                                                        */
+/* ================================================================== */
+
+/** GET /teachers */
+export const useTeachers = () => useRawQuery<Teacher[]>(TEACHERS_URL);
+
+/** GET /teachers/active */
+export const useActiveTeachers = () =>
+  useRawQuery<Teacher[]>(`${TEACHERS_URL}/active`);
+
+/** GET /teachers/:id */
+export const useTeacherById = (id: string, enabled = true) =>
+  useRawQuery<Teacher>(id ? `${TEACHERS_URL}/${id}` : null, enabled && !!id);
+
+/* ================================================================== */
+/* Mutation hooks                                                     */
+/* ================================================================== */
+
+/** POST /teachers */
+export const useCreateTeacher = () => {
+  const { data, message, loading, error, send } = useRawMutation<Teacher>();
+
+  const createTeacher = (teacher: CreateTeacherData) =>
+    send("post", TEACHERS_URL, teacher, {
+      customErrorMap: (m) => mapTeacherConstraintError(m, "registered"),
+    });
+
+  return { createData: data, message, loading, error, createTeacher };
+};
+
+/** PATCH /teachers/:id */
+export const useUpdateTeacher = () => {
+  const { data, message, loading, error, send } = useRawMutation<Teacher>();
+
+  const updateTeacher = (id: string, teacher: Partial<CreateTeacherData>) =>
+    send("patch", `${TEACHERS_URL}/${id}`, teacher, {
+      customErrorMap: (m) =>
+        mapTeacherConstraintError(m, "registeredByAnother"),
+    });
+
+  return { updateData: data, message, loading, error, updateTeacher };
+};
+
+/** DELETE /teachers/:id */
+export const useDeleteTeacher = () => {
+  const { data, message, loading, error, send } = useRawMutation<void>();
+  const remove = (id: string) => send("delete", `${TEACHERS_URL}/${id}`);
+  return { deleteData: data, message, loading, error, remove };
 };
 
 /**
- * Delete a teacher by ID
- * DELETE /teachers/{id}
+ * PATCH /teachers/:id/status
+ *
+ * Endpoint is a sub-path (`/status`), so we build the full URL directly
+ * rather than going through the generic `useUpdate` trick.
  */
-export const deleteTeacher = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/teachers/${id}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+export const useUpdateTeacherStatus = () => {
+  const { data, message, loading, error, send } = useRawMutation<Teacher>();
 
-  if (!response.ok) {
-    let errorMessage = `Failed to delete teacher. Status: ${response.status}`;
+  const updateStatus = (id: string, isActive: boolean) =>
+    send("patch", `${TEACHERS_URL}/${id}/status`, { isActive });
 
-    try {
-      const errorData = await response.json();
-      if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status);
-  }
-};
-
-/**
- * Update teacher activation status
- * PATCH /teachers/{id}/status
- */
-export const updateTeacherStatus = async (
-  id: string,
-  data: { isActive: boolean }
-): Promise<Teacher> => {
-  const response = await fetch(`${API_URL}/teachers/${id}/status`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update teacher status. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: Teacher = await response.json();
-  return result;
+  return { updateData: data, message, loading, error, updateStatus };
 };

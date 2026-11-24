@@ -1,7 +1,7 @@
 // src/components/teachers/TeacherUpdateModal.tsx
 import { useState, useEffect } from "react";
-import type { Teacher } from "@/types/teacher";
-import type { UpdateTeacherData, ApiError } from "@/api/teacherApi";
+import { ApiError } from "@/api/teacherApi";
+import type { Teacher, UpdateTeacherData } from "@/api/teacherApi";
 // ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
@@ -51,7 +51,7 @@ const TeacherUpdateModal = ({
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
@@ -502,9 +502,7 @@ const TeacherUpdateModal = ({
 
           {/* Status */}
           <div className="mb-6 border-t border-gray-200 pt-6">
-            <h4 className="mb-3 text-sm font-semibold text-gray-700">
-              Status
-            </h4>
+            <h4 className="mb-3 text-sm font-semibold text-gray-700">Status</h4>
 
             <label className="flex cursor-pointer items-center gap-3">
               <input

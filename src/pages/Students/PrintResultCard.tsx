@@ -1,12 +1,12 @@
 // src/pages/Students/PrintResultCard.tsx
 import { useEffect, useState, useMemo } from "react";
 import {
-  findStudentsForScoring,
+  useFindStudentsForScoring,
   type StudentForScoring,
 } from "@/api/studentApi";
-import { getTeachers, type Teacher } from "@/api/teacherApi";
-import { getBooks, type Book } from "@/api/bookApi";
-import { getClasses, type Class } from "@/api/classApi";
+import { useTeachers, type Teacher } from "@/api/teacherApi";
+import { useBooks, type Book } from "@/api/bookApi";
+import { useClasses, type Class } from "@/api/classApi";
 // ✅ Shamsi date picker + formatter
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 import { formatShamsi } from "@/utils/dateConverter";
@@ -26,7 +26,7 @@ const getInitials = (first?: string, last?: string) =>
   `${first?.charAt(0) || "?"}${last?.charAt(0) || ""}`.toUpperCase();
 
 const parseScore = (
-  value: string | number | null | undefined
+  value: string | number | null | undefined,
 ): number | null => {
   if (value === null || value === undefined) return null;
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -516,305 +516,6 @@ const ResultCardDesign2 = ({ student }: ResultCardProps) => {
   );
 };
 
-
-//   const midterm = parseScore(student.midtermScore);
-//   const final = parseScore(student.finalScore);
-
-//   const total =
-//     parseScore(student.totalScore) ??
-//     (midterm !== null || final !== null
-//       ? (midterm || 0) + (final || 0)
-//       : null);
-
-//   const passed = total !== null && total >= student.passingScore;
-//   const percentage = total !== null ? total.toFixed(1) : "—";
-//   const resultText = passed ? "Passed" : "Failed";
-
-//   // Shamsi date split into day / month / year
-//   const todayShamsi = formatShamsi(new Date(), "YYYY/MM/DD");
-//   const [y, m, d] = todayShamsi.split("/");
-
-//   return (
-//     <div
-//       className="result-card relative mx-auto overflow-hidden bg-white shadow-xl print:shadow-none"
-//       style={{
-//         width: "210mm",
-//         height: "148.5mm",
-//         pageBreakInside: "avoid",
-//         breakInside: "avoid",
-//         fontFamily: "'CertificateScript', cursive",
-//       }}
-//     >
-//       {/* TOP-LEFT RIBBON — 5 layered shapes */}
-//       <div className="pointer-events-none absolute left-0 top-0 z-0">
-//         <div
-//           className="h-[58mm] w-[58mm]"
-//           style={{
-//             backgroundColor: "#0a1a5c",
-//             clipPath: "polygon(0 0, 100% 0, 0 100%)",
-//           }}
-//         />
-//         <div
-//           className="absolute left-0 top-0 h-[52mm] w-[52mm]"
-//           style={{
-//             background:
-//               "linear-gradient(135deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
-//             clipPath: "polygon(0 0, 100% 0, 0 100%)",
-//           }}
-//         />
-//         <div
-//           className="absolute left-0 top-0 h-[46mm] w-[46mm] bg-white"
-//           style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }}
-//         />
-//         <div
-//           className="absolute left-0 top-0 h-[26mm] w-[26mm]"
-//           style={{
-//             background:
-//               "linear-gradient(135deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
-//             clipPath: "polygon(0 0, 100% 0, 0 100%)",
-//           }}
-//         />
-//         <div
-//           className="absolute left-0 top-0 h-[18mm] w-[18mm]"
-//           style={{
-//             backgroundColor: "#0a1a5c",
-//             clipPath: "polygon(0 0, 100% 0, 0 100%)",
-//           }}
-//         />
-//       </div>
-
-//       {/* BOTTOM-RIGHT RIBBON */}
-//       <div className="pointer-events-none absolute bottom-0 right-0 z-0">
-//         <div
-//           className="h-[58mm] w-[58mm]"
-//           style={{
-//             backgroundColor: "#0a1a5c",
-//             clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
-//           }}
-//         />
-//         <div
-//           className="absolute bottom-0 right-0 h-[52mm] w-[52mm]"
-//           style={{
-//             background:
-//               "linear-gradient(315deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
-//             clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
-//           }}
-//         />
-//         <div
-//           className="absolute bottom-0 right-0 h-[46mm] w-[46mm] bg-white"
-//           style={{ clipPath: "polygon(100% 100%, 100% 0, 0 100%)" }}
-//         />
-//         <div
-//           className="absolute bottom-[24mm] right-0 h-[3mm] w-[60mm]"
-//           style={{
-//             backgroundColor: "#1e8a3c",
-//             transform: "rotate(-45deg)",
-//             transformOrigin: "right center",
-//           }}
-//         />
-//         <div
-//           className="absolute bottom-0 right-0 h-[26mm] w-[26mm]"
-//           style={{
-//             background:
-//               "linear-gradient(315deg, #f5d77a 0%, #c9a227 50%, #7a5c14 100%)",
-//             clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
-//           }}
-//         />
-//         <div
-//           className="absolute bottom-0 right-0 h-[18mm] w-[18mm]"
-//           style={{
-//             backgroundColor: "#0a1a5c",
-//             clipPath: "polygon(100% 100%, 100% 0, 0 100%)",
-//           }}
-//         />
-//       </div>
-
-//       {/* HEADER — Logo · Center · Photo */}
-//       <div className="relative z-10 flex items-start justify-between gap-3 px-10 pt-10">
-//         {/* Logo */}
-//         <div className="flex h-[40mm] w-[40mm] shrink-0 items-center justify-center">
-//           <img
-//             src="/images/cours-log.png"
-//             alt="Center Logo"
-//             className="h-full w-full object-contain"
-//             onError={(e) => {
-//               const parent = e.currentTarget.parentElement;
-//               if (parent) {
-//                 parent.innerHTML = `
-//                   <div style="
-//                     display:flex; align-items:center; justify-content:center;
-//                     width:100%; height:100%; border-radius:9999px;
-//                     background:#0a1a5c; border:3px solid #c9a227;
-//                     color:#f5d77a; font-family:'CertificateScript',cursive;
-//                     font-weight:700; font-size:11px; line-height:1.2;
-//                     text-align:center;
-//                   ">
-//                     <span>MODERN<br/>MOAFAQ</span>
-//                   </div>
-//                 `;
-//               }
-//             }}
-//           />
-//         </div>
-
-//         {/* Center name + subtitle + tagline */}
-//         <div className="min-w-0 flex-1 px-2 text-center">
-//           <h1
-//             className="whitespace-nowrap text-[26px] leading-[1.15] text-[#0a1a5c]"
-//             style={{ fontFamily: "'CertificateScript', cursive" }}
-//           >
-//             Modern Moafaq Educational Center
-//           </h1>
-
-//           <h2
-//             className="mt-2 whitespace-nowrap text-[24px] leading-[1.15] text-[#0a1a5c]"
-//             style={{ fontFamily: "'CertificateScript', cursive" }}
-//           >
-//             English Certificate
-//           </h2>
-
-//           <p
-//             className="mt-2 whitespace-nowrap text-[16px] leading-[1.2] text-[#1c3ca8]"
-//             style={{ fontFamily: "'CertificateScript', cursive" }}
-//           >
-//             Enlightening Minds Empowering Tomorrow
-//           </p>
-//         </div>
-
-//         {/* Photo frame */}
-//         <div className="flex h-[34mm] w-[26mm] shrink-0 items-center justify-center border-[3px] border-[#0a1a5c] bg-white p-1">
-//           {student.studentImage ? (
-//             <img
-//               src={getImageUrl(student.studentImage) || ""}
-//               alt={`${student.studentName} ${student.studentLastName}`}
-//               className="h-full w-full object-cover"
-//               crossOrigin="anonymous"
-//               onError={(e) => {
-//                 e.currentTarget.style.display = "none";
-//               }}
-//             />
-//           ) : (
-//             <div
-//               className="flex h-full w-full items-center justify-center bg-blue-50 text-[22px] font-bold text-blue-900"
-//               style={{ fontFamily: "'CertificateScript', cursive" }}
-//             >
-//               {getInitials(student.studentName, student.studentLastName)}
-//             </div>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* BODY — Student details */}
-//       <div
-//         className="relative z-10 mt-[8mm] px-8"
-//         style={{ fontFamily: "'CertificateScript', cursive" }}
-//       >
-//         {/* Row 1 — Student name + S/D of Father name */}
-//         <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
-//           <span>This Certificate is awarded to</span>
-//           <span
-//             className="mx-2 inline-block min-w-[55mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {student.studentName} {student.studentLastName}
-//           </span>
-//           <span>S/D of</span>
-//           <span
-//             className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {student.studentFatherName || ""}
-//           </span>
-//         </div>
-
-//         {/* Row 2 */}
-//         <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
-//           <span>Course Level:</span>
-//           <span
-//             className="mx-2 inline-block min-w-[55mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {student.bookLevelOrder ? `Level ${student.bookLevelOrder}` : ""}
-//           </span>
-//           <span>English for Level:</span>
-//           <span
-//             className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {student.bookName}
-//           </span>
-//           <span>at final</span>
-//         </div>
-
-//         {/* Row 3 */}
-//         <div className="flex items-baseline whitespace-nowrap text-[16px] leading-[2]">
-//           <span>grade: (</span>
-//           <span
-//             className="mx-2 inline-block min-w-[16mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {percentage}
-//           </span>
-//           <span>% result:</span>
-//           <span
-//             className="mx-2 inline-block min-w-[40mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {resultText}
-//           </span>
-//           <span>) Date Awarded:</span>
-//           <span
-//             className="mx-2 inline-block min-w-[12mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {d}
-//           </span>
-//           <span>/</span>
-//           <span
-//             className="mx-2 inline-block min-w-[12mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {m}
-//           </span>
-//           <span>/</span>
-//           <span
-//             className="mx-2 inline-block min-w-[16mm] border-b-2 border-dotted border-black text-center"
-//             style={{ lineHeight: 1.1 }}
-//           >
-//             {y}
-//           </span>
-//         </div>
-//       </div>
-
-//       {/* FOOTER — Signatures */}
-//       <div className="absolute bottom-[10mm] left-0 right-0 z-10 flex items-end justify-around px-[22mm]">
-//         <p
-//           className="text-[26px]"
-//           style={{
-//             fontFamily: "'CertificateScript', cursive",
-//             color: "#c9a227",
-//           }}
-//         >
-//           Director sign
-//         </p>
-
-//         <p
-//           className="text-[26px]"
-//           style={{
-//             fontFamily: "'CertificateScript', cursive",
-//             color: "#c9a227",
-//           }}
-//         >
-//           Instructor sign
-//         </p>
-//       </div>
-//     </div>
-//   );
-// };
-
-
-
-
 // Wrapper that switches between the two designs based on the selected design
 const ResultCard = ({
   student,
@@ -833,10 +534,20 @@ const ResultCard = ({
 // MAIN PAGE
 // ============================================
 const PrintResultCard = () => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [loadingDropdowns, setLoadingDropdowns] = useState(true);
+  // ✅ Dropdowns from hooks (replaces getTeachers / getBooks / getClasses)
+  const { data: teachersData, loading: loadingTeachers } = useTeachers();
+  const { data: booksData, loading: loadingBooks } = useBooks();
+  const { data: classesData, loading: loadingClasses } = useClasses();
+
+  const teachers: Teacher[] = Array.isArray(teachersData)
+    ? teachersData.filter((t) => t.isActive)
+    : [];
+  const books: Book[] = Array.isArray(booksData)
+    ? booksData.filter((b) => b.isActive)
+    : [];
+  const classes: Class[] = Array.isArray(classesData) ? classesData : [];
+
+  const loadingDropdowns = loadingTeachers || loadingBooks || loadingClasses;
 
   // Filters
   const [teacherId, setTeacherId] = useState("");
@@ -856,60 +567,42 @@ const PrintResultCard = () => {
   // ✅ Design selection
   const [design, setDesign] = useState<ResultCardDesign>("design-1");
 
-  // ============================================
-  // FETCH DROPDOWNS
-  // ============================================
-  useEffect(() => {
-    const fetchDropdowns = async () => {
-      try {
-        setLoadingDropdowns(true);
-        const [teachersData, booksData, classesData] = await Promise.all([
-          getTeachers(),
-          getBooks(),
-          getClasses(),
-        ]);
-        setTeachers(teachersData.filter((t) => t.isActive));
-        setBooks(booksData.filter((b) => b.isActive));
-        setClasses(classesData);
-      } catch (err) {
-        console.error("Failed to load dropdowns:", err);
-      } finally {
-        setLoadingDropdowns(false);
-      }
-    };
-    fetchDropdowns();
-  }, []);
+  // ✅ Hook for find-students, gated on (teacherId && bookId && hasSearched)
+  const { data: findData, refetch: refetchFind } = useFindStudentsForScoring(
+    {
+      teacherId,
+      bookId,
+      classId: classId || undefined,
+      time: time || undefined,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    },
+    hasSearched && !!teacherId && !!bookId,
+  );
 
   // ============================================
-  // FETCH STUDENTS
+  // SYNC find-students hook result → local students state
+  // ============================================
+  useEffect(() => {
+    if (!findData) return;
+    if (findData.success) {
+      setStudents(findData.data);
+    }
+    setLoading(false);
+  }, [findData]);
+
+  // ============================================
+  // FETCH STUDENTS (triggered by "Find Students" button)
   // ============================================
   const handleFindStudents = async () => {
     if (!teacherId || !bookId) {
       setError("Please select both a teacher and a book");
       return;
     }
-    try {
-      setLoading(true);
-      setError("");
-      setHasSearched(true);
-
-      const response = await findStudentsForScoring({
-        teacherId,
-        bookId,
-        classId: classId || undefined,
-        time: time || undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-      });
-
-      if (response.success) setStudents(response.data);
-    } catch (err) {
-      console.error("Failed to find students:", err);
-      setError(err instanceof Error ? err.message : "Failed to find students");
-      setStudents([]);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    setError("");
+    setHasSearched(true);
+    refetchFind();
   };
 
   const handleClear = () => {
@@ -977,7 +670,7 @@ const PrintResultCard = () => {
 
       const fileName = `result-cards-${formatShamsi(
         new Date(),
-        "YYYY-MM-DD"
+        "YYYY-MM-DD",
       )}.pdf`;
       pdf.save(fileName);
     } catch (err) {
@@ -1078,7 +771,7 @@ const PrintResultCard = () => {
                   <option value="">Any class</option>
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.className}
                       {c.block ? ` - ${c.block}` : ""}
                     </option>
                   ))}

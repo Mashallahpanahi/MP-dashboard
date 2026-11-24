@@ -1,13 +1,13 @@
 // src/pages/Payment/TeacherPayroll.tsx
 import { useEffect, useState } from "react";
 import {
-  getTeacherPayrolls,
-  deleteTeacherPayroll,
-  getTeacherPayrollById,
-  updateTeacherPayroll,
-  createTeacherPayroll,
-  addPaymentToPayroll,
-  getUnpaidSalaries,
+  useTeacherPayrolls,
+  useUnpaidSalaries,
+  useTeacherPayrollById,
+  useCreateTeacherPayroll,
+  useUpdateTeacherPayroll,
+  useDeleteTeacherPayroll,
+  useAddPaymentToPayroll,
 } from "@/api/teacherPayrollApi";
 import type {
   TeacherPayroll,
@@ -15,7 +15,7 @@ import type {
   CreateTeacherPayrollData,
   AddPaymentData,
   UnpaidSalaryRecord,
-} from "@/types/teacherPayroll";
+} from "@/api/teacherPayrollApi";
 import {
   TeacherPayrollCreateModal,
   TeacherPayrollHistoryModal,
@@ -29,35 +29,64 @@ import {
 } from "@/utils/dateConverter";
 
 const TeacherPayrollPage = () => {
-  const [payrolls, setPayrolls] = useState<TeacherPayroll[]>([]);
-  const [unpaidRecords, setUnpaidRecords] = useState<UnpaidSalaryRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingUnpaid, setLoadingUnpaid] = useState(true);
-  const [error, setError] = useState("");
+  // ✅ List hooks
+  const {
+    data: payrollsData,
+    loading,
+    error: payrollsError,
+    refetch: refetchPayrolls,
+  } = useTeacherPayrolls();
+  const payrolls: TeacherPayroll[] = Array.isArray(payrollsData)
+    ? payrollsData
+    : [];
+
+  const {
+    data: unpaidData,
+    loading: loadingUnpaid,
+    refetch: refetchUnpaid,
+  } = useUnpaidSalaries();
+  const unpaidRecords: UnpaidSalaryRecord[] = Array.isArray(unpaidData)
+    ? unpaidData
+    : [];
+
+  // ✅ Mutation hooks — destructure using the actual keys the hooks export
+  const { createTeacherPayroll, loading: createLoading } =
+    useCreateTeacherPayroll();
+  const { updateTeacherPayroll } = useUpdateTeacherPayroll();
+  const { remove: deleteTeacherPayroll, loading: deleteLoading } =
+    useDeleteTeacherPayroll();
+  const { addPaymentToPayroll, loading: addPaymentLoading } =
+    useAddPaymentToPayroll();
+
+  const [localError, setLocalError] = useState("");
+  const error = localError || payrollsError || "";
 
   // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [payrollToDelete, setPayrollToDelete] = useState<TeacherPayroll | null>(
-    null
+    null,
   );
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Update state
+  // Update state — track ID, let the hook fetch fresh copy
+  const [updatePayrollId, setUpdatePayrollId] = useState<string | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [payrollToUpdate, setPayrollToUpdate] = useState<TeacherPayroll | null>(
-    null
-  );
-  const [updateLoading, setUpdateLoading] = useState(false);
+
+  const { data: fetchedPayrollToUpdate, loading: updateLoading } =
+    useTeacherPayrollById(updatePayrollId ?? "", !!updatePayrollId);
+
+  const payrollToUpdate: TeacherPayroll | null = updatePayrollId
+    ? fetchedPayrollToUpdate?.id === updatePayrollId
+      ? fetchedPayrollToUpdate
+      : (payrolls.find((p) => p.id === updatePayrollId) ?? null)
+    : null;
 
   // Create state
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createLoading, setCreateLoading] = useState(false);
 
   // Add Payment state
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const [payrollToAddPayment, setPayrollToAddPayment] =
     useState<TeacherPayroll | null>(null);
-  const [addPaymentLoading, setAddPaymentLoading] = useState(false);
 
   // History state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -69,42 +98,14 @@ const TeacherPayrollPage = () => {
   const [prefillData, setPrefillData] =
     useState<CreateTeacherPayrollData | null>(null);
 
-  const fetchPayrolls = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getTeacherPayrolls();
-      setPayrolls(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Failed to fetch teacher payrolls:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch teacher payrolls"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUnpaidSalaries = async () => {
-    try {
-      setLoadingUnpaid(true);
-      const data = await getUnpaidSalaries();
-      setUnpaidRecords(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Failed to fetch unpaid salaries:", error);
-    } finally {
-      setLoadingUnpaid(false);
-    }
-  };
-
+  // Reset local errors on mount
   useEffect(() => {
-    fetchPayrolls();
-    fetchUnpaidSalaries();
+    setLocalError("");
   }, []);
 
-  // Delete handlers
+  // ============================================
+  // DELETE
+  // ============================================
   const handleDeleteClick = (payroll: TeacherPayroll) => {
     setPayrollToDelete(payroll);
     setShowDeleteModal(true);
@@ -113,20 +114,16 @@ const TeacherPayrollPage = () => {
   const handleConfirmDelete = async () => {
     if (!payrollToDelete) return;
 
-    try {
-      setDeleteLoading(true);
-      await deleteTeacherPayroll(payrollToDelete.id);
-      setPayrolls((prev) => prev.filter((p) => p.id !== payrollToDelete.id));
+    setLocalError("");
+    const ok = await deleteTeacherPayroll(payrollToDelete.id);
+
+    if (ok) {
       setShowDeleteModal(false);
       setPayrollToDelete(null);
-      fetchUnpaidSalaries();
-    } catch (error) {
-      console.error("Failed to delete payroll:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to delete payroll"
-      );
-    } finally {
-      setDeleteLoading(false);
+      refetchPayrolls();
+      refetchUnpaid();
+    } else {
+      setLocalError("Failed to delete payroll");
     }
   };
 
@@ -135,40 +132,37 @@ const TeacherPayrollPage = () => {
     setPayrollToDelete(null);
   };
 
-  // Update handlers
+  // ============================================
+  // UPDATE
+  // ============================================
   const handleUpdateClick = async (payroll: TeacherPayroll) => {
-    try {
-      setUpdateLoading(true);
-      const payrollData = await getTeacherPayrollById(payroll.id);
-      setPayrollToUpdate(payrollData);
-      setShowUpdateModal(true);
-    } catch (error) {
-      console.error("Failed to fetch payroll for update:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load payroll data"
-      );
-    } finally {
-      setUpdateLoading(false);
-    }
+    // Open the modal instantly with list data; hook fetches fresh copy in background
+    setUpdatePayrollId(payroll.id);
+    setShowUpdateModal(true);
   };
 
   const handleUpdatePayroll = async (
     id: string,
-    data: UpdateTeacherPayrollData
+    data: UpdateTeacherPayrollData,
   ) => {
-    const updatedPayroll = await updateTeacherPayroll(id, data);
-    setPayrolls((prev) =>
-      prev.map((p) => (p.id === updatedPayroll.id ? updatedPayroll : p))
-    );
-    fetchUnpaidSalaries();
+    const ok = await updateTeacherPayroll(id, data);
+    if (!ok) {
+      throw new Error("Failed to update payroll");
+    }
+    setShowUpdateModal(false);
+    setUpdatePayrollId(null);
+    refetchPayrolls();
+    refetchUnpaid();
   };
 
   const handleCloseUpdate = () => {
     setShowUpdateModal(false);
-    setPayrollToUpdate(null);
+    setUpdatePayrollId(null);
   };
 
-  // Create handlers
+  // ============================================
+  // CREATE
+  // ============================================
   const handleCreateClick = () => {
     setPrefillData(null);
     setShowCreateModal(true);
@@ -182,7 +176,6 @@ const TeacherPayrollPage = () => {
   const handlePayForMonth = (record: UnpaidSalaryRecord) => {
     const isPerStudent = record.salaryType === "PerStudent";
 
-    // ✅ Prefer calculatedSalary when it exists (PerStudent)
     const calculated = safeNumber(record.calculatedSalary as any);
     const fixedAmount = safeNumber(record.salaryAmount);
 
@@ -190,7 +183,6 @@ const TeacherPayrollPage = () => {
     let paidAmount: number;
 
     if (isPerStudent) {
-      // Use backend-calculated amount (0 if no students)
       baseSalary = calculated;
       paidAmount = calculated;
     } else {
@@ -198,7 +190,6 @@ const TeacherPayrollPage = () => {
       paidAmount = fixedAmount;
     }
 
-    // ✅ Build a nicer note depending on type
     const noteText = isPerStudent
       ? `Salary for ${record.month} ${record.year} — ${calculated} from ${
           record.enrolledStudents ?? 0
@@ -231,19 +222,14 @@ const TeacherPayrollPage = () => {
   };
 
   const handleCreatePayroll = async (data: CreateTeacherPayrollData) => {
-    try {
-      setCreateLoading(true);
-      const newPayroll = await createTeacherPayroll(data);
-      setPayrolls((prev) => [newPayroll, ...prev]);
-      setShowCreateModal(false);
-      setPrefillData(null);
-      fetchUnpaidSalaries();
-    } catch (error) {
-      console.error("Failed to create payroll:", error);
-      throw error;
-    } finally {
-      setCreateLoading(false);
+    const ok = await createTeacherPayroll(data);
+    if (!ok) {
+      throw new Error("Failed to create payroll");
     }
+    setShowCreateModal(false);
+    setPrefillData(null);
+    refetchPayrolls();
+    refetchUnpaid();
   };
 
   const handleCloseCreate = () => {
@@ -251,27 +237,23 @@ const TeacherPayrollPage = () => {
     setPrefillData(null);
   };
 
-  // Add Payment handlers
+  // ============================================
+  // ADD PAYMENT
+  // ============================================
   const handleAddPaymentClick = (payroll: TeacherPayroll) => {
     setPayrollToAddPayment(payroll);
     setShowAddPaymentModal(true);
   };
 
   const handleAddPayment = async (id: string, data: AddPaymentData) => {
-    try {
-      setAddPaymentLoading(true);
-      const updatedPayroll = await addPaymentToPayroll(id, data);
-      setPayrolls((prev) =>
-        prev.map((p) => (p.id === updatedPayroll.id ? updatedPayroll : p))
-      );
-      setShowAddPaymentModal(false);
-      setPayrollToAddPayment(null);
-    } catch (error) {
-      console.error("Failed to add payment:", error);
-      throw error;
-    } finally {
-      setAddPaymentLoading(false);
+    const ok = await addPaymentToPayroll(id, data);
+    if (!ok) {
+      throw new Error("Failed to add payment");
     }
+    setShowAddPaymentModal(false);
+    setPayrollToAddPayment(null);
+    refetchPayrolls();
+    refetchUnpaid();
   };
 
   const handleCloseAddPayment = () => {
@@ -279,7 +261,9 @@ const TeacherPayrollPage = () => {
     setPayrollToAddPayment(null);
   };
 
-  // History handlers
+  // ============================================
+  // HISTORY
+  // ============================================
   const handleHistoryClick = () => {
     setShowHistoryModal(true);
   };
@@ -292,9 +276,10 @@ const TeacherPayrollPage = () => {
   // HELPERS
   // ============================================
   const formatCurrency = (
-    amount: number | string | null | undefined
+    amount: number | string | null | undefined,
   ): string => {
-    if (amount === null || amount === undefined || amount === "") return "$0.00";
+    if (amount === null || amount === undefined || amount === "")
+      return "$0.00";
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "$0.00";
     return `$${numAmount.toFixed(2)}`;
@@ -308,8 +293,18 @@ const TeacherPayrollPage = () => {
 
   const monthNameToNumber = (monthName: string): number => {
     const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December",
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
     return monthNames.indexOf(monthName) + 1;
   };
@@ -392,7 +387,7 @@ const TeacherPayrollPage = () => {
             See History of Payment
           </button>
           <button
-            onClick={fetchUnpaidSalaries}
+            onClick={() => refetchUnpaid()}
             disabled={loadingUnpaid}
             className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -476,9 +471,7 @@ const TeacherPayrollPage = () => {
               <tbody className="divide-y divide-gray-100">
                 {filteredUnpaidRecords.map((record, index) => {
                   const isPerStudent = record.salaryType === "PerStudent";
-                  const calculated = safeNumber(
-                    record.calculatedSalary as any
-                  );
+                  const calculated = safeNumber(record.calculatedSalary as any);
                   const fixed = safeNumber(record.salaryAmount);
                   const amountDue = isPerStudent ? calculated : fixed;
                   const studentsCount = record.enrolledStudents ?? 0;

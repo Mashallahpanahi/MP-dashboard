@@ -1,15 +1,12 @@
 // src/pages/Payment/OtherExpenses.tsx
 import { useEffect, useState } from "react";
 import {
-  getExpenseHistory,
-  getTotalLastMonth,
-  deleteOtherExpense,
-  getOtherExpenseById,
+  useExpenseHistory,
+  useTotalLastMonth,
+  useDeleteOtherExpense,
+  useOtherExpenseById,
 } from "@/api/otherExpenseApi";
-import type {
-  OtherExpense,
-  LastMonthTotal,
-} from "@/types/otherExpense";
+import type { OtherExpense, LastMonthTotal } from "@/api/otherExpenseApi";
 import {
   AddOtherExpenseModal,
   UpdateOtherExpenseModal,
@@ -25,13 +22,6 @@ import {
 } from "@/utils/dateConverter";
 
 const OtherExpensesPage = () => {
-  const [expenses, setExpenses] = useState<OtherExpense[]>([]);
-  const [lastMonthTotal, setLastMonthTotal] = useState<LastMonthTotal | null>(null);
-  const [totalForRange, setTotalForRange] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadingTotal, setLoadingTotal] = useState(true);
-  const [error, setError] = useState("");
-
   // ✅ Default date range: last 1 month (Miladi ISO for backend)
   const getDefaultDates = () => {
     const today = new Date();
@@ -49,15 +39,61 @@ const OtherExpensesPage = () => {
   const [fromDate, setFromDate] = useState(defaultDates.fromDate);
   const [toDate, setToDate] = useState(defaultDates.toDate);
 
+  // ✅ Track whether a search has been triggered (mirrors original fetchExpenses call)
+  const [hasSearched, setHasSearched] = useState(true);
+
+  // ✅ Range history hook (replaces getExpenseHistory + local state)
+  const {
+    data: historyData,
+    loading,
+    error: historyError,
+    refetch: refetchHistory,
+  } = useExpenseHistory(
+    { fromDate, toDate },
+    hasSearched && !!fromDate && !!toDate,
+  );
+
+  const expenses: OtherExpense[] = Array.isArray(historyData?.expenses)
+    ? historyData!.expenses
+    : [];
+  const totalForRange = safeNumberStatic(historyData?.totalExpenses);
+
+  // ✅ Last month total hook (replaces getTotalLastMonth + local state)
+  const {
+    data: lastMonthTotalData,
+    loading: loadingTotal,
+    refetch: refetchTotal,
+  } = useTotalLastMonth();
+
+  const lastMonthTotal: LastMonthTotal | null = lastMonthTotalData ?? null;
+
+  // ✅ Delete hook (replaces deleteOtherExpense + deleteLoading state)
+  const { remove: deleteOtherExpense, loading: deleteLoading } =
+    useDeleteOtherExpense();
+
+  const [localError, setLocalError] = useState("");
+  const error = localError || historyError || "";
+
   // Delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [expenseToDelete, setExpenseToDelete] = useState<OtherExpense | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<OtherExpense | null>(
+    null,
+  );
 
-  // Update state
+  // Update state — track ID, let the hook fetch fresh copy
+  const [updateExpenseId, setUpdateExpenseId] = useState<string | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [expenseToUpdate, setExpenseToUpdate] = useState<OtherExpense | null>(null);
-  const [updateLoading, setUpdateLoading] = useState(false);
+
+  const { data: fetchedExpenseToUpdate } = useOtherExpenseById(
+    updateExpenseId ?? "",
+    !!updateExpenseId,
+  );
+
+  const expenseToUpdate: OtherExpense | null = updateExpenseId
+    ? fetchedExpenseToUpdate?.id === updateExpenseId
+      ? fetchedExpenseToUpdate
+      : (expenses.find((e) => e.id === updateExpenseId) ?? null)
+    : null;
 
   // Add state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -69,7 +105,9 @@ const OtherExpensesPage = () => {
     return isNaN(num) ? 0 : num;
   };
 
-  const formatCurrency = (amount: number | string | null | undefined): string => {
+  const formatCurrency = (
+    amount: number | string | null | undefined,
+  ): string => {
     const num = safeNumber(amount);
     return `$${num.toFixed(2)}`;
   };
@@ -87,12 +125,22 @@ const OtherExpensesPage = () => {
   // ✅ Convert "September 2026" (Miladi month name + year) to "سنبله 1405"
   const formatLastMonthLabel = (
     monthName: string | undefined,
-    year: number | string | undefined
+    year: number | string | undefined,
   ): string => {
     if (!monthName || !year) return "Last Month";
     const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December",
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
     const monthNumber = monthNames.indexOf(monthName) + 1;
     if (!monthNumber) return `${monthName} ${year}`;
@@ -106,53 +154,17 @@ const OtherExpensesPage = () => {
     }
   };
 
-  // ✅ Fetch expenses by date range
-  const fetchExpenses = async (from: string, to: string) => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const result = await getExpenseHistory(from, to);
-      setExpenses(Array.isArray(result.expenses) ? result.expenses : []);
-      setTotalForRange(safeNumber(result.totalExpenses));
-    } catch (error) {
-      console.error("Failed to fetch expenses:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to fetch expenses"
-      );
-      setExpenses([]);
-      setTotalForRange(0);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✅ Fetch last month total
-  const fetchLastMonthTotal = async () => {
-    try {
-      setLoadingTotal(true);
-      const data = await getTotalLastMonth();
-      setLastMonthTotal(data);
-    } catch (error) {
-      console.error("Failed to fetch last month total:", error);
-    } finally {
-      setLoadingTotal(false);
-    }
-  };
-
-  // Initial fetch
-  useEffect(() => {
-    fetchExpenses(fromDate, toDate);
-    fetchLastMonthTotal();
-  }, []);
-
-  // Handle date range change
+  // Handle date range change — triggers a re-fetch via the hook
   const handleDateRangeSearch = () => {
     if (fromDate > toDate) {
-      setError("From date must be before To date");
+      setLocalError("From date must be before To date");
       return;
     }
-    fetchExpenses(fromDate, toDate);
+    setLocalError("");
+    setHasSearched(true);
+    // Hook auto-refetches when fromDate/toDate change; if they didn't,
+    // call refetch explicitly to re-trigger.
+    refetchHistory();
   };
 
   // Delete handlers
@@ -164,21 +176,16 @@ const OtherExpensesPage = () => {
   const handleConfirmDelete = async () => {
     if (!expenseToDelete) return;
 
-    try {
-      setDeleteLoading(true);
-      await deleteOtherExpense(expenseToDelete.id);
-      setExpenses((prev) => prev.filter((e) => e.id !== expenseToDelete.id));
+    setLocalError("");
+    const ok = await deleteOtherExpense(expenseToDelete.id);
+
+    if (ok) {
       setShowDeleteModal(false);
       setExpenseToDelete(null);
-      fetchExpenses(fromDate, toDate);
-      fetchLastMonthTotal();
-    } catch (error) {
-      console.error("Failed to delete expense:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to delete expense"
-      );
-    } finally {
-      setDeleteLoading(false);
+      refetchHistory();
+      refetchTotal();
+    } else {
+      setLocalError("Failed to delete expense");
     }
   };
 
@@ -187,31 +194,20 @@ const OtherExpensesPage = () => {
     setExpenseToDelete(null);
   };
 
-  // Update handlers
-  const handleUpdateClick = async (expense: OtherExpense) => {
-    try {
-      setUpdateLoading(true);
-      const expenseData = await getOtherExpenseById(expense.id);
-      setExpenseToUpdate(expenseData);
-      setShowUpdateModal(true);
-    } catch (error) {
-      console.error("Failed to fetch expense for update:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load expense data"
-      );
-    } finally {
-      setUpdateLoading(false);
-    }
+  // Update handlers — open modal instantly, hook fetches fresh copy
+  const handleUpdateClick = (expense: OtherExpense) => {
+    setUpdateExpenseId(expense.id);
+    setShowUpdateModal(true);
   };
 
   const handleUpdateSuccess = () => {
-    fetchExpenses(fromDate, toDate);
-    fetchLastMonthTotal();
+    refetchHistory();
+    refetchTotal();
   };
 
   const handleCloseUpdate = () => {
     setShowUpdateModal(false);
-    setExpenseToUpdate(null);
+    setUpdateExpenseId(null);
   };
 
   // Add handlers
@@ -220,8 +216,8 @@ const OtherExpensesPage = () => {
   };
 
   const handleAddSuccess = () => {
-    fetchExpenses(fromDate, toDate);
-    fetchLastMonthTotal();
+    refetchHistory();
+    refetchTotal();
   };
 
   const handleCloseAdd = () => {
@@ -253,8 +249,18 @@ const OtherExpensesPage = () => {
           onClick={handleAddClick}
           className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
         >
-          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <svg
+            className="mr-2 h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           Add New Expense
         </button>
@@ -269,7 +275,7 @@ const OtherExpensesPage = () => {
                 Total Expenses for{" "}
                 {formatLastMonthLabel(
                   lastMonthTotal?.month,
-                  lastMonthTotal?.year
+                  lastMonthTotal?.year,
                 )}{" "}
                 (preview month)
               </p>
@@ -285,8 +291,18 @@ const OtherExpensesPage = () => {
               </p>
             </div>
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
-              <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="h-8 w-8 text-blue-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </div>
           </div>
@@ -324,8 +340,18 @@ const OtherExpensesPage = () => {
             disabled={loading}
             className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg
+              className="mr-2 h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             Search
           </button>
@@ -410,8 +436,18 @@ const OtherExpensesPage = () => {
                           onClick={() => handleUpdateClick(expense)}
                           className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
                         >
-                          <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          <svg
+                            className="mr-1.5 h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
                           </svg>
                           Edit
                         </button>
@@ -420,8 +456,18 @@ const OtherExpensesPage = () => {
                           disabled={deleteLoading}
                           className="inline-flex items-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg
+                            className="mr-1.5 h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                           Delete
                         </button>
@@ -459,5 +505,12 @@ const OtherExpensesPage = () => {
     </div>
   );
 };
+
+// Helper used above to avoid circular dependency on `safeNumber` before it's defined
+function safeNumberStatic(value: number | string | null | undefined): number {
+  if (value === null || value === undefined || value === "") return 0;
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  return isNaN(num) ? 0 : num;
+}
 
 export default OtherExpensesPage;

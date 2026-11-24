@@ -1,5 +1,5 @@
 // src/components/books/BookDeleteModal.tsx
-import type { Book } from "@/types/book";
+import type { Book } from "@/api/bookApi";
 
 interface BookDeleteModalProps {
   isOpen: boolean;

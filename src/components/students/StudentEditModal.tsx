@@ -1,14 +1,14 @@
 // src/components/students/StudentEditModal.tsx
-import { useState, useEffect } from "react";
-import type { Student } from "@/types/student";
+import { useState, useMemo } from "react";
+import type { Student } from "@/api/studentApi";
 import {
-  getEnrollmentsByStudent,
-  updateBoth,
-  deleteEnrollment,
+  useEnrollmentsByStudent,
+  useUpdateBoth,
+  useDeleteEnrollment,
 } from "@/api/studentEnrollmentApi";
-import { getTeachers, type Teacher } from "@/api/teacherApi";
-import { getBooks, type Book } from "@/api/bookApi";
-import { getClasses, type Class } from "@/api/classApi";
+import { useTeachers, type Teacher } from "@/api/teacherApi";
+import { useBooks, type Book } from "@/api/bookApi";
+import { useClasses, type Class } from "@/api/classApi";
 import StudentPersonalInfoModal from "./StudentPersonalInfoModal";
 // ✅ Shamsi date picker + formatter
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
@@ -32,109 +32,98 @@ const StudentEditModal = ({
   const [showEnrollments, setShowEnrollments] = useState(false);
   const [showPersonalInfo, setShowPersonalInfo] = useState(false);
 
-  const [enrollments, setEnrollments] = useState<any[]>([]);
-  const [loadingEnrollments, setLoadingEnrollments] = useState(false);
-  const [enrollmentError, setEnrollmentError] = useState("");
-  const [enrollmentSuccess, setEnrollmentSuccess] = useState("");
+  // ✅ Data hooks (replace getTeachers / getBooks / getClasses)
+  const { data: allTeachersData, error: teachersError } = useTeachers();
+  const { data: allBooksData, error: booksError } = useBooks();
+  const { data: allClassesData, error: classesError } = useClasses();
 
+  // Filter to active — matches original
+  const teachers = useMemo(
+    () => (allTeachersData || []).filter((t) => t.isActive),
+    [allTeachersData],
+  );
+  const books = useMemo(
+    () => (allBooksData || []).filter((b) => b.isActive),
+    [allBooksData],
+  );
+  const classes = allClassesData || [];
+
+  // Lookup maps for enriching enrollments
+  const teacherMap = useMemo(() => {
+    const m: Record<string, Teacher> = {};
+    teachers.forEach((t) => {
+      m[t.id] = t;
+    });
+    return m;
+  }, [teachers]);
+
+  const bookMap = useMemo(() => {
+    const m: Record<string, Book> = {};
+    books.forEach((b) => {
+      m[b.id] = b;
+    });
+    return m;
+  }, [books]);
+
+  const classMap = useMemo(() => {
+    const m: Record<string, Class> = {};
+    classes.forEach((c) => {
+      m[c.id] = c;
+    });
+    return m;
+  }, [classes]);
+
+  // ✅ Enrollments hook — fetches only when All Enrollments view is open
+  const {
+    data: rawEnrollments,
+    loading: loadingEnrollments,
+    error: enrollmentsError,
+    refetch: refetchEnrollments,
+  } = useEnrollmentsByStudent(
+    student?.id ?? "",
+    isOpen && showEnrollments && !!student?.id,
+  );
+
+  // ✅ Mutation hooks
+  const { updateBoth, error: updateBothError } = useUpdateBoth();
+  const { remove: removeEnrollment } = useDeleteEnrollment();
+
+  // Local UI state
   const [editingEnrollmentId, setEditingEnrollmentId] = useState<string | null>(
-    null
+    null,
   );
   const [editEnrollmentData, setEditEnrollmentData] = useState<any>({});
   const [savingEnrollment, setSavingEnrollment] = useState(false);
-  const [editEnrollmentError, setEditEnrollmentError] = useState("");
   const [editEnrollmentSuccess, setEditEnrollmentSuccess] = useState("");
-
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [loadingDropdowns, setLoadingDropdowns] = useState(false);
+  // ✅ Derived enrollments (replaces old fetchAllData enrichment)
+  const enrollments = useMemo(() => {
+    if (!rawEnrollments) return [];
+    const rawData = (rawEnrollments as any)?.data ?? rawEnrollments;
+    if (!Array.isArray(rawData)) return [];
 
-  const [teacherMap, setTeacherMap] = useState<Record<string, Teacher>>({});
-  const [bookMap, setBookMap] = useState<Record<string, Book>>({});
-  const [classMap, setClassMap] = useState<Record<string, Class>>({});
+    return rawData.map((item: any) => {
+      const enrollment = item.enrollment || item;
+      const payment = item.payment || {};
+      return {
+        enrollment: {
+          ...enrollment,
+          teacher: teacherMap[enrollment.teacherId] || null,
+          book: bookMap[enrollment.bookId] || null,
+          class: classMap[enrollment.classId] || null,
+        },
+        payment,
+      };
+    });
+  }, [rawEnrollments, teacherMap, bookMap, classMap]);
 
-  useEffect(() => {
-    if (showEnrollments && student) {
-      fetchAllData();
-    }
-  }, [showEnrollments, student]);
+  // Combined fetch error (matches original "Failed to fetch data" banner)
+  const enrollmentFetchError =
+    enrollmentsError || teachersError || booksError || classesError || "";
 
-  if (!isOpen || !student) return null;
-
-  const fetchAllData = async () => {
-    try {
-      setLoadingEnrollments(true);
-      setLoadingDropdowns(true);
-      setEnrollmentError("");
-
-      const [enrollmentsResponse, teachersData, booksData, classesData] =
-        await Promise.all([
-          getEnrollmentsByStudent(student.id),
-          getTeachers(),
-          getBooks(),
-          getClasses(),
-        ]);
-
-      const activeTeachers = teachersData.filter((t) => t.isActive);
-      const activeBooks = booksData.filter((b) => b.isActive);
-      const activeClasses = classesData;
-
-      setTeachers(activeTeachers);
-      setBooks(activeBooks);
-      setClasses(activeClasses);
-
-      const teacherMapData: Record<string, Teacher> = {};
-      activeTeachers.forEach((t) => {
-        teacherMapData[t.id] = t;
-      });
-      setTeacherMap(teacherMapData);
-
-      const bookMapData: Record<string, Book> = {};
-      activeBooks.forEach((b) => {
-        bookMapData[b.id] = b;
-      });
-      setBookMap(bookMapData);
-
-      const classMapData: Record<string, Class> = {};
-      activeClasses.forEach((c) => {
-        classMapData[c.id] = c;
-      });
-      setClassMap(classMapData);
-
-      const enrollmentsData = enrollmentsResponse?.data || [];
-      const enrichedEnrollments = enrollmentsData.map((item: any) => {
-        const enrollment = item.enrollment || item;
-        const payment = item.payment || {};
-
-        const teacher = teacherMapData[enrollment.teacherId];
-        const book = bookMapData[enrollment.bookId];
-        const classItem = classMapData[enrollment.classId];
-
-        return {
-          enrollment: {
-            ...enrollment,
-            teacher: teacher || null,
-            book: book || null,
-            class: classItem || null,
-          },
-          payment: payment,
-        };
-      });
-
-      setEnrollments(enrichedEnrollments);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      setEnrollmentError(
-        error instanceof Error ? error.message : "Failed to fetch data"
-      );
-    } finally {
-      setLoadingEnrollments(false);
-      setLoadingDropdowns(false);
-    }
-  };
+  // Edit error from the update hook
+  const editEnrollmentError = updateBothError || "";
 
   const handleEnrollmentsClick = () => {
     setShowEnrollments(true);
@@ -151,12 +140,13 @@ const StudentEditModal = ({
     setShowPersonalInfo(false);
     setEditingEnrollmentId(null);
     setEditEnrollmentData({});
+    setEditEnrollmentSuccess("");
   };
 
   const handlePersonalInfoUpdate = () => {
     if (onUpdate) onUpdate();
     if (showEnrollments && student) {
-      fetchAllData();
+      refetchEnrollments();
     }
   };
 
@@ -180,20 +170,18 @@ const StudentEditModal = ({
       payment: {
         fee: parseFloat(payment.fee) || enrollment.fee || 0,
         discount: parseFloat(payment.discount) || enrollment.discount || 0,
-        finalFee:
-          parseFloat(payment.finalFee) || enrollment.finalFee || 0,
+        finalFee: parseFloat(payment.finalFee) || enrollment.finalFee || 0,
         date: payment.date?.split("T")[0] || payment.date || "",
         status: payment.status || enrollment.paymentStatus || "Pending",
       },
     });
-    setEditEnrollmentError("");
     setEditEnrollmentSuccess("");
   };
 
   const handleEnrollmentEditChange = (
     section: "enrollment" | "payment",
     field: string,
-    value: any
+    value: any,
   ) => {
     setEditEnrollmentData((prev: any) => ({
       ...prev,
@@ -207,88 +195,78 @@ const StudentEditModal = ({
   const handleSaveEnrollmentEdit = async () => {
     if (!editingEnrollmentId) return;
 
-    try {
-      setSavingEnrollment(true);
-      setEditEnrollmentError("");
-      setEditEnrollmentSuccess("");
+    setSavingEnrollment(true);
+    setEditEnrollmentSuccess("");
 
-      const submitData: any = {};
+    const submitData: any = {};
 
-      if (editEnrollmentData.enrollment) {
-        submitData.enrollment = {};
-        Object.keys(editEnrollmentData.enrollment).forEach((key) => {
-          const value = editEnrollmentData.enrollment[key];
-          if (value !== undefined && value !== null && value !== "") {
-            submitData.enrollment[key] = value;
-          }
-        });
-      }
-
-      if (editEnrollmentData.payment) {
-        submitData.payment = {};
-        Object.keys(editEnrollmentData.payment).forEach((key) => {
-          const value = editEnrollmentData.payment[key];
-          if (value !== undefined && value !== null && value !== "") {
-            submitData.payment[key] =
-              key === "fee" || key === "discount" || key === "finalFee"
-                ? parseFloat(value)
-                : value;
-          }
-        });
-      }
-
-      const response = await updateBoth(editingEnrollmentId, submitData);
-      setEditEnrollmentSuccess(
-        response?.message || "✅ Enrollment updated successfully!"
-      );
-
-      setTimeout(async () => {
-        await fetchAllData();
-        setEditingEnrollmentId(null);
-        setEditEnrollmentData({});
-        setEditEnrollmentSuccess("");
-        setSavingEnrollment(false);
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to update enrollment:", error);
-      setEditEnrollmentError(
-        error instanceof Error ? error.message : "Failed to update enrollment"
-      );
-      setSavingEnrollment(false);
+    if (editEnrollmentData.enrollment) {
+      submitData.enrollment = {};
+      Object.keys(editEnrollmentData.enrollment).forEach((key) => {
+        const value = editEnrollmentData.enrollment[key];
+        if (value !== undefined && value !== null && value !== "") {
+          submitData.enrollment[key] = value;
+        }
+      });
     }
+
+    if (editEnrollmentData.payment) {
+      submitData.payment = {};
+      Object.keys(editEnrollmentData.payment).forEach((key) => {
+        const value = editEnrollmentData.payment[key];
+        if (value !== undefined && value !== null && value !== "") {
+          submitData.payment[key] =
+            key === "fee" || key === "discount" || key === "finalFee"
+              ? parseFloat(value)
+              : value;
+        }
+      });
+    }
+
+    const ok = await updateBoth(editingEnrollmentId, submitData);
+
+    if (!ok) {
+      setSavingEnrollment(false);
+      return;
+    }
+
+    setEditEnrollmentSuccess("✅ Enrollment updated successfully!");
+
+    setTimeout(async () => {
+      await refetchEnrollments();
+      setEditingEnrollmentId(null);
+      setEditEnrollmentData({});
+      setEditEnrollmentSuccess("");
+      setSavingEnrollment(false);
+    }, 1500);
   };
 
   const handleCancelEnrollmentEdit = () => {
     setEditingEnrollmentId(null);
     setEditEnrollmentData({});
-    setEditEnrollmentError("");
     setEditEnrollmentSuccess("");
   };
 
   const handleDeleteEnrollment = async (enrollmentId: string) => {
     if (
       !confirm(
-        "Are you sure you want to delete this enrollment? This will also delete the associated payment."
+        "Are you sure you want to delete this enrollment? This will also delete the associated payment.",
       )
     ) {
       return;
     }
 
-    try {
-      setDeletingId(enrollmentId);
-      const response = await deleteEnrollment(enrollmentId);
-      alert(response?.message || "Enrollment deleted successfully!");
-      await fetchAllData();
-    } catch (error) {
-      console.error("Failed to delete enrollment:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to delete enrollment"
-      );
-    } finally {
-      setDeletingId(null);
+    setDeletingId(enrollmentId);
+    const ok = await removeEnrollment(enrollmentId);
+
+    if (ok) {
+      alert("Enrollment deleted successfully!");
+      await refetchEnrollments();
+    } else {
+      alert("Failed to delete enrollment");
     }
+
+    setDeletingId(null);
   };
 
   // ✅ Shamsi date display
@@ -341,6 +319,8 @@ const StudentEditModal = ({
         return "bg-gray-100 text-gray-700";
     }
   };
+
+  if (!isOpen || !student) return null;
 
   return (
     <>
@@ -524,17 +504,10 @@ const StudentEditModal = ({
           {/* Enrollments View */}
           {showEnrollments && (
             <div>
-              {enrollmentError && (
+              {enrollmentFetchError && (
                 <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
                   <p className="text-sm font-medium text-red-700">
-                    {enrollmentError}
-                  </p>
-                </div>
-              )}
-              {enrollmentSuccess && (
-                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
-                  <p className="text-sm font-medium text-green-700">
-                    {enrollmentSuccess}
+                    {enrollmentFetchError}
                   </p>
                 </div>
               )}
@@ -602,7 +575,6 @@ const StudentEditModal = ({
                                 <td colSpan={7} className="px-4 py-3">
                                   <div className="space-y-3">
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                      {/* Book, Teacher, Class, Status, Result — same as before */}
                                       <div>
                                         <label className="block text-xs font-medium text-gray-500">
                                           Book *
@@ -616,7 +588,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "enrollment",
                                               "bookId",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                           className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -645,7 +617,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "enrollment",
                                               "teacherId",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                           className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -677,7 +649,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "enrollment",
                                               "classId",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                           className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -688,7 +660,7 @@ const StudentEditModal = ({
                                               key={classItem.id}
                                               value={classItem.id}
                                             >
-                                              {classItem.name} -{" "}
+                                              {classItem.className} -{" "}
                                               {classItem.block || "No block"}
                                             </option>
                                           ))}
@@ -707,7 +679,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "enrollment",
                                               "status",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                           className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -718,9 +690,7 @@ const StudentEditModal = ({
                                           <option value="Completed">
                                             Completed
                                           </option>
-                                          <option value="Passed">
-                                            Passed
-                                          </option>
+                                          <option value="Passed">Passed</option>
                                           <option value="Dropped">
                                             Dropped
                                           </option>
@@ -743,7 +713,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "enrollment",
                                               "result",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                           placeholder="e.g., 85%, Passed"
@@ -751,7 +721,6 @@ const StudentEditModal = ({
                                         />
                                       </div>
 
-                                      {/* ✅ Start Date — Shamsi picker */}
                                       <div>
                                         <label className="block text-xs font-medium text-gray-500">
                                           Start Date
@@ -765,14 +734,13 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "enrollment",
                                               "startDate",
-                                              miladiISO
+                                              miladiISO,
                                             )
                                           }
                                           placeholder="انتخاب تاریخ"
                                         />
                                       </div>
 
-                                      {/* ✅ End Date — Shamsi picker */}
                                       <div>
                                         <label className="block text-xs font-medium text-gray-500">
                                           End Date
@@ -786,7 +754,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "enrollment",
                                               "endDate",
-                                              miladiISO
+                                              miladiISO,
                                             )
                                           }
                                           placeholder="انتخاب تاریخ"
@@ -810,17 +778,17 @@ const StudentEditModal = ({
                                             const discount =
                                               parseFloat(
                                                 editEnrollmentData.payment
-                                                  ?.discount
+                                                  ?.discount,
                                               ) || 0;
                                             handleEnrollmentEditChange(
                                               "payment",
                                               "fee",
-                                              val
+                                              val,
                                             );
                                             handleEnrollmentEditChange(
                                               "payment",
                                               "finalFee",
-                                              Math.max(0, val - discount)
+                                              Math.max(0, val - discount),
                                             );
                                           }}
                                           className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -842,17 +810,17 @@ const StudentEditModal = ({
                                               parseFloat(e.target.value) || 0;
                                             const fee =
                                               parseFloat(
-                                                editEnrollmentData.payment?.fee
+                                                editEnrollmentData.payment?.fee,
                                               ) || 0;
                                             handleEnrollmentEditChange(
                                               "payment",
                                               "discount",
-                                              discount
+                                              discount,
                                             );
                                             handleEnrollmentEditChange(
                                               "payment",
                                               "finalFee",
-                                              Math.max(0, fee - discount)
+                                              Math.max(0, fee - discount),
                                             );
                                           }}
                                           className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -889,7 +857,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "payment",
                                               "status",
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                           className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
@@ -908,7 +876,6 @@ const StudentEditModal = ({
                                         </select>
                                       </div>
 
-                                      {/* ✅ Payment Date — Shamsi picker */}
                                       <div>
                                         <label className="block text-xs font-medium text-gray-500">
                                           Payment Date
@@ -922,7 +889,7 @@ const StudentEditModal = ({
                                             handleEnrollmentEditChange(
                                               "payment",
                                               "date",
-                                              miladiISO
+                                              miladiISO,
                                             )
                                           }
                                           placeholder="انتخاب تاریخ"
@@ -971,7 +938,6 @@ const StudentEditModal = ({
                                       {enrollment.teacher?.lastName || ""}
                                     </p>
                                   </td>
-                                  {/* ✅ Dates — now Shamsi */}
                                   <td className="px-4 py-3">
                                     <div className="text-sm">
                                       <p>
@@ -991,7 +957,7 @@ const StudentEditModal = ({
                                   <td className="px-4 py-3">
                                     <span
                                       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(
-                                        enrollment.status
+                                        enrollment.status,
                                       )}`}
                                     >
                                       {enrollment.status}
@@ -1007,7 +973,7 @@ const StudentEditModal = ({
                                       <p className="font-medium text-gray-900">
                                         {formatCurrency(
                                           payment.finalFee ||
-                                            enrollment.finalFee
+                                            enrollment.finalFee,
                                         )}
                                       </p>
                                     </div>
@@ -1016,7 +982,7 @@ const StudentEditModal = ({
                                     <span
                                       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getPaymentStatusColor(
                                         payment.status ||
-                                          enrollment.paymentStatus
+                                          enrollment.paymentStatus,
                                       )}`}
                                     >
                                       {payment.status ||
@@ -1036,13 +1002,9 @@ const StudentEditModal = ({
                                       </button>
                                       <button
                                         onClick={() =>
-                                          handleDeleteEnrollment(
-                                            enrollment.id
-                                          )
+                                          handleDeleteEnrollment(enrollment.id)
                                         }
-                                        disabled={
-                                          deletingId === enrollment.id
-                                        }
+                                        disabled={deletingId === enrollment.id}
                                         className="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                                       >
                                         {deletingId === enrollment.id

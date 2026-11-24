@@ -1,10 +1,14 @@
 // src/components/teacher-payroll/TeacherPayrollHistoryModal.tsx
-import { useState, useEffect } from "react";
-import { getPayrollsByTeacher, getTeachers } from "@/api/teacherPayrollApi";
-import type { TeacherPayroll, Teacher } from "@/types/teacherPayroll";
+import { useEffect, useState } from "react";
+import { useTeachers, usePayrollsByTeacher } from "@/api/teacherPayrollApi";
+import type { TeacherPayroll, Teacher } from "@/api/teacherPayrollApi";
 import TeacherPayrollHistoryEditModal from "./TeacherPayrollHistoryEditModal";
 // ✅ Shamsi helpers
-import { formatShamsi, convertToShamsi, SHAMSI_MONTHS } from "@/utils/dateConverter";
+import {
+  formatShamsi,
+  convertToShamsi,
+  SHAMSI_MONTHS,
+} from "@/utils/dateConverter";
 
 interface TeacherPayrollHistoryModalProps {
   isOpen: boolean;
@@ -15,17 +19,37 @@ const TeacherPayrollHistoryModal = ({
   isOpen,
   onClose,
 }: TeacherPayrollHistoryModalProps) => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  // ✅ Teachers come from the hook (replaces getTeachers())
+  const { data: teachersData, loading: loadingTeachers } = useTeachers();
+  const teachers: Teacher[] = Array.isArray(teachersData)
+    ? teachersData.filter((t) => t.isActive)
+    : [];
+
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
-  const [payrolls, setPayrolls] = useState<TeacherPayroll[]>([]);
-  const [loadingTeachers, setLoadingTeachers] = useState(false);
-  const [loadingPayrolls, setLoadingPayrolls] = useState(false);
   const [error, setError] = useState("");
+
+  // ✅ Payrolls come from the hook (replaces getPayrollsByTeacher)
+  const {
+    data: payrollsData,
+    loading: loadingPayrolls,
+    refetch: refetchPayrolls,
+  } = usePayrollsByTeacher(selectedTeacherId, !!selectedTeacherId);
+
+  const payrolls: TeacherPayroll[] = (
+    Array.isArray(payrollsData) ? payrollsData : []
+  )
+    .slice()
+    .sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.month - a.month;
+    });
 
   // ✅ Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
-  const [payrollToEdit, setPayrollToEdit] = useState<TeacherPayroll | null>(null);
+  const [payrollToEdit, setPayrollToEdit] = useState<TeacherPayroll | null>(
+    null,
+  );
 
   // ✅ Safe number conversion
   const safeNumber = (value: number | string | null | undefined): number => {
@@ -36,7 +60,7 @@ const TeacherPayrollHistoryModal = ({
 
   // ✅ Safe currency formatter
   const formatCurrency = (
-    amount: number | string | null | undefined
+    amount: number | string | null | undefined,
   ): string => {
     const num = safeNumber(amount);
     return `$${num.toFixed(2)}`;
@@ -82,55 +106,14 @@ const TeacherPayrollHistoryModal = ({
     return colors[status] || "bg-gray-500";
   };
 
-  // ✅ Fetch teachers on modal open
+  // ✅ Reset local selection when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchTeachersList();
       setSelectedTeacherId("");
       setSelectedTeacher(null);
-      setPayrolls([]);
       setError("");
     }
   }, [isOpen]);
-
-  const fetchTeachersList = async () => {
-    try {
-      setLoadingTeachers(true);
-      const data = await getTeachers();
-      setTeachers(Array.isArray(data) ? data.filter((t) => t.isActive) : []);
-    } catch (error) {
-      console.error("Failed to fetch teachers:", error);
-      setError("Failed to load teachers list");
-    } finally {
-      setLoadingTeachers(false);
-    }
-  };
-
-  // ✅ Fetch payrolls when teacher is selected
-  const fetchPayrollsByTeacher = async (teacherId: string) => {
-    if (!teacherId) return;
-
-    try {
-      setLoadingPayrolls(true);
-      setError("");
-      const data = await getPayrollsByTeacher(teacherId);
-      const sorted = (Array.isArray(data) ? data : []).sort((a, b) => {
-        if (a.year !== b.year) return b.year - a.year;
-        return b.month - a.month;
-      });
-      setPayrolls(sorted);
-    } catch (error) {
-      console.error("Failed to fetch payrolls:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load payroll history"
-      );
-      setPayrolls([]);
-    } finally {
-      setLoadingPayrolls(false);
-    }
-  };
 
   const handleTeacherChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const teacherId = e.target.value;
@@ -139,10 +122,8 @@ const TeacherPayrollHistoryModal = ({
     if (teacherId) {
       const teacher = teachers.find((t) => t.id === teacherId);
       setSelectedTeacher(teacher || null);
-      fetchPayrollsByTeacher(teacherId);
     } else {
       setSelectedTeacher(null);
-      setPayrolls([]);
     }
   };
 
@@ -160,22 +141,22 @@ const TeacherPayrollHistoryModal = ({
   // ✅ Handle edit success - refresh list
   const handleEditSuccess = () => {
     if (selectedTeacherId) {
-      fetchPayrollsByTeacher(selectedTeacherId);
+      refetchPayrolls();
     }
   };
 
   // Calculate totals
   const totalBaseSalary = payrolls.reduce(
     (sum, p) => sum + safeNumber(p.baseSalary),
-    0
+    0,
   );
   const totalPaid = payrolls.reduce(
     (sum, p) => sum + safeNumber(p.paidAmount),
-    0
+    0,
   );
   const totalRemaining = payrolls.reduce(
     (sum, p) => sum + safeNumber(p.remainingSalary),
-    0
+    0,
   );
 
   if (!isOpen) return null;
@@ -431,12 +412,12 @@ const TeacherPayrollHistoryModal = ({
                           <td className="px-4 py-3">
                             <span
                               className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusColor(
-                                payroll.status
+                                payroll.status,
                               )}`}
                             >
                               <span
                                 className={`mr-1.5 h-1.5 w-1.5 rounded-full ${getStatusDotColor(
-                                  payroll.status
+                                  payroll.status,
                                 )}`}
                               />
                               {payroll.status}

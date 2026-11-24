@@ -1,6 +1,6 @@
 // src/components/classes/ClassUpdateModal.tsx
 import { useState, useEffect } from "react";
-import type { Class, UpdateClassData } from "@/types/class";
+import type { Class, UpdateClassData } from "@/api/classApi";
 
 interface ClassUpdateModalProps {
   isOpen: boolean;
@@ -37,9 +37,7 @@ const ClassUpdateModal = ({
 
   if (!isOpen || !classItem) return null;
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
 
     if (type === "checkbox") {
@@ -68,20 +66,19 @@ const ClassUpdateModal = ({
 
       // Only send fields that have changed
       const changedData: UpdateClassData = {};
-      
+
       if (formData.className !== classItem.className) {
         changedData.className = formData.className;
       }
-      
+
       // Handle block - send null if empty, otherwise send the value
-      const blockValue = formData.block && formData.block.trim() !== "" 
-        ? formData.block 
-        : null;
-      
+      const blockValue =
+        formData.block && formData.block.trim() !== "" ? formData.block : null;
+
       if (blockValue !== classItem.block) {
         changedData.block = blockValue;
       }
-      
+
       if (formData.isActive !== classItem.isActive) {
         changedData.isActive = formData.isActive;
       }
@@ -108,7 +105,7 @@ const ClassUpdateModal = ({
     } catch (error) {
       console.error("Failed to update class:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to update class"
+        error instanceof Error ? error.message : "Failed to update class",
       );
     } finally {
       setIsSubmitting(false);
@@ -132,9 +129,7 @@ const ClassUpdateModal = ({
             <h3 className="text-xl font-semibold text-gray-900">
               Update Class
             </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Edit class information
-            </p>
+            <p className="mt-1 text-sm text-gray-500">Edit class information</p>
           </div>
           <button
             type="button"

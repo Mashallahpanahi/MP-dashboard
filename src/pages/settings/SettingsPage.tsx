@@ -1,43 +1,29 @@
 // src/pages/Settings/SettingsPage.tsx
-import { useState, useEffect } from "react";
 import PaymentMethodCard from "@/components/settings/SelectPaymentMethodCard";
 import MonthlyFeeCard from "@/components/settings/MonthlyFeeCard";
 import BookFeeCard from "@/components/settings/BookFeeCard";
-import { getPaymentMethod } from "@/api/settingsApi";
-import type { PaymentMethod } from "@/types/settings";
+import { usePaymentMethod, type PaymentMethod } from "@/api/settingsApi";
 
 const SettingsPage = () => {
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  // ✅ Read hook (replaces getPaymentMethod + local loading/error state)
+  const {
+    data: paymentMethodData,
+    loading,
+    error: fetchError,
+    refetch: refetchPaymentMethod,
+  } = usePaymentMethod();
 
-  // Fetch payment method on mount
-  useEffect(() => {
-    fetchPaymentMethod();
-  }, []);
+  // Mirror the original logic: any failure that isn't 404 becomes a visible error.
+  // A 404 (or null data) is treated as "no payment method configured".
+  const paymentMethod: PaymentMethod | null = paymentMethodData ?? null;
+  const error =
+    fetchError && !fetchError.includes("404")
+      ? "Failed to load payment method"
+      : "";
 
-  const fetchPaymentMethod = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getPaymentMethod();
-      setPaymentMethod(data);
-    } catch (error) {
-      console.error("Failed to fetch payment method:", error);
-      // If 404, it means no payment method exists yet
-      if (error instanceof Error && error.message.includes("404")) {
-        setPaymentMethod(null);
-      } else {
-        setError("Failed to load payment method");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle payment method change from the card
+  // Handle payment method change from the card — re-fetch the current value
   const handlePaymentMethodChange = () => {
-    fetchPaymentMethod();
+    refetchPaymentMethod();
   };
 
   if (loading) {
@@ -84,13 +70,9 @@ const SettingsPage = () => {
         {/* Conditional Fee Cards based on payment method */}
         {paymentMethod && (
           <>
-            {paymentMethod.paymentMethod === "per_month" && (
-              <MonthlyFeeCard />
-            )}
-            
-            {paymentMethod.paymentMethod === "per_book" && (
-              <BookFeeCard />
-            )}
+            {paymentMethod.paymentMethod === "per_month" && <MonthlyFeeCard />}
+
+            {paymentMethod.paymentMethod === "per_book" && <BookFeeCard />}
           </>
         )}
 
@@ -118,7 +100,8 @@ const SettingsPage = () => {
                 No Payment Method Configured
               </h3>
               <p className="mt-2 text-sm text-gray-500">
-                Please configure a payment method first. The fee configuration options will appear after you select and save a payment method.
+                Please configure a payment method first. The fee configuration
+                options will appear after you select and save a payment method.
               </p>
             </div>
           </div>

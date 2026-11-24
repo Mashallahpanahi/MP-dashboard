@@ -1,6 +1,9 @@
 // src/components/student-payments/StudentPaymentUpdateModal.tsx
 import { useState, useEffect } from "react";
-import type { StudentPayment, UpdateStudentPaymentData } from "@/types/studentPayment";
+import type {
+  StudentPayment,
+  UpdateStudentPaymentData,
+} from "@/api/studentPaymentApi";
 
 interface StudentPaymentUpdateModalProps {
   isOpen: boolean;
@@ -30,7 +33,7 @@ const StudentPaymentUpdateModal = ({
         amount: payment.amount,
         discount: payment.discount,
         paidAmount: payment.paidAmount,
-        paymentDate: payment.paymentDate.split('T')[0],
+        paymentDate: payment.paymentDate.split("T")[0],
         paymentMethod: payment.paymentMethod,
         receiptNumber: payment.receiptNumber || "",
         status: payment.status,
@@ -46,11 +49,16 @@ const StudentPaymentUpdateModal = ({
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
-    if (type === "number" || name === "amount" || name === "discount" || name === "paidAmount") {
+    if (
+      type === "number" ||
+      name === "amount" ||
+      name === "discount" ||
+      name === "paidAmount"
+    ) {
       setFormData((prev) => ({
         ...prev,
         [name]: value === "" ? 0 : parseFloat(value),
@@ -100,17 +108,20 @@ const StudentPaymentUpdateModal = ({
         const currentValue = formData[key];
         const originalValue = payment[key as keyof StudentPayment];
 
-        if (key === 'studentEnrollmentId') {
+        if (key === "studentEnrollmentId") {
           // Compare nested object IDs
           if (currentValue !== payment.studentEnrollment.id) {
-            changedData[key] = currentValue;
+            (changedData as Record<string, unknown>)[key] = currentValue;
           }
-        } else if (typeof currentValue === 'number' && typeof originalValue === 'number') {
+        } else if (
+          typeof currentValue === "number" &&
+          typeof originalValue === "number"
+        ) {
           if (currentValue !== originalValue) {
-            changedData[key] = currentValue;
+            (changedData as Record<string, unknown>)[key] = currentValue;
           }
         } else if (currentValue !== originalValue) {
-          changedData[key] = currentValue;
+          (changedData as Record<string, unknown>)[key] = currentValue;
         }
       });
 
@@ -138,7 +149,7 @@ const StudentPaymentUpdateModal = ({
     } catch (error) {
       console.error("Failed to update payment:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to update payment"
+        error instanceof Error ? error.message : "Failed to update payment",
       );
     } finally {
       setIsSubmitting(false);
@@ -167,7 +178,9 @@ const StudentPaymentUpdateModal = ({
               Update Payment
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {payment.studentEnrollment.student.firstName} {payment.studentEnrollment.student.lastName} - {payment.studentEnrollment.book.name}
+              {payment.studentEnrollment.student.firstName}{" "}
+              {payment.studentEnrollment.student.lastName} -{" "}
+              {payment.studentEnrollment.book.name}
             </p>
           </div>
           <button
@@ -266,7 +279,10 @@ const StudentPaymentUpdateModal = ({
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Remaining: {formatCurrency((formData.amount || 0) - (formData.paidAmount || 0))}
+                  Remaining:{" "}
+                  {formatCurrency(
+                    (formData.amount || 0) - (formData.paidAmount || 0),
+                  )}
                 </p>
               </div>
 

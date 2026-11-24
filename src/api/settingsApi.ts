@@ -1,104 +1,60 @@
 // src/api/settingsApi.ts
-import type { PaymentMethod, CreatePaymentMethodData, UpdatePaymentMethodData } from "@/types/settings";
-import { ApiError } from "./teacherApi";
+import { useFetch } from "@/hooks/useFetch";
+import { useCreate } from "@/hooks/useCreate";
+import { useUpdate } from "@/hooks/useUpdate";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const PAYMENT_METHOD_URL = `${API_URL}/select-payment-method`;
+
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface PaymentMethod {
+  id: string;
+  paymentMethod: "per_month" | "per_book";
+}
+
+export interface CreatePaymentMethodData {
+  paymentMethod: "per_month" | "per_book";
+}
+
+export interface UpdatePaymentMethodData {
+  paymentMethod: "per_month" | "per_book";
+}
+
+/* ------------------------------------------------------------------ */
+/* Query hook                                                          */
+/* ------------------------------------------------------------------ */
+
+/** GET /select-payment-method */
+export const usePaymentMethod = () =>
+  useFetch<PaymentMethod>(PAYMENT_METHOD_URL);
+
+/* ------------------------------------------------------------------ */
+/* Mutation hooks                                                      */
+/* ------------------------------------------------------------------ */
+
+/** POST /select-payment-method */
+export const useCreatePaymentMethod = () =>
+  useCreate<PaymentMethod>(PAYMENT_METHOD_URL);
 
 /**
- * Get payment method
- * GET /select-payment-method
- */
-export const getPaymentMethod = async (): Promise<PaymentMethod> => {
-  const response = await fetch(`${API_URL}/select-payment-method`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch payment method. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: PaymentMethod = await response.json();
-  return data;
-};
-
-/**
- * Create payment method
- * POST /select-payment-method
- */
-export const createPaymentMethod = async (
-  data: CreatePaymentMethodData
-): Promise<PaymentMethod> => {
-  const response = await fetch(`${API_URL}/select-payment-method`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to create payment method. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: PaymentMethod = await response.json();
-  return result;
-};
-
-/**
- * Update payment method
  * PATCH /select-payment-method
+ *
+ * Endpoint has no `:id` path param, but `useUpdate` appends `/${id}`.
+ * We pass `""` as the id, so the final URL is
+ *   `.../select-payment-method/`
+ * which Express/NestJS route to the same handler.
+ *
+ * If your backend rejects trailing slashes (strict routing), see the
+ * fallback note below.
  */
-export const updatePaymentMethod = async (
-  data: UpdatePaymentMethodData
-): Promise<PaymentMethod> => {
-  const response = await fetch(`${API_URL}/select-payment-method`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
+export const useUpdatePaymentMethod = () => {
+  const { update, ...rest } = useUpdate<PaymentMethod>(PAYMENT_METHOD_URL);
 
-  if (!response.ok) {
-    let errorMessage = `Failed to update payment method. Status: ${response.status}`;
-    let errorDetails = null;
+  const updatePaymentMethod = (data: UpdatePaymentMethodData) =>
+    update("", data);
 
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: PaymentMethod = await response.json();
-  return result;
+  return { ...rest, updatePaymentMethod, update };
 };

@@ -1,9 +1,12 @@
 // src/components/students/StudentScoresModal.tsx
-import { useState, useEffect } from "react";
-import { getScoresByStudent, deleteStudentScore } from "@/api/scoreApi";
-import type { StudentScore } from "@/api/scoreApi";
-import { getBooks, type Book } from "@/api/bookApi";
-import { getTeachers, type Teacher } from "@/api/teacherApi";
+import { useState, useMemo } from "react";
+import {
+  useScoresByStudent,
+  useDeleteStudentScore,
+  type StudentScore,
+} from "@/api/scoreApi";
+import { useBooks, type Book } from "@/api/bookApi";
+import { useTeachers, type Teacher } from "@/api/teacherApi";
 import ScoreUpdateModal from "./ScoreUpdateModal";
 import ScoreAddModal from "./ScoreAddModal";
 // ✅ Shamsi formatter
@@ -22,12 +25,38 @@ const StudentScoresModal = ({
   studentName,
   onClose,
 }: StudentScoresModalProps) => {
-  const [scores, setScores] = useState<StudentScore[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // ✅ Hooks replace getScoresByStudent + getBooks + getTeachers
+  const {
+    data: rawScores,
+    loading,
+    error: scoresError,
+    refetch,
+  } = useScoresByStudent(studentId ?? "", isOpen && !!studentId);
+
+  const { data: rawBooks } = useBooks();
+  const { data: rawTeachers } = useTeachers();
+
+  // ✅ Delete hook
+  const {
+    remove: deleteStudentScore,
+    loading: deletingId,
+    error: deleteError,
+  } = useDeleteStudentScore();
+  // Normalize scores — hook may return raw array or { data: [...] }
+  const scores: StudentScore[] = useMemo(() => {
+    if (!rawScores) return [];
+    return Array.isArray(rawScores) ? rawScores : [];
+  }, [rawScores]);
+
+  const books: Book[] = Array.isArray(rawBooks) ? rawBooks : [];
+  const teachers: Teacher[] = Array.isArray(rawTeachers) ? rawTeachers : [];
+
+  // Local state
   const [success, setSuccess] = useState("");
-  const [books, setBooks] = useState<Book[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [localError, setLocalError] = useState("");
+
+  // Combined error
+  const error = localError || scoresError || deleteError || "";
 
   // Update modal state
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -37,41 +66,12 @@ const StudentScoresModal = ({
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Delete state
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [scoreToDelete, setScoreToDelete] = useState<StudentScore | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && studentId) {
-      fetchScoresAndData();
-    }
-  }, [isOpen, studentId]);
-
-  const fetchScoresAndData = async () => {
-    if (!studentId) return;
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const [scoresResponse, booksData, teachersData] = await Promise.all([
-        getScoresByStudent(studentId),
-        getBooks().catch(() => []),
-        getTeachers().catch(() => []),
-      ]);
-
-      const scoresData = Array.isArray(scoresResponse) ? scoresResponse : [];
-      setScores(scoresData);
-      setBooks(Array.isArray(booksData) ? booksData : []);
-      setTeachers(Array.isArray(teachersData) ? teachersData : []);
-    } catch (error) {
-      console.error("Failed to fetch scores:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to fetch scores"
-      );
-    } finally {
-      setLoading(false);
-    }
+  // Refresh
+  const fetchScoresAndData = () => {
+    refetch();
   };
 
   // Handle Edit Click
@@ -86,7 +86,7 @@ const StudentScoresModal = ({
   };
 
   const handleUpdateSuccess = () => {
-    fetchScoresAndData();
+    refetch();
   };
 
   // Handle Add Click
@@ -99,7 +99,7 @@ const StudentScoresModal = ({
   };
 
   const handleAddSuccess = () => {
-    fetchScoresAndData();
+    refetch();
   };
 
   // Handle Delete Click
@@ -117,26 +117,20 @@ const StudentScoresModal = ({
   const handleConfirmDelete = async () => {
     if (!scoreToDelete) return;
 
-    try {
-      setDeletingId(scoreToDelete.id);
-      await deleteStudentScore(scoreToDelete.id);
+    setLocalError("");
+    const ok = await deleteStudentScore(scoreToDelete.id);
 
+    if (ok) {
       setSuccess("Score deleted successfully!");
       setShowDeleteConfirm(false);
       setScoreToDelete(null);
 
-      await fetchScoresAndData();
+      await refetch();
 
       setTimeout(() => setSuccess(""), 3000);
-    } catch (error) {
-      console.error("Failed to delete score:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to delete score"
-      );
+    } else {
       setShowDeleteConfirm(false);
       setScoreToDelete(null);
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -384,7 +378,7 @@ const StudentScoresModal = ({
                         <td className="px-4 py-3">
                           <span
                             className={`text-sm ${getScoreColor(
-                              parseFloat(formatNumber(score.totalScore))
+                              parseFloat(formatNumber(score.totalScore)),
                             )}`}
                           >
                             {formatNumber(score.totalScore)}
@@ -407,12 +401,10 @@ const StudentScoresModal = ({
 
                             <button
                               onClick={() => handleDeleteClick(score)}
-                              disabled={deletingId === score.id}
+                              disabled={deletingId}
                               className="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {deletingId === score.id
-                                ? "Deleting..."
-                                : "Delete"}
+                              {deletingId ? "Deleting..." : "Delete"}
                             </button>
                           </div>
                         </td>

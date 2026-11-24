@@ -1,19 +1,138 @@
 // src/api/studentEnrollmentApi.ts
-import type {
-  StudentEnrollment,
-  CreateEnrollmentWithPaymentData,
-  UpdateEnrollmentData,
-  UpdatePaymentData,
-  UpdateScoreData,
-  UpdateBothData,
-  ScoreData
-} from "@/types/studentEnrollment";
-import { ApiError } from "./teacherApi";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const BASE_URL = `${API_URL}/student-enrollment-payment`;
 
+/* ================================================================== */
+/* Types — inlined from src/types/studentEnrollment.ts               */
+/* ================================================================== */
 
-// SCORE
-// ============================================
+export interface StudentEnrollment {
+  id: string;
+  studentId: string;
+  bookId: string;
+  classId: string;
+  teacherId: string;
+  startDate: string;
+  endDate: string;
+  time: string | null;
+  status: "Studying" | "Completed" | "Dropped" | "Pending";
+  result: "Passed" | "Failed" | "Pending" | "In Progress";
+  fee: number;
+  discount: number;
+  finalFee: number;
+  date: string;
+  paymentStatus: "Paid" | "Pending" | "Partially Paid" | "Overdue";
+  score: number | null;
+  scoreDate: string | null;
+  scoreTime: string | null;
+  scoreNotes: string | null;
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    studentNumber: string;
+    phone: string;
+  };
+  book: {
+    id: string;
+    name: string;
+    code: string;
+    level: string;
+    levelOrder: number;
+  };
+  teacher: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  class: {
+    id: string;
+    name: string;
+    block: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEnrollmentWithPaymentData {
+  studentId: string;
+  bookId: string;
+  classId: string;
+  teacherId: string;
+  startDate: string;
+  endDate: string;
+  time?: string;
+  status?: "Studying" | "Completed" | "Dropped" | "Pending";
+  result?: "Passed" | "Failed" | "Pending" | "In Progress";
+  fee: number;
+  discount?: number;
+  finalFee: number;
+  date: string;
+  paymentStatus?: "Paid" | "Pending" | "Partially Paid" | "Overdue";
+  score?: number;
+  scoreDate?: string;
+  scoreTime?: string;
+  scoreNotes?: string;
+}
+
+export interface UpdateEnrollmentData {
+  studentId?: string;
+  bookId?: string;
+  classId?: string;
+  teacherId?: string;
+  startDate?: string;
+  endDate?: string;
+  time?: string;
+  status?: "Studying" | "Completed" | "Dropped" | "Pending";
+  result?: "Passed" | "Failed" | "Pending" | "In Progress";
+}
+
+export interface UpdatePaymentData {
+  fee?: number;
+  discount?: number;
+  finalFee?: number;
+  date?: string;
+  paymentStatus?: "Paid" | "Pending" | "Partially Paid" | "Overdue";
+}
+
+export interface UpdateScoreData {
+  score?: number;
+  scoreDate?: string;
+  scoreTime?: string;
+  scoreNotes?: string;
+}
+
+export interface UpdateBothData {
+  studentId?: string;
+  bookId?: string;
+  classId?: string;
+  teacherId?: string;
+  startDate?: string;
+  endDate?: string;
+  time?: string;
+  status?: "Studying" | "Completed" | "Dropped" | "Pending";
+  result?: "Passed" | "Failed" | "Pending" | "In Progress";
+  fee?: number;
+  discount?: number;
+  finalFee?: number;
+  date?: string;
+  paymentStatus?: "Paid" | "Pending" | "Partially Paid" | "Overdue";
+}
+
+export interface ScoreData {
+  id: string;
+  enrollmentId: string;
+  score: number;
+  scoreDate: string;
+  scoreTime: string;
+  scoreNotes: string;
+}
+
+/* ---------- enrollment history ---------- */
 
 export interface EnrollmentScore {
   id: string;
@@ -24,10 +143,6 @@ export interface EnrollmentScore {
   scoreTime: string | null;
   scoreNotes: string | null;
 }
-
-// ============================================
-// ENROLLMENT & PAYMENT HISTORY
-// ============================================
 
 export interface EnrollmentHistoryRecord {
   enrollmentId: string;
@@ -54,7 +169,7 @@ export interface EnrollmentHistoryRecord {
   finalFee: string | number;
   paymentDate: string;
   paymentStatus: string;
-  score: EnrollmentScore | null; // ✅ NEW
+  score: EnrollmentScore | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,8 +179,8 @@ export interface EnrollmentHistorySummary {
   totalAmount: number;
   paidCount: number;
   pendingCount: number;
-  scoredCount: number;         // ✅ NEW
-  averageTotalScore: number;   // ✅ NEW
+  scoredCount: number;
+  averageTotalScore: number;
 }
 
 export interface EnrollmentHistoryStudent {
@@ -93,394 +208,202 @@ export interface EnrollmentHistoryResponse {
   };
 }
 
-/**
- * Get student enrollment & payment history
- * GET /student-enrollment-payment/history/student/{studentId}
- *
- * @param studentId - Student UUID
- */
-export const getStudentEnrollmentHistory = async (
-  studentId: string
-): Promise<EnrollmentHistoryResponse> => {
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+/* ================================================================== */
+/* Inline helpers (same as studentApi.ts)                             */
+/* ================================================================== */
 
-  const response = await fetch(
-    `${API_URL}/student-enrollment-payment/history/student/${studentId}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+const extractErrMessage = (err: any, fallback: string): string => {
+  const m = err?.response?.data?.message;
+  if (Array.isArray(m)) return m.join(", ");
+  if (typeof m === "string") return m;
+  return err?.message || fallback;
+};
+
+function useRawQuery<T>(url: string | null, enabled = true) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(!!url && enabled);
+  const [error, setError] = useState<string | null>(null);
+  const [trigger, setTrigger] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || !url) {
+      setLoading(false);
+      return;
     }
+    let alive = true;
+    setLoading(true);
+    setError(null);
+
+    axios
+      .get<T>(url)
+      .then((res) => {
+        if (alive) setData(res.data);
+      })
+      .catch((err) => {
+        if (alive) setError(extractErrMessage(err, "Something went wrong"));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [url, trigger, enabled]);
+
+  return { data, loading, error, refetch: () => setTrigger((n) => n + 1) };
+}
+
+function useRawMutation<T>() {
+  const [data, setData] = useState<T | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = async (
+    method: "post" | "patch" | "delete",
+    url: string,
+    body?: object,
+    opts: { customErrorMap?: (m: string) => string } = {},
+  ): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const res = await axios.request<T>({
+        method,
+        url,
+        headers:
+          body !== undefined
+            ? { "Content-Type": "application/json" }
+            : undefined,
+        data: body,
+      });
+      setData(res.data);
+      setMessage((res.data as any)?.message ?? null);
+      return true;
+    } catch (err: any) {
+      const rawMsg = extractErrMessage(err, "Something went wrong");
+      setError(opts.customErrorMap ? opts.customErrorMap(rawMsg) : rawMsg);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { data, message, loading, error, send };
+}
+
+/* ================================================================== */
+/* Query hooks                                                        */
+/* ================================================================== */
+
+/** GET /student-enrollment-payment/history/student/:studentId */
+export const useEnrollmentHistory = (studentId: string, enabled = true) =>
+  useRawQuery<EnrollmentHistoryResponse>(
+    studentId ? `${BASE_URL}/history/student/${studentId}` : null,
+    enabled && !!studentId,
   );
 
-  if (!response.ok) {
-    let errorMessage = `Failed to fetch enrollment history. Status: ${response.status}`;
+/** GET /student-enrollment-payment */
+export const useEnrollments = () => useRawQuery<StudentEnrollment[]>(BASE_URL);
 
-    try {
-      const errorData = await response.json();
-      if (errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // Keep default error message
-    }
+/** GET /student-enrollment-payment/:id */
+export const useEnrollmentById = (id: string, enabled = true) =>
+  useRawQuery<StudentEnrollment>(
+    id ? `${BASE_URL}/${id}` : null,
+    enabled && !!id,
+  );
 
-    throw new Error(errorMessage);
-  }
+/** GET /student-enrollment-payment/student/:studentId */
+export const useEnrollmentsByStudent = (studentId: string, enabled = true) =>
+  useRawQuery<StudentEnrollment[]>(
+    studentId ? `${BASE_URL}/student/${studentId}` : null,
+    enabled && !!studentId,
+  );
 
-  return response.json();
+/** GET /student-enrollment-payment/:id/score */
+export const useScoreByEnrollment = (id: string, enabled = true) =>
+  useRawQuery<ScoreData>(
+    id ? `${BASE_URL}/${id}/score` : null,
+    enabled && !!id,
+  );
+
+/** GET /student-enrollment-payment/scores/student/:studentId */
+export const useScoresByStudent = (studentId: string, enabled = true) =>
+  useRawQuery<ScoreData[]>(
+    studentId ? `${BASE_URL}/scores/student/${studentId}` : null,
+    enabled && !!studentId,
+  );
+
+/* ================================================================== */
+/* Mutation hooks                                                     */
+/* ================================================================== */
+
+/** POST /student-enrollment-payment */
+export const useCreateEnrollmentWithPayment = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+
+  const createEnrollmentWithPayment = (
+    payload: CreateEnrollmentWithPaymentData,
+  ) =>
+    send("post", BASE_URL, payload, {
+      customErrorMap: (m) =>
+        m.includes("already enrolled")
+          ? "This student is already enrolled in this course."
+          : m,
+    });
+
+  return {
+    createData: data,
+    message,
+    loading,
+    error,
+    createEnrollmentWithPayment,
+  };
 };
 
-
-
-
-
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-/**
- * Create enrollment with payment (and optional score)
- * POST /student-enrollment-payment
- */
-export const createEnrollmentWithPayment = async (
-  data: CreateEnrollmentWithPaymentData
-): Promise<StudentEnrollment> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to create enrollment. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-
-      if (errorData.message && typeof errorData.message === 'string') {
-        if (errorData.message.includes('already enrolled')) {
-          errorMessage = 'This student is already enrolled in this course.';
-        } else if (Array.isArray(errorData.message)) {
-          errorMessage = errorData.message.join(", ");
-        } else {
-          errorMessage = errorData.message;
-        }
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: StudentEnrollment = await response.json();
-  return result;
+/** DELETE /student-enrollment-payment/:id */
+export const useDeleteEnrollment = () => {
+  const { data, message, loading, error, send } = useRawMutation<void>();
+  const remove = (id: string) => send("delete", `${BASE_URL}/${id}`);
+  return { deleteData: data, message, loading, error, remove };
 };
 
-/**
- * Get all enrollments with payments and scores
- * GET /student-enrollment-payment
- */
-export const getEnrollments = async (): Promise<StudentEnrollment[]> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch enrollments. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: StudentEnrollment[] = await response.json();
-  return data;
+/** PATCH /student-enrollment-payment/:id/enrollment */
+export const useUpdateEnrollmentOnly = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+  const updateEnrollmentOnly = (id: string, payload: UpdateEnrollmentData) =>
+    send("patch", `${BASE_URL}/${id}/enrollment`, payload);
+  return { updateData: data, message, loading, error, updateEnrollmentOnly };
 };
 
-/**
- * Get enrollment by ID with payment and score
- * GET /student-enrollment-payment/{id}
- */
-export const getEnrollmentById = async (id: string): Promise<StudentEnrollment> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/${id}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch enrollment. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: StudentEnrollment = await response.json();
-  return data;
+/** PATCH /student-enrollment-payment/:id/payment */
+export const useUpdatePaymentOnly = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+  const updatePaymentOnly = (id: string, payload: UpdatePaymentData) =>
+    send("patch", `${BASE_URL}/${id}/payment`, payload);
+  return { updateData: data, message, loading, error, updatePaymentOnly };
 };
 
-/**
- * Get enrollments by student ID
- * GET /student-enrollment-payment/student/{studentId}
- */
-export const getEnrollmentsByStudent = async (studentId: string): Promise<StudentEnrollment[]> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/student/${studentId}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch enrollments for student. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: StudentEnrollment[] = await response.json();
-  return data;
+/** PATCH /student-enrollment-payment/:id/score */
+export const useUpdateScoreOnly = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+  const updateScoreOnly = (id: string, payload: UpdateScoreData) =>
+    send("patch", `${BASE_URL}/${id}/score`, payload);
+  return { updateData: data, message, loading, error, updateScoreOnly };
 };
 
-/**
- * Delete enrollment, payment and score
- * DELETE /student-enrollment-payment/{id}
- */
-export const deleteEnrollment = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/${id}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to delete enrollment. Status: ${response.status}`;
-
-    try {
-      const errorData = await response.json();
-      if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status);
-  }
-};
-
-/**
- * Update enrollment only
- * PATCH /student-enrollment-payment/{id}/enrollment
- */
-export const updateEnrollmentOnly = async (
-  id: string,
-  data: UpdateEnrollmentData
-): Promise<StudentEnrollment> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/${id}/enrollment`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update enrollment. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: StudentEnrollment = await response.json();
-  return result;
-};
-
-/**
- * Update payment only
- * PATCH /student-enrollment-payment/{id}/payment
- */
-export const updatePaymentOnly = async (
-  id: string,
-  data: UpdatePaymentData
-): Promise<StudentEnrollment> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/${id}/payment`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update payment. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: StudentEnrollment = await response.json();
-  return result;
-};
-
-/**
- * Update score only
- * PATCH /student-enrollment-payment/{id}/score
- */
-export const updateScoreOnly = async (
-  id: string,
-  data: UpdateScoreData
-): Promise<StudentEnrollment> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/${id}/score`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update score. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: StudentEnrollment = await response.json();
-  return result;
-};
-
-/**
- * Get score by enrollment ID
- * GET /student-enrollment-payment/{id}/score
- */
-export const getScoreByEnrollment = async (id: string): Promise<ScoreData> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/${id}/score`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch score. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: ScoreData = await response.json();
-  return data;
-};
-
-/**
- * Get all scores by student ID
- * GET /student-enrollment-payment/scores/student/{studentId}
- */
-export const getScoresByStudent = async (studentId: string): Promise<ScoreData[]> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/scores/student/${studentId}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      `Failed to fetch scores for student. Status: ${response.status}`,
-      response.status
-    );
-  }
-
-  const data: ScoreData[] = await response.json();
-  return data;
-};
-
-/**
- * Update both enrollment and payment
- * PATCH /student-enrollment-payment/{id}/both
- */
-export const updateBoth = async (
-  id: string,
-  data: UpdateBothData
-): Promise<StudentEnrollment> => {
-  const response = await fetch(`${API_URL}/student-enrollment-payment/${id}/both`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to update enrollment and payment. Status: ${response.status}`;
-    let errorDetails = null;
-
-    try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      if (errorData.message && typeof errorData.message === 'string') {
-        errorMessage = errorData.message;
-      } else if (Array.isArray(errorData.message)) {
-        errorMessage = errorData.message.join(", ");
-      }
-    } catch {
-      // Keep the default error message
-    }
-
-    throw new ApiError(errorMessage, response.status, errorDetails);
-  }
-
-  const result: StudentEnrollment = await response.json();
-  return result;
+/** PATCH /student-enrollment-payment/:id/both */
+export const useUpdateBoth = () => {
+  const { data, message, loading, error, send } =
+    useRawMutation<StudentEnrollment>();
+  const updateBoth = (id: string, payload: UpdateBothData) =>
+    send("patch", `${BASE_URL}/${id}/both`, payload);
+  return { updateData: data, message, loading, error, updateBoth };
 };

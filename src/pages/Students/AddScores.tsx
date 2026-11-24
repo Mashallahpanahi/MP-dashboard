@@ -1,13 +1,13 @@
 // src/pages/Students/AddScores.tsx
 import { useEffect, useState, useMemo } from "react";
 import {
-  findStudentsForScoring,
-  bulkUpdateStudentScores,
+  useFindStudentsForScoring,
+  useBulkUpdateStudentScores,
   type StudentForScoring,
 } from "@/api/studentApi";
-import { getTeachers, type Teacher } from "@/api/teacherApi";
-import { getBooks, type Book } from "@/api/bookApi";
-import { getClasses, type Class } from "@/api/classApi";
+import { useTeachers, type Teacher } from "@/api/teacherApi";
+import { useBooks, type Book } from "@/api/bookApi";
+import { useClasses, type Class } from "@/api/classApi";
 // ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
@@ -39,11 +39,20 @@ const getResultBadge = (result: string) => {
 // MAIN PAGE
 // ============================================
 const AddScores = () => {
-  // Dropdown data
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [loadingDropdowns, setLoadingDropdowns] = useState(true);
+  // ✅ Dropdowns from hooks (replaces getTeachers / getBooks / getClasses)
+  const { data: teachersData, loading: loadingTeachers } = useTeachers();
+  const { data: booksData, loading: loadingBooks } = useBooks();
+  const { data: classesData, loading: loadingClasses } = useClasses();
+
+  const teachers: Teacher[] = Array.isArray(teachersData)
+    ? teachersData.filter((t) => t.isActive)
+    : [];
+  const books: Book[] = Array.isArray(booksData)
+    ? booksData.filter((b) => b.isActive)
+    : [];
+  const classes: Class[] = Array.isArray(classesData) ? classesData : [];
+
+  const loadingDropdowns = loadingTeachers || loadingBooks || loadingClasses;
 
   // Filters — fromDate / toDate kept as MILADI ISO for backend
   const [teacherId, setTeacherId] = useState("");
@@ -56,6 +65,26 @@ const AddScores = () => {
   // Result
   const [students, setStudents] = useState<StudentForScoring[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // ✅ Bulk-update hook (replaces bulkUpdateStudentScores)
+  const { bulkUpdate: bulkUpdateStudentScores } = useBulkUpdateStudentScores();
+
+  // ✅ Hook for find-students, gated on (teacherId && bookId && hasSearched)
+  const {
+    data: findData,
+    loading: loadingFind,
+    refetch: refetchFind,
+  } = useFindStudentsForScoring(
+    {
+      teacherId,
+      bookId,
+      classId: classId || undefined,
+      time: time || undefined,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    },
+    hasSearched && !!teacherId && !!bookId,
+  );
 
   // Loading / messages
   const [loading, setLoading] = useState(false);
@@ -71,31 +100,34 @@ const AddScores = () => {
   const [savingId, setSavingId] = useState<string | null>(null);
 
   // ============================================
-  // FETCH DROPDOWNS
+  // SYNC find-students hook result → local students state
+  // (Preserves the original "students is local state" model)
   // ============================================
   useEffect(() => {
-    const fetchDropdowns = async () => {
-      try {
-        setLoadingDropdowns(true);
-        const [teachersData, booksData, classesData] = await Promise.all([
-          getTeachers(),
-          getBooks(),
-          getClasses(),
-        ]);
-        setTeachers(teachersData.filter((t) => t.isActive));
-        setBooks(booksData.filter((b) => b.isActive));
-        setClasses(classesData);
-      } catch (err) {
-        console.error("Failed to load dropdowns:", err);
-      } finally {
-        setLoadingDropdowns(false);
-      }
-    };
-    fetchDropdowns();
-  }, []);
+    if (!findData) return;
+    if (findData.success) {
+      setStudents(findData.data);
+
+      const init: Record<string, { midterm: string; final: string }> = {};
+      findData.data.forEach((s) => {
+        init[s.enrollmentId] = {
+          midterm:
+            s.midtermScore !== null && s.midtermScore !== undefined
+              ? String(s.midtermScore)
+              : "",
+          final:
+            s.finalScore !== null && s.finalScore !== undefined
+              ? String(s.finalScore)
+              : "",
+        };
+      });
+      setEditedScores(init);
+    }
+    setLoading(false);
+  }, [findData]);
 
   // ============================================
-  // FETCH STUDENTS
+  // FETCH STUDENTS (triggered by "Find Students" button)
   // ============================================
   const handleFindStudents = async () => {
     if (!teacherId || !bookId) {
@@ -103,46 +135,14 @@ const AddScores = () => {
       return;
     }
 
-    try {
-      setLoading(true);
-      setError("");
-      setSuccess("");
-      setHasSearched(true);
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    setHasSearched(true);
 
-      const response = await findStudentsForScoring({
-        teacherId,
-        bookId,
-        classId: classId || undefined,
-        time: time || undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-      });
-
-      if (response.success) {
-        setStudents(response.data);
-
-        const init: Record<string, { midterm: string; final: string }> = {};
-        response.data.forEach((s) => {
-          init[s.enrollmentId] = {
-            midterm:
-              s.midtermScore !== null && s.midtermScore !== undefined
-                ? String(s.midtermScore)
-                : "",
-            final:
-              s.finalScore !== null && s.finalScore !== undefined
-                ? String(s.finalScore)
-                : "",
-          };
-        });
-        setEditedScores(init);
-      }
-    } catch (err) {
-      console.error("Failed to find students:", err);
-      setError(err instanceof Error ? err.message : "Failed to find students");
-      setStudents([]);
-    } finally {
-      setLoading(false);
-    }
+    // If filter values didn't change since last search, the hook won't refire
+    // on its own — trigger refetch explicitly.
+    refetchFind();
   };
 
   const handleClear = () => {
@@ -165,7 +165,7 @@ const AddScores = () => {
   const updateScoreField = (
     enrollmentId: string,
     field: "midterm" | "final",
-    value: string
+    value: string,
   ) => {
     if (value !== "" && !/^\d*\.?\d*$/.test(value)) return;
 
@@ -210,61 +210,57 @@ const AddScores = () => {
       return;
     }
 
-    try {
-      setSavingId(student.enrollmentId);
-      setError("");
-      setSuccess("");
+    setSavingId(student.enrollmentId);
+    setError("");
+    setSuccess("");
 
-      const response = await bulkUpdateStudentScores([
-        {
-          studentId: student.studentId,
-          bookId: student.bookId,
-          teacherId: student.teacherId,
-          midtermScore: midterm,
-          finalScore: finalScore,
-          notes: "",
-        },
-      ]);
+    const ok = await bulkUpdateStudentScores([
+      {
+        studentId: student.studentId,
+        bookId: student.bookId,
+        teacherId: student.teacherId,
+        midtermScore: midterm,
+        finalScore: finalScore,
+        notes: "",
+      },
+    ]);
 
-      setSuccess(
-        response.message ||
-          `Score saved for ${student.studentName} ${student.studentLastName}`
-      );
-
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.enrollmentId === student.enrollmentId
-            ? {
-                ...s,
-                midtermScore: midterm,
-                finalScore: finalScore,
-                totalScore:
-                  midterm !== null || finalScore !== null
-                    ? (midterm || 0) + (finalScore || 0)
-                    : null,
-                scoreId: s.scoreId || "temp",
-                result:
-                  finalScore !== null
-                    ? (midterm || 0) + finalScore >= s.passingScore
-                      ? "Passed"
-                      : "Failed"
-                    : s.result,
-                enrollmentStatus:
-                  finalScore !== null ? "Completed" : s.enrollmentStatus,
-              }
-            : s
-        )
-      );
-    } catch (err) {
-      console.error("Failed to save score:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to save score. Please try again."
-      );
-    } finally {
+    if (!ok) {
+      setError("Failed to save score. Please try again.");
       setSavingId(null);
+      return;
     }
+
+    setSuccess(
+      `Score saved for ${student.studentName} ${student.studentLastName}`,
+    );
+
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.enrollmentId === student.enrollmentId
+          ? {
+              ...s,
+              midtermScore: midterm,
+              finalScore: finalScore,
+              totalScore:
+                midterm !== null || finalScore !== null
+                  ? (midterm || 0) + (finalScore || 0)
+                  : null,
+              scoreId: s.scoreId || "temp",
+              result:
+                finalScore !== null
+                  ? (midterm || 0) + finalScore >= s.passingScore
+                    ? "Passed"
+                    : "Failed"
+                  : s.result,
+              enrollmentStatus:
+                finalScore !== null ? "Completed" : s.enrollmentStatus,
+            }
+          : s,
+      ),
+    );
+
+    setSavingId(null);
   };
 
   // ============================================
@@ -320,31 +316,26 @@ const AddScores = () => {
       return;
     }
 
-    try {
-      setSavingId("__ALL__");
-      setError("");
-      setSuccess("");
+    setSavingId("__ALL__");
+    setError("");
+    setSuccess("");
 
-      const response = await bulkUpdateStudentScores(scores);
+    const ok = await bulkUpdateStudentScores(scores);
 
-      setSuccess(
-        response.message ||
-          `Successfully saved ${scores.length} score${
-            scores.length !== 1 ? "s" : ""
-          }`
-      );
-
-      await handleFindStudents();
-    } catch (err) {
-      console.error("Failed to save all scores:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to save scores. Please try again."
-      );
-    } finally {
+    if (!ok) {
+      setError("Failed to save scores. Please try again.");
       setSavingId(null);
+      return;
     }
+
+    setSuccess(
+      `Successfully saved ${scores.length} score${
+        scores.length !== 1 ? "s" : ""
+      }`,
+    );
+
+    await handleFindStudents();
+    setSavingId(null);
   };
 
   // ============================================
@@ -482,7 +473,7 @@ const AddScores = () => {
                   <option value="">Any class</option>
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.className}
                       {c.block ? ` - ${c.block}` : ""}
                     </option>
                   ))}
@@ -722,7 +713,7 @@ const AddScores = () => {
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getResultBadge(
-                            s.result
+                            s.result,
                           )}`}
                         >
                           {s.result}
@@ -738,7 +729,7 @@ const AddScores = () => {
                             updateScoreField(
                               s.enrollmentId,
                               "midterm",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           placeholder="—"
@@ -756,7 +747,7 @@ const AddScores = () => {
                             updateScoreField(
                               s.enrollmentId,
                               "final",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                           placeholder="—"

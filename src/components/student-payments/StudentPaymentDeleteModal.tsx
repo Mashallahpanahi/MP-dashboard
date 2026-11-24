@@ -1,5 +1,5 @@
 // src/components/student-payments/StudentPaymentDeleteModal.tsx
-import type { StudentPayment } from "@/types/studentPayment";
+import type { StudentPayment } from "@/api/studentPaymentApi";
 
 interface StudentPaymentDeleteModalProps {
   isOpen: boolean;

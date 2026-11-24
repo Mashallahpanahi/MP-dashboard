@@ -1,82 +1,181 @@
-import React, { useEffect, useState } from 'react';
-import { useForm } from '../../../hooks/useForm';
-import { SalaryType } from '../../../api/types/teacher.types';
-import Button from '../../common/Button/Button';
-import Input from '../../common/Input/Input';
-import Select from '../../common/Select/Select';
-import Card from '../../common/Card/Card';
+// src/components/teachers/TeacherForm.tsx
+
+import React, { useEffect, useState } from "react";
+import {
+  useCreateTeacher,
+  useUpdateTeacher,
+  type CreateTeacherData,
+} from "../../../api/teacherApi";
+
+import Button from "../../common/Button/Button";
+import Input from "../../common/Input/Input";
+import Select from "../../common/Select/Select";
+import Card from "../../common/Card/Card";
+
+// Backend supports only Fixed / PerStudent
+const SalaryType = {
+  FIXED: "Fixed",
+  PER_STUDENT: "PerStudent",
+} as const;
+
+type SalaryType = (typeof SalaryType)[keyof typeof SalaryType];
 
 interface TeacherFormProps {
   initialData?: any;
-  onSubmit: (data: any) => void;
+  onSubmit?: (data: CreateTeacherData) => void;
   onCancel: () => void;
   loading?: boolean;
   isEdit?: boolean;
 }
 
+interface TeacherFormValues {
+  firstName: string;
+  lastName: string;
+  gender: string;
+  phone: string;
+  email: string;
+  address: string;
+  salaryType: SalaryType;
+  salaryAmount: string | number;
+  feePercentage: number;
+  hireDate: string;
+  isActive: boolean;
+}
+
+type FormErrors = Partial<Record<keyof TeacherFormValues, string>>;
+
 const TeacherForm: React.FC<TeacherFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
-  loading = false,
+  loading: externalLoading = false,
   isEdit = false,
 }) => {
+  // API hooks — do the actual create / update
+  const {
+    createTeacher,
+    loading: creating,
+    error: createError,
+  } = useCreateTeacher();
+  const {
+    updateTeacher,
+    loading: updating,
+    error: updateError,
+  } = useUpdateTeacher();
+
+  const isLoading = externalLoading || creating || updating;
+  const apiError = createError || updateError || "";
+
   const [salaryType, setSalaryType] = useState<SalaryType>(
-    initialData?.salaryType || SalaryType.FIXED
+    initialData?.salaryType || SalaryType.FIXED,
   );
 
-  const { values, errors, handleChange, handleSubmit, setValues } = useForm({
-    initialValues: {
-      firstName: initialData?.firstName || '',
-      lastName: initialData?.lastName || '',
-      gender: initialData?.gender || '',
-      phone: initialData?.phone || '',
-      email: initialData?.email || '',
-      address: initialData?.address || '',
-      salaryType: initialData?.salaryType || SalaryType.FIXED,
-      salaryAmount: initialData?.salaryAmount || '',
-      feePercentage: initialData?.feePercentage || 40,
-      hireDate: initialData?.hireDate || new Date().toISOString().split('T')[0],
-      isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
-    },
-    validate: (vals) => {
-      const errors: any = {};
-      if (!vals.firstName) errors.firstName = 'First name is required';
-      if (!vals.lastName) errors.lastName = 'Last name is required';
-      if (!vals.hireDate) errors.hireDate = 'Hire date is required';
-      
-      if (vals.salaryType === SalaryType.FIXED && !vals.salaryAmount) {
-        errors.salaryAmount = 'Salary amount is required for fixed salary';
-      }
-      
-      return errors;
-    },
-    onSubmit,
+  const [values, setValues] = useState<TeacherFormValues>({
+    firstName: initialData?.firstName || "",
+    lastName: initialData?.lastName || "",
+    gender: initialData?.gender || "",
+    phone: initialData?.phone || "",
+    email: initialData?.email || "",
+    address: initialData?.address || "",
+    salaryType: initialData?.salaryType || SalaryType.FIXED,
+    salaryAmount: initialData?.salaryAmount ?? "",
+    feePercentage: initialData?.feePercentage ?? 40,
+    hireDate: initialData?.hireDate || new Date().toISOString().split("T")[0],
+    isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
   });
 
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  // Keep values.salaryType in sync with the Select
   useEffect(() => {
     setValues((prev) => ({ ...prev, salaryType }));
-  }, [salaryType, setValues]);
+  }, [salaryType]);
 
+  // Reload values when initialData arrives (edit mode)
   useEffect(() => {
-    if (initialData) {
-      setValues(initialData);
-      setSalaryType(initialData.salaryType || SalaryType.FIXED);
+    if (!initialData) return;
+    setValues({
+      firstName: initialData.firstName || "",
+      lastName: initialData.lastName || "",
+      gender: initialData.gender || "",
+      phone: initialData.phone || "",
+      email: initialData.email || "",
+      address: initialData.address || "",
+      salaryType: initialData.salaryType || SalaryType.FIXED,
+      salaryAmount: initialData.salaryAmount ?? "",
+      feePercentage: initialData.feePercentage ?? 40,
+      hireDate: initialData.hireDate || new Date().toISOString().split("T")[0],
+      isActive:
+        initialData.isActive !== undefined ? initialData.isActive : true,
+    });
+    setSalaryType(initialData.salaryType || SalaryType.FIXED);
+  }, [initialData]);
+
+  const handleChange = <K extends keyof TeacherFormValues>(
+    field: K,
+    value: TeacherFormValues[K],
+  ) => {
+    setValues((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {};
+    if (!values.firstName) newErrors.firstName = "First name is required";
+    if (!values.lastName) newErrors.lastName = "Last name is required";
+    if (!values.hireDate) newErrors.hireDate = "Hire date is required";
+    if (salaryType === SalaryType.FIXED && !values.salaryAmount) {
+      newErrors.salaryAmount = "Salary amount is required for fixed salary";
     }
-  }, [initialData, setValues]);
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!validate() || isLoading) return;
+
+    const payload: CreateTeacherData = {
+      firstName: values.firstName,
+      lastName: values.lastName,
+      gender: values.gender,
+      phone: values.phone,
+      salaryType,
+      salaryAmount: Number(values.salaryAmount) || 0,
+      feePercentage: Number(values.feePercentage) || 0,
+      hireDate: values.hireDate,
+      isActive: values.isActive,
+      // Omit optional strings when empty — avoids backend @IsEmail() rejecting ""
+      ...(values.email ? { email: values.email } : {}),
+      ...(values.address ? { address: values.address } : {}),
+    };
+
+    let success = false;
+
+    if (isEdit) {
+      if (!initialData?.id) {
+        console.error("Cannot update teacher: teacher ID is missing.");
+        return;
+      }
+      success = await updateTeacher(initialData.id, payload);
+    } else {
+      success = await createTeacher(payload);
+    }
+
+    if (success && onSubmit) {
+      onSubmit(payload);
+    }
+  };
 
   const salaryTypeOptions = [
-    { value: SalaryType.FIXED, label: 'Fixed Salary' },
-    { value: SalaryType.PER_STUDENT, label: 'Per Student' },
-    { value: SalaryType.PER_CLASS, label: 'Per Class' },
-    { value: SalaryType.PERCENTAGE, label: 'Percentage' },
-    { value: SalaryType.HYBRID, label: 'Hybrid (Base + Percentage)' },
+    { value: SalaryType.FIXED, label: "Fixed Salary" },
+    { value: SalaryType.PER_STUDENT, label: "Per Student" },
   ];
 
   const genderOptions = [
-    { value: 'Male', label: 'Male' },
-    { value: 'Female', label: 'Female' },
-    { value: 'Other', label: 'Other' },
+    { value: "Male", label: "Male" },
+    { value: "Female", label: "Female" },
+    { value: "Other", label: "Other" },
   ];
 
   const renderSalaryFields = () => {
@@ -88,7 +187,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             name="salaryAmount"
             type="number"
             value={values.salaryAmount}
-            onChange={(e) => handleChange('salaryAmount', e.target.value)}
+            onChange={(e) => handleChange("salaryAmount", e.target.value)}
             error={errors.salaryAmount}
             placeholder="e.g., 20000"
             required
@@ -102,67 +201,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             name="salaryAmount"
             type="number"
             value={values.salaryAmount}
-            onChange={(e) => handleChange('salaryAmount', e.target.value)}
+            onChange={(e) => handleChange("salaryAmount", e.target.value)}
             error={errors.salaryAmount}
             placeholder="e.g., 500"
             required
           />
-        );
-
-      case SalaryType.PER_CLASS:
-        return (
-          <Input
-            label="Amount Per Class"
-            name="salaryAmount"
-            type="number"
-            value={values.salaryAmount}
-            onChange={(e) => handleChange('salaryAmount', e.target.value)}
-            error={errors.salaryAmount}
-            placeholder="e.g., 8000"
-            required
-          />
-        );
-
-      case SalaryType.PERCENTAGE:
-        return (
-          <Input
-            label="Percentage (%)"
-            name="feePercentage"
-            type="number"
-            value={values.feePercentage}
-            onChange={(e) => handleChange('feePercentage', e.target.value)}
-            error={errors.feePercentage}
-            placeholder="e.g., 40"
-            helpText="Teacher will receive this percentage of student fees"
-            required
-          />
-        );
-
-      case SalaryType.HYBRID:
-        return (
-          <>
-            <Input
-              label="Base Salary"
-              name="salaryAmount"
-              type="number"
-              value={values.salaryAmount}
-              onChange={(e) => handleChange('salaryAmount', e.target.value)}
-              error={errors.salaryAmount}
-              placeholder="e.g., 10000"
-              required
-            />
-            <Input
-              label="Percentage (%)"
-              name="feePercentage"
-              type="number"
-              value={values.feePercentage}
-              onChange={(e) => handleChange('feePercentage', e.target.value)}
-              error={errors.feePercentage}
-              placeholder="e.g., 40"
-              helpText="Additional percentage of student fees"
-              required
-            />
-          </>
         );
 
       default:
@@ -171,7 +214,14 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
   };
 
   return (
-    <Card title={isEdit ? 'Edit Teacher' : 'Add New Teacher'}>
+    <Card title={isEdit ? "Edit Teacher" : "Add New Teacher"}>
+      {/* API error banner (friendly-mapped in teacherApi.ts) */}
+      {apiError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+          <p className="text-sm font-medium text-red-700">{apiError}</p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Personal Information */}
@@ -179,23 +229,23 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
               Personal Information
             </h3>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="First Name"
                 name="firstName"
                 value={values.firstName}
-                onChange={(e) => handleChange('firstName', e.target.value)}
+                onChange={(e) => handleChange("firstName", e.target.value)}
                 error={errors.firstName}
                 placeholder="Enter first name"
                 required
               />
-              
+
               <Input
                 label="Last Name"
                 name="lastName"
                 value={values.lastName}
-                onChange={(e) => handleChange('lastName', e.target.value)}
+                onChange={(e) => handleChange("lastName", e.target.value)}
                 error={errors.lastName}
                 placeholder="Enter last name"
                 required
@@ -203,21 +253,23 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* ✅ Event-based onChange — matches your Select component */}
               <Select
                 label="Gender"
                 name="gender"
                 value={values.gender}
-                onChange={(value) => handleChange('gender', value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  handleChange("gender", e.target.value)
+                }
                 options={genderOptions}
-                placeholder="Select gender"
               />
-              
+
               <Input
                 label="Phone"
                 name="phone"
                 type="tel"
                 value={values.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
+                onChange={(e) => handleChange("phone", e.target.value)}
                 placeholder="+93 700 123 456"
               />
             </div>
@@ -227,7 +279,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
               name="email"
               type="email"
               value={values.email}
-              onChange={(e) => handleChange('email', e.target.value)}
+              onChange={(e) => handleChange("email", e.target.value)}
               placeholder="teacher@example.com"
             />
 
@@ -235,7 +287,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
               label="Address"
               name="address"
               value={values.address}
-              onChange={(e) => handleChange('address', e.target.value)}
+              onChange={(e) => handleChange("address", e.target.value)}
               placeholder="Enter address"
             />
           </div>
@@ -251,16 +303,19 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
               name="hireDate"
               type="date"
               value={values.hireDate}
-              onChange={(e) => handleChange('hireDate', e.target.value)}
+              onChange={(e) => handleChange("hireDate", e.target.value)}
               error={errors.hireDate}
               required
             />
 
+            {/* ✅ Event-based onChange + no placeholder */}
             <Select
               label="Salary Type"
               name="salaryType"
               value={salaryType}
-              onChange={(value) => setSalaryType(value as SalaryType)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setSalaryType(e.target.value as SalaryType)
+              }
               options={salaryTypeOptions}
               required
             />
@@ -272,10 +327,13 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
                 type="checkbox"
                 id="isActive"
                 checked={values.isActive}
-                onChange={(e) => handleChange('isActive', e.target.checked)}
+                onChange={(e) => handleChange("isActive", e.target.checked)}
                 className="w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500"
               />
-              <label htmlFor="isActive" className="text-sm font-medium text-gray-700 cursor-pointer">
+              <label
+                htmlFor="isActive"
+                className="text-sm font-medium text-gray-700 cursor-pointer"
+              >
                 Active
               </label>
             </div>
@@ -288,7 +346,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
             type="button"
             variant="secondary"
             onClick={onCancel}
-            disabled={loading}
+            disabled={isLoading}
             className="order-2 sm:order-1"
           >
             Cancel
@@ -296,11 +354,11 @@ const TeacherForm: React.FC<TeacherFormProps> = ({
           <Button
             type="submit"
             variant="primary"
-            loading={loading}
-            disabled={loading}
+            loading={isLoading}
+            disabled={isLoading}
             className="order-1 sm:order-2"
           >
-            {isEdit ? 'Update Teacher' : 'Create Teacher'}
+            {isEdit ? "Update Teacher" : "Create Teacher"}
           </Button>
         </div>
       </form>

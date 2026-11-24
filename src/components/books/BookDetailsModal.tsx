@@ -1,5 +1,5 @@
 // src/components/books/BookDetailsModal.tsx
-import type { Book } from "@/types/book";
+import type { Book } from "@/api/bookApi";
 
 interface BookDetailsModalProps {
   isOpen: boolean;

@@ -1,8 +1,10 @@
 // src/components/students/StudentEnrollmentsModal.tsx
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import type { StudentEnrollment } from "@/types/student";
-import { getStudentEnrollments } from "@/api/studentApi";
+import {
+  useStudentEnrollments,
+  type StudentEnrollment,
+} from "@/api/studentApi";
 
 interface StudentEnrollmentsModalProps {
   isOpen: boolean;
@@ -20,43 +22,42 @@ const StudentEnrollmentsModal = ({
   onClose,
 }: StudentEnrollmentsModalProps) => {
   const navigate = useNavigate();
-  const [enrollments, setEnrollments] = useState<StudentEnrollment[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (isOpen && studentId) {
-      fetchEnrollments();
-    }
-  }, [isOpen, studentId]);
+  const {
+    data: rawEnrollments,
+    loading,
+    error: fetchError,
+    refetch,
+  } = useStudentEnrollments(studentId ?? "", isOpen && !!studentId);
 
-  const fetchEnrollments = async () => {
-    if (!studentId) return;
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getStudentEnrollments(studentId);
-      
-      // Transform the data to ensure numeric fields are numbers
-      const transformedData = data.map((enrollment) => ({
-        ...enrollment,
-        tuitionFee: typeof enrollment.tuitionFee === 'string' ? parseFloat(enrollment.tuitionFee) : enrollment.tuitionFee,
-        discount: typeof enrollment.discount === 'string' ? parseFloat(enrollment.discount) : enrollment.discount,
-        finalFee: typeof enrollment.finalFee === 'string' ? parseFloat(enrollment.finalFee) : enrollment.finalFee,
-        finalScore: typeof enrollment.finalScore === 'string' ? parseFloat(enrollment.finalScore) : enrollment.finalScore,
-        attendancePercentage: typeof enrollment.attendancePercentage === 'string' ? parseFloat(enrollment.attendancePercentage) : enrollment.attendancePercentage,
-      }));
-      
-      setEnrollments(transformedData);
-    } catch (error) {
-      console.error("Failed to fetch enrollments:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to fetch enrollments"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const error = fetchError || "";
+
+  const enrollments = useMemo<StudentEnrollment[]>(() => {
+    if (!rawEnrollments) return [];
+    return rawEnrollments.map((enrollment) => ({
+      ...enrollment,
+      tuitionFee:
+        typeof enrollment.tuitionFee === "string"
+          ? parseFloat(enrollment.tuitionFee)
+          : enrollment.tuitionFee,
+      discount:
+        typeof enrollment.discount === "string"
+          ? parseFloat(enrollment.discount)
+          : enrollment.discount,
+      finalFee:
+        typeof enrollment.finalFee === "string"
+          ? parseFloat(enrollment.finalFee)
+          : enrollment.finalFee,
+      finalScore:
+        typeof enrollment.finalScore === "string"
+          ? parseFloat(enrollment.finalScore)
+          : enrollment.finalScore,
+      attendancePercentage:
+        typeof enrollment.attendancePercentage === "string"
+          ? parseFloat(enrollment.attendancePercentage)
+          : enrollment.attendancePercentage,
+    }));
+  }, [rawEnrollments]);
 
   const handleNewEnrollment = () => {
     if (studentId) {
@@ -65,20 +66,21 @@ const StudentEnrollmentsModal = ({
     }
   };
 
-  // Helper function to safely format numbers - handles both string and number
+  const handleRefresh = () => {
+    refetch();
+  };
+
   const safeToFixed = (value: any, decimals: number = 2): string => {
-    if (value === null || value === undefined || value === '') {
-      return '0.00';
+    if (value === null || value === undefined || value === "") {
+      return "0.00";
     }
-    // If it's already a number, use it directly
-    const num = typeof value === 'number' ? value : parseFloat(value);
+    const num = typeof value === "number" ? value : parseFloat(value);
     if (isNaN(num)) {
-      return '0.00';
+      return "0.00";
     }
     return num.toFixed(decimals);
   };
 
-  // Helper function to safely format a number with $ sign
   const formatCurrency = (value: any): string => {
     return `$${safeToFixed(value)}`;
   };
@@ -87,44 +89,44 @@ const StudentEnrollmentsModal = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Studying':
-        return 'bg-green-100 text-green-700';
-      case 'Completed':
-        return 'bg-blue-100 text-blue-700';
-      case 'Dropped':
-        return 'bg-red-100 text-red-700';
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-700';
+      case "Studying":
+        return "bg-green-100 text-green-700";
+      case "Completed":
+        return "bg-blue-100 text-blue-700";
+      case "Dropped":
+        return "bg-red-100 text-red-700";
+      case "Pending":
+        return "bg-yellow-100 text-yellow-700";
       default:
-        return 'bg-gray-100 text-gray-700';
+        return "bg-gray-100 text-gray-700";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Studying':
-        return '📖';
-      case 'Completed':
-        return '✅';
-      case 'Dropped':
-        return '❌';
-      case 'Pending':
-        return '⏳';
+      case "Studying":
+        return "📖";
+      case "Completed":
+        return "✅";
+      case "Dropped":
+        return "❌";
+      case "Pending":
+        return "⏳";
       default:
-        return '📚';
+        return "📚";
     }
   };
 
   const formatDate = (date: string) => {
-    if (!date) return 'N/A';
+    if (!date) return "N/A";
     try {
-      return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
+      return new Date(date).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
     } catch {
-      return 'Invalid date';
+      return "Invalid date";
     }
   };
 
@@ -191,7 +193,7 @@ const StudentEnrollmentsModal = ({
             New Enrollment
           </button>
           <button
-            onClick={fetchEnrollments}
+            onClick={handleRefresh}
             disabled={loading}
             className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -276,57 +278,59 @@ const StudentEnrollmentsModal = ({
                       </span>
                       <div>
                         <h4 className="font-semibold text-gray-900">
-                          {enrollment.book?.name || 'Unknown Book'}
+                          {enrollment.book?.name || "Unknown Book"}
                         </h4>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
-                            {enrollment.book?.code || 'N/A'}
+                            {enrollment.book?.code || "N/A"}
                           </span>
                           <span className="text-xs text-gray-500">
-                            Level: {enrollment.book?.level || 'N/A'}
+                            Level: {enrollment.book?.level || "N/A"}
                           </span>
                           <span className="text-xs text-gray-500">
-                            Category: {enrollment.book?.category || 'N/A'}
+                            Category: {enrollment.book?.category || "N/A"}
                           </span>
                         </div>
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
                       <span>
-                        <span className="font-medium">Teacher:</span>{' '}
-                        {enrollment.teacher?.firstName || 'N/A'} {enrollment.teacher?.lastName || ''}
+                        <span className="font-medium">Teacher:</span>{" "}
+                        {enrollment.teacher?.firstName || "N/A"}{" "}
+                        {enrollment.teacher?.lastName || ""}
                       </span>
                       <span>
-                        <span className="font-medium">Timetable:</span>{' '}
-                        {enrollment.timetable || 'N/A'}
+                        <span className="font-medium">Timetable:</span>{" "}
+                        {enrollment.timetable || "N/A"}
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-4 text-sm text-gray-600">
                       <span>
-                        <span className="font-medium">Start:</span>{' '}
+                        <span className="font-medium">Start:</span>{" "}
                         {formatDate(enrollment.startDate)}
                       </span>
                       <span>
-                        <span className="font-medium">Expected End:</span>{' '}
+                        <span className="font-medium">Expected End:</span>{" "}
                         {formatDate(enrollment.expectedEndDate)}
                       </span>
                       {enrollment.completedDate && (
                         <span>
-                          <span className="font-medium">Completed:</span>{' '}
+                          <span className="font-medium">Completed:</span>{" "}
                           {formatDate(enrollment.completedDate)}
                         </span>
                       )}
                     </div>
                     {enrollment.remarks && (
                       <div className="mt-2 text-sm text-gray-500">
-                        <span className="font-medium">Remarks:</span> {enrollment.remarks}
+                        <span className="font-medium">Remarks:</span>{" "}
+                        {enrollment.remarks}
                       </div>
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span
                       className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
-                        enrollment.status
+                        enrollment.status,
                       )}`}
                     >
                       <span className="mr-2 h-2 w-2 rounded-full bg-current" />
@@ -345,14 +349,25 @@ const StudentEnrollmentsModal = ({
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       {enrollment.finalScore && enrollment.finalScore > 0 && (
                         <span className="rounded-full bg-blue-100 px-2.5 py-1 font-medium text-blue-700">
-                          Score: {typeof enrollment.finalScore === 'number' ? enrollment.finalScore : parseFloat(enrollment.finalScore || '0')}%
+                          Score:{" "}
+                          {typeof enrollment.finalScore === "number"
+                            ? enrollment.finalScore
+                            : parseFloat(enrollment.finalScore || "0")}
+                          %
                         </span>
                       )}
-                      {enrollment.attendancePercentage && enrollment.attendancePercentage > 0 && (
-                        <span className="rounded-full bg-green-100 px-2.5 py-1 font-medium text-green-700">
-                          Attendance: {typeof enrollment.attendancePercentage === 'number' ? enrollment.attendancePercentage : parseFloat(enrollment.attendancePercentage || '0')}%
-                        </span>
-                      )}
+                      {enrollment.attendancePercentage &&
+                        enrollment.attendancePercentage > 0 && (
+                          <span className="rounded-full bg-green-100 px-2.5 py-1 font-medium text-green-700">
+                            Attendance:{" "}
+                            {typeof enrollment.attendancePercentage === "number"
+                              ? enrollment.attendancePercentage
+                              : parseFloat(
+                                  enrollment.attendancePercentage || "0",
+                                )}
+                            %
+                          </span>
+                        )}
                     </div>
                   </div>
                 </div>

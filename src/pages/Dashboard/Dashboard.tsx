@@ -1,8 +1,8 @@
 // src/pages/Dashboard/Dashboard.tsx
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
-  getDashboardReport,
-  type DashboardReportResponse,
+  useDashboardReport,
+  type DashboardReportParams,
 } from "@/api/dashboardApi";
 import {
   PieChart,
@@ -114,13 +114,13 @@ const TodayDateCard = () => {
 
   const miladiFull = `${miladiWeekday}, ${miladiMonthName} ${miladiDay}, ${miladiYear}`;
   const miladiShort = `${String(miladiDay).padStart(2, "0")} / ${String(
-    now.getMonth() + 1
+    now.getMonth() + 1,
   ).padStart(2, "0")} / ${miladiYear}`;
 
   const shamsiMonthName = SHAMSI_MONTHS[sh.month - 1];
   const shamsiShort = `${sh.year}/${String(sh.month).padStart(
     2,
-    "0"
+    "0",
   )}/${String(sh.day).padStart(2, "0")}`;
 
   return (
@@ -246,7 +246,7 @@ const MiniCalendar = () => {
   const firstJsDate = new Date(
     firstMiladi.year,
     firstMiladi.month - 1,
-    firstMiladi.day
+    firstMiladi.day,
   );
   const jsDay = firstJsDate.getDay();
   const firstDay = (jsDay + 1) % 7;
@@ -282,8 +282,18 @@ const MiniCalendar = () => {
             onClick={prevMonth}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
           <span className="text-sm font-medium text-gray-700">
@@ -293,8 +303,18 @@ const MiniCalendar = () => {
             onClick={nextMonth}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
             </svg>
           </button>
         </div>
@@ -319,8 +339,8 @@ const MiniCalendar = () => {
               d === null
                 ? ""
                 : isToday(d)
-                ? "bg-blue-600 text-white"
-                : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-700 hover:bg-gray-100"
             }`}
           >
             {d || ""}
@@ -335,56 +355,46 @@ const MiniCalendar = () => {
 // MAIN DASHBOARD
 // ============================================
 const Dashboard = () => {
-  const [report, setReport] = useState<DashboardReportResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
   // ✅ Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
 
+  // ✅ "Applied" params that drive the hook. {} = server default range.
+  const [queryParams, setQueryParams] = useState<DashboardReportParams>({});
+
+  // ✅ Hook replaces getDashboardReport + report/loading/error state
+  const {
+    data: report,
+    loading,
+    error: fetchError,
+    refetch,
+  } = useDashboardReport(queryParams);
+
+  // ✅ Same shape as old `error` (empty string when there's no error)
+  const error = fetchError || "";
+
   // ============================================
-  // FETCH
+  // ACTIONS
   // ============================================
-  const fetchReport = async (
-    fDate?: string,
-    tDate?: string,
-    isRefresh = false
-  ) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      setError("");
-
-      const data = await getDashboardReport(fDate, tDate);
-      setReport(data);
-    } catch (err) {
-      console.error("Failed to fetch dashboard report:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to load dashboard report"
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleApply = () => {
-    fetchReport(fromDate || undefined, toDate || undefined);
+    setQueryParams({
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    });
+    refetch();
   };
 
   const handleClear = () => {
     setFromDate("");
     setToDate("");
-    fetchReport();
+    setQueryParams({});
+    refetch();
+  };
+
+  const handleRefresh = () => {
+    refetch();
   };
 
   const data = report?.data;
@@ -512,15 +522,13 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={() =>
-              fetchReport(fromDate || undefined, toDate || undefined, true)
-            }
-            disabled={refreshing}
+            onClick={handleRefresh}
+            disabled={loading}
             className="rounded-full border border-gray-300 bg-white p-2.5 text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             title="Refresh"
           >
             <svg
-              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+              className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -630,11 +638,15 @@ const Dashboard = () => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-blue-500" />
-                <span className="text-xs font-medium text-gray-600">Income</span>
+                <span className="text-xs font-medium text-gray-600">
+                  Income
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-emerald-400" />
-                <span className="text-xs font-medium text-gray-600">Expenses</span>
+                <span className="text-xs font-medium text-gray-600">
+                  Expenses
+                </span>
               </div>
             </div>
           </div>
@@ -666,7 +678,9 @@ const Dashboard = () => {
                   }
                 />
                 <Tooltip
-                  formatter={(value: number) => `AF ${value.toLocaleString()}`}
+                  formatter={(value) =>
+                    `AF ${Number(value ?? 0).toLocaleString("en-US")}`
+                  }
                   contentStyle={{
                     borderRadius: 8,
                     border: "1px solid #e5e7eb",
@@ -689,8 +703,18 @@ const Dashboard = () => {
           color="bg-blue-100"
           iconColor="text-blue-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"
+              />
             </svg>
           }
         />
@@ -701,8 +725,18 @@ const Dashboard = () => {
           color="bg-emerald-100"
           iconColor="text-emerald-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           }
         />
@@ -713,8 +747,18 @@ const Dashboard = () => {
           color="bg-orange-100"
           iconColor="text-orange-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+              />
             </svg>
           }
         />
@@ -725,8 +769,18 @@ const Dashboard = () => {
           color="bg-purple-100"
           iconColor="text-purple-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
           }
         />
@@ -737,8 +791,18 @@ const Dashboard = () => {
           color="bg-indigo-100"
           iconColor="text-indigo-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+              />
             </svg>
           }
         />
@@ -749,8 +813,18 @@ const Dashboard = () => {
           color="bg-green-100"
           iconColor="text-green-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           }
         />
@@ -761,8 +835,18 @@ const Dashboard = () => {
           color="bg-amber-100"
           iconColor="text-amber-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+              />
             </svg>
           }
         />
@@ -773,8 +857,18 @@ const Dashboard = () => {
           color="bg-rose-100"
           iconColor="text-rose-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5h.01M15 14.5h.01" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5h.01M15 14.5h.01"
+              />
             </svg>
           }
         />
@@ -785,8 +879,18 @@ const Dashboard = () => {
           color="bg-red-100"
           iconColor="text-red-600"
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4m16 0l-4-4m4 4l-4 4" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M20 12H4m16 0l-4-4m4 4l-4 4"
+              />
             </svg>
           }
         />
@@ -798,13 +902,21 @@ const Dashboard = () => {
             (data?.totalBenefit || 0) >= 0 ? "bg-emerald-100" : "bg-red-100"
           }
           iconColor={
-            (data?.totalBenefit || 0) >= 0
-              ? "text-emerald-600"
-              : "text-red-600"
+            (data?.totalBenefit || 0) >= 0 ? "text-emerald-600" : "text-red-600"
           }
           icon={
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            <svg
+              className="h-7 w-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+              />
             </svg>
           }
         />

@@ -1,7 +1,10 @@
 // src/components/other-expenses/UpdateOtherExpenseModal.tsx
 import { useState, useEffect } from "react";
-import { updateOtherExpense } from "@/api/otherExpenseApi";
-import type { OtherExpense, UpdateOtherExpenseData } from "@/types/otherExpense";
+import { useUpdateOtherExpense } from "@/api/otherExpenseApi";
+import type {
+  OtherExpense,
+  UpdateOtherExpenseData,
+} from "@/api/otherExpenseApi";
 
 interface UpdateOtherExpenseModalProps {
   isOpen: boolean;
@@ -16,10 +19,20 @@ const UpdateOtherExpenseModal = ({
   onClose,
   onSuccess,
 }: UpdateOtherExpenseModalProps) => {
+  // ✅ Hook replaces updateOtherExpense + local loading/error state
+  const {
+    update: updateOtherExpense,
+    loading,
+    error: hookError,
+  } = useUpdateOtherExpense();
+
   const [formData, setFormData] = useState<UpdateOtherExpenseData>({});
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Combined error: local first, then hook error
+  const error = localError || hookError || "";
 
   // ✅ Safe number conversion
   const safeNumber = (value: number | string | null | undefined): number => {
@@ -36,7 +49,7 @@ const UpdateOtherExpenseModal = ({
         description: expense.description,
         date: expense.date ? expense.date.split("T")[0] : "",
       });
-      setError("");
+      setLocalError("");
       setSuccess("");
     }
   }, [expense]);
@@ -44,13 +57,14 @@ const UpdateOtherExpenseModal = ({
   if (!isOpen || !expense) return null;
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value, type } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "number" ? (value === "" ? 0 : parseFloat(value)) : value,
+      [name]:
+        type === "number" ? (value === "" ? 0 : parseFloat(value)) : value,
     }));
   };
 
@@ -59,23 +73,23 @@ const UpdateOtherExpenseModal = ({
 
     // Validate
     if (!formData.amount || formData.amount <= 0) {
-      setError("Amount must be greater than 0");
+      setLocalError("Amount must be greater than 0");
       return;
     }
 
     if (!formData.description || formData.description.trim() === "") {
-      setError("Description is required");
+      setLocalError("Description is required");
       return;
     }
 
     if (!formData.date) {
-      setError("Date is required");
+      setLocalError("Date is required");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError("");
+      setLocalError("");
       setSuccess("");
 
       // Only send changed fields
@@ -101,7 +115,12 @@ const UpdateOtherExpenseModal = ({
         return;
       }
 
-      await updateOtherExpense(expense.id, changedData);
+      // ✅ Hook returns boolean — throw so the existing catch block runs
+      const ok = await updateOtherExpense(expense.id, changedData);
+      if (!ok) {
+        throw new Error(hookError || "Failed to update expense");
+      }
+
       setSuccess("Expense updated successfully!");
 
       setTimeout(() => {
@@ -110,8 +129,8 @@ const UpdateOtherExpenseModal = ({
       }, 1500);
     } catch (error) {
       console.error("Failed to update expense:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to update expense"
+      setLocalError(
+        error instanceof Error ? error.message : "Failed to update expense",
       );
     } finally {
       setIsSubmitting(false);
@@ -133,9 +152,7 @@ const UpdateOtherExpenseModal = ({
             <h3 className="text-xl font-semibold text-gray-900">
               Update Expense
             </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Edit expense details
-            </p>
+            <p className="mt-1 text-sm text-gray-500">Edit expense details</p>
           </div>
           <button
             type="button"
@@ -143,8 +160,18 @@ const UpdateOtherExpenseModal = ({
             disabled={isSubmitting}
             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -153,8 +180,18 @@ const UpdateOtherExpenseModal = ({
         {success && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-green-700">{success}</p>
             </div>
@@ -165,8 +202,18 @@ const UpdateOtherExpenseModal = ({
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
             <div className="flex items-start gap-2">
-              <svg className="mt-0.5 h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mt-0.5 h-5 w-5 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <p className="text-sm font-medium text-red-700">{error}</p>
             </div>

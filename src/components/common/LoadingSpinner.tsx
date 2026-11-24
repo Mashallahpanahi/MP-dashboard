@@ -1,20 +1,20 @@
 // src/components/common/LoadingSpinner.tsx
-import Spinner from '@/components/Spinner/Spinner';
+import Spinner from "@/components/common/Spinner/Spinner";
 
 interface LoadingSpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   text?: string;
   fullScreen?: boolean;
 }
 
 const LoadingSpinner = ({
-  size = 'md',
-  text = 'Loading...',
+  size = "md",
+  text = "Loading...",
   fullScreen = false,
 }: LoadingSpinnerProps) => {
   const containerClasses = fullScreen
-    ? 'fixed inset-0 flex flex-col items-center justify-center bg-white/80 z-50'
-    : 'flex flex-col items-center justify-center p-8';
+    ? "fixed inset-0 flex flex-col items-center justify-center bg-white/80 z-50"
+    : "flex flex-col items-center justify-center p-8";
 
   return (
     <div className={containerClasses}>

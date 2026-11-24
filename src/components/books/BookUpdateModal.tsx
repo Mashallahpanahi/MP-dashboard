@@ -1,6 +1,6 @@
 // src/components/books/BookUpdateModal.tsx
 import { useState, useEffect } from "react";
-import type { Book, UpdateBookData } from "@/types/book";
+import type { Book, UpdateBookData } from "@/api/bookApi";
 
 interface BookUpdateModalProps {
   isOpen: boolean;
@@ -29,7 +29,7 @@ const BookUpdateModal = ({
     "B1 - Intermediate",
     "B2 - Upper Intermediate",
     "C1 - Advanced",
-    "C2 - Proficiency"
+    "C2 - Proficiency",
   ];
 
   // Reset form when book changes
@@ -62,7 +62,7 @@ const BookUpdateModal = ({
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value, type } = e.target;
 
@@ -103,16 +103,10 @@ const BookUpdateModal = ({
         const currentValue = formData[key];
         const originalValue = book[key as keyof Book];
 
-        if (typeof currentValue === 'number' && typeof originalValue === 'number') {
-          if (currentValue !== originalValue) {
-            changedData[key] = currentValue;
-          }
-        } else if (typeof currentValue === 'boolean' && typeof originalValue === 'boolean') {
-          if (currentValue !== originalValue) {
-            changedData[key] = currentValue;
-          }
-        } else if (currentValue !== originalValue) {
-          changedData[key] = currentValue;
+        if (currentValue !== originalValue) {
+          Object.assign(changedData, {
+            [key]: currentValue,
+          });
         }
       });
 
@@ -138,7 +132,7 @@ const BookUpdateModal = ({
     } catch (error) {
       console.error("Failed to update book:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to update book"
+        error instanceof Error ? error.message : "Failed to update book",
       );
     } finally {
       setIsSubmitting(false);
@@ -159,12 +153,8 @@ const BookUpdateModal = ({
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-semibold text-gray-900">
-              Update Book
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Edit book information
-            </p>
+            <h3 className="text-xl font-semibold text-gray-900">Update Book</h3>
+            <p className="mt-1 text-sm text-gray-500">Edit book information</p>
           </div>
           <button
             type="button"

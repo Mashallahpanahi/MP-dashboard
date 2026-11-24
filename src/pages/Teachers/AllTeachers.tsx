@@ -1,61 +1,79 @@
 // src/pages/Teachers/AllTeachers.tsx
 import { useEffect, useState } from "react";
 import {
-  getActiveTeachers,
-  deleteTeacher,
-  getTeacherById,
-  updateTeacher,
-  updateTeacherStatus,
+  useActiveTeachers,
+  useTeacherById,
+  useDeleteTeacher,
+  useUpdateTeacher,
+  useUpdateTeacherStatus,
+  type Teacher,
   type UpdateTeacherData,
 } from "@/api/teacherApi";
-import type { Teacher } from "@/types/teacher";
 import TeacherUpdateModal from "@/components/teachers/TeacherUpdateModal";
 import TeacherDeleteModal from "@/components/teachers/TeacherDeleteModal";
 // ✅ Shamsi formatter
 import { formatShamsi } from "@/utils/dateConverter";
 
 const AllTeachers = () => {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  // ✅ Hook for the list (replaces getActiveTeachers + local loading/error)
+  const {
+    data: fetchedTeachers,
+    loading,
+    error: fetchError,
+    refetch,
+  } = useActiveTeachers();
 
-  // Delete state - Keeping for backward compatibility but not using
+  // ✅ Mutation hooks
+  const { remove, loading: deleting } = useDeleteTeacher();
+  const { updateTeacher, loading: updatingTeacher } = useUpdateTeacher();
+  const { updateStatus } = useUpdateTeacherStatus();
+
+  // Local mirror so we can optimistically patch the list on mutations
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [localError, setLocalError] = useState("");
+
+  // Sync hook data → local mirror
+  useEffect(() => {
+    if (fetchedTeachers) setTeachers(fetchedTeachers);
+  }, [fetchedTeachers]);
+
+  // Combined error (local mutations + hook fetch)
+  const error = localError || fetchError || "";
+
+  // Delete state — kept for backward compatibility
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Update state
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [teacherToUpdate, setTeacherToUpdate] = useState<Teacher | null>(null);
-  const [updateLoading, setUpdateLoading] = useState(false);
+  // We keep the *ID* of the teacher being edited — the hook fetches fresh
+  // details, but we fall back to the list copy while the request is in flight.
+  const [teacherToUpdateId, setTeacherToUpdateId] = useState<string | null>(
+    null,
+  );
 
-  // Status update state
+  const {
+    data: fetchedTeacherToUpdate,
+    // loading is intentionally ignored — we have list data to fall back on
+  } = useTeacherById(teacherToUpdateId ?? "", !!teacherToUpdateId);
+
+  // Prefer the freshly-fetched teacher; fall back to the list copy
+  const teacherToUpdate: Teacher | null = teacherToUpdateId
+    ? fetchedTeacherToUpdate && fetchedTeacherToUpdate.id === teacherToUpdateId
+      ? fetchedTeacherToUpdate
+      : (teachers.find((t) => t.id === teacherToUpdateId) ?? null)
+    : null;
+
+  // Show the modal whenever a teacher is selected
+  const showUpdateModal = !!teacherToUpdate;
+
+  // Track which teacher is mid status-toggle (per-row spinner)
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
 
-  const fetchTeachers = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const data = await getActiveTeachers();
-
-      setTeachers(data);
-    } catch (error) {
-      console.error("Failed to fetch teachers:", error);
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch teachers"
-      );
-    } finally {
-      setLoading(false);
-    }
+  // Refresh (same effect as the old fetchTeachers button)
+  const handleRefresh = () => {
+    setLocalError("");
+    refetch();
   };
-
-  useEffect(() => {
-    fetchTeachers();
-  }, []);
 
   // Status toggle handler
   const handleToggleStatus = async (teacher: Teacher) => {
@@ -64,7 +82,7 @@ const AllTeachers = () => {
 
     if (
       !confirm(
-        `Are you sure you want to ${action} ${teacher.firstName} ${teacher.lastName}?`
+        `Are you sure you want to ${action} ${teacher.firstName} ${teacher.lastName}?`,
       )
     ) {
       return;
@@ -72,34 +90,32 @@ const AllTeachers = () => {
 
     try {
       setStatusLoading(teacher.id);
+      const ok = await updateStatus(teacher.id, newStatus);
 
-      await updateTeacherStatus(teacher.id, { isActive: newStatus });
+      if (!ok) {
+        setLocalError(`Failed to ${action} teacher`);
+        return;
+      }
 
+      // Optimistic local update (same as before)
       if (!newStatus) {
         setTeachers((prev) => prev.filter((t) => t.id !== teacher.id));
       } else {
         setTeachers((prev) =>
           prev.map((t) =>
-            t.id === teacher.id ? { ...t, isActive: newStatus } : t
-          )
+            t.id === teacher.id ? { ...t, isActive: newStatus } : t,
+          ),
         );
       }
 
       const statusText = newStatus ? "activated" : "deactivated";
       alert(`Teacher ${statusText} successfully!`);
-    } catch (error) {
-      console.error("Failed to update teacher status:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to update teacher status"
-      );
     } finally {
       setStatusLoading(null);
     }
   };
 
-  // Delete handlers - Keeping but not used
+  // Delete handlers — kept for backward compatibility
   const handleDeleteClick = (teacher: Teacher) => {
     setTeacherToDelete(teacher);
     setShowDeleteModal(true);
@@ -108,23 +124,15 @@ const AllTeachers = () => {
   const handleConfirmDelete = async () => {
     if (!teacherToDelete) return;
 
-    try {
-      setDeleteLoading(true);
-      await deleteTeacher(teacherToDelete.id);
+    const ok = await remove(teacherToDelete.id);
+    if (ok) {
       setTeachers((prev) =>
-        prev.filter((teacher) => teacher.id !== teacherToDelete.id)
+        prev.filter((teacher) => teacher.id !== teacherToDelete.id),
       );
       setShowDeleteModal(false);
       setTeacherToDelete(null);
-    } catch (error) {
-      console.error("Failed to delete teacher:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to delete teacher"
-      );
-    } finally {
-      setDeleteLoading(false);
+    } else {
+      setLocalError("Failed to delete teacher");
     }
   };
 
@@ -134,39 +142,28 @@ const AllTeachers = () => {
   };
 
   // Update handlers
-  const handleUpdateClick = async (teacher: Teacher) => {
-    try {
-      setUpdateLoading(true);
-      const teacherData = await getTeacherById(teacher.id);
-      setTeacherToUpdate(teacherData);
-      setShowUpdateModal(true);
-    } catch (error) {
-      console.error("Failed to fetch teacher for update:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load teacher data"
-      );
-    } finally {
-      setUpdateLoading(false);
-    }
+  const handleUpdateClick = (teacher: Teacher) => {
+    // Modal opens immediately using list data; the hook fetches fresh
+    // data in the background and the modal updates when it arrives.
+    setTeacherToUpdateId(teacher.id);
   };
 
   const handleUpdateTeacher = async (
     id: string,
-    data: Partial<UpdateTeacherData>
+    data: Partial<UpdateTeacherData>,
   ) => {
-    const updatedTeacher = await updateTeacher(id, data);
-    setTeachers((prev) =>
-      prev.map((teacher) =>
-        teacher.id === updatedTeacher.id ? updatedTeacher : teacher
-      )
-    );
+    const ok = await updateTeacher(id, data);
+    if (!ok) {
+      // Throwing preserves the modal's "stay open on failure" behaviour
+      throw new Error("Failed to update teacher. Please try again.");
+    }
+    // Close the modal + refresh the list
+    setTeacherToUpdateId(null);
+    await refetch();
   };
 
   const handleCloseUpdate = () => {
-    setShowUpdateModal(false);
-    setTeacherToUpdate(null);
+    setTeacherToUpdateId(null);
   };
 
   return (
@@ -174,9 +171,7 @@ const AllTeachers = () => {
       {/* Page Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            All Teachers
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">All Teachers</h1>
 
           <p className="mt-1 text-sm text-gray-500">
             View and manage all active teachers
@@ -185,7 +180,7 @@ const AllTeachers = () => {
 
         <button
           type="button"
-          onClick={fetchTeachers}
+          onClick={handleRefresh}
           disabled={loading}
           className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -202,14 +197,12 @@ const AllTeachers = () => {
                 Failed to load teachers
               </h3>
 
-              <p className="mt-1 text-sm text-red-600">
-                {error}
-              </p>
+              <p className="mt-1 text-sm text-red-600">{error}</p>
             </div>
 
             <button
               type="button"
-              onClick={fetchTeachers}
+              onClick={handleRefresh}
               className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
               Retry
@@ -223,9 +216,7 @@ const AllTeachers = () => {
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
 
-          <p className="mt-4 text-sm text-gray-500">
-            Loading teachers...
-          </p>
+          <p className="mt-4 text-sm text-gray-500">Loading teachers...</p>
         </div>
       )}
 
@@ -307,9 +298,7 @@ const AllTeachers = () => {
 
                       {/* Contact */}
                       <td className="px-6 py-4">
-                        <p className="text-sm text-gray-900">
-                          {teacher.phone}
-                        </p>
+                        <p className="text-sm text-gray-900">{teacher.phone}</p>
 
                         <p className="mt-1 text-xs text-gray-500">
                           {teacher.email || "No email"}
@@ -635,7 +624,7 @@ const AllTeachers = () => {
         teacher={teacherToDelete}
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
-        isLoading={deleteLoading}
+        isLoading={deleting}
       />
 
       <TeacherUpdateModal
@@ -643,7 +632,7 @@ const AllTeachers = () => {
         teacher={teacherToUpdate}
         onClose={handleCloseUpdate}
         onUpdate={handleUpdateTeacher}
-        isLoading={updateLoading}
+        isLoading={updatingTeacher}
       />
     </div>
   );

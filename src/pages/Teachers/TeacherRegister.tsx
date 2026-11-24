@@ -1,16 +1,15 @@
 // src/pages/Teachers/TeacherRegister.tsx
 import { FormEvent, useState } from "react";
-import {
-  createTeacher,
-  type CreateTeacherData,
-  ApiError,
-} from "@/api/teacherApi";
+import { useCreateTeacher, type CreateTeacherData } from "@/api/teacherApi";
 import { useNavigate } from "react-router-dom";
 // ✅ Shamsi date picker
 import ShamsiDatePicker from "@/utils/ShamsiDatePicker";
 
 const TeacherRegister = () => {
   const navigate = useNavigate();
+
+  // ✅ Hook replaces createTeacher + local loading/error state
+  const { createTeacher, loading, error: apiError } = useCreateTeacher();
 
   // ⚠️ hireDate is stored as MILADI ISO ("YYYY-MM-DD") for the backend
   const [formData, setFormData] = useState<CreateTeacherData>({
@@ -27,9 +26,11 @@ const TeacherRegister = () => {
     isActive: true,
   });
 
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
+
+  // Hook's error is `null` when no error, otherwise the backend string.
+  // Coerce to "" so `.includes(...)` below works without null checks.
+  const error = apiError || "";
 
   // ============================================
   // CHANGE HANDLER (text/number/select)
@@ -37,7 +38,7 @@ const TeacherRegister = () => {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
 
@@ -65,41 +66,31 @@ const TeacherRegister = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    setLoading(true);
     setSuccess("");
-    setError("");
 
-    try {
-      const submitData = { ...formData };
+    // Prepare payload
+    const submitData = { ...formData };
 
-      if (submitData.salaryType === "Fixed") {
-        submitData.feePercentage = 0;
-      } else if (submitData.salaryType === "PerStudent") {
-        submitData.salaryAmount = 0;
-      }
+    if (submitData.salaryType === "Fixed") {
+      submitData.feePercentage = 0;
+    } else if (submitData.salaryType === "PerStudent") {
+      submitData.salaryAmount = 0;
+    }
 
-      if (!submitData.email) delete submitData.email;
-      if (!submitData.address) delete submitData.address;
+    const payload: Partial<CreateTeacherData> = { ...submitData };
+    if (!payload.email) delete payload.email;
+    if (!payload.address) delete payload.address;
 
-      await createTeacher(submitData);
+    // ✅ Single call — the hook returns true on success, false on failure.
+    //    On failure, `apiError` will be populated for the error banner.
+    const ok = await createTeacher(payload as CreateTeacherData);
 
+    if (ok) {
       setSuccess("Teacher registered successfully.");
 
       setTimeout(() => {
         navigate("/teachers/all");
       }, 1500);
-    } catch (error) {
-      console.error("Failed to create teacher:", error);
-
-      if (error instanceof ApiError) {
-        setError(error.message);
-      } else if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("Failed to register teacher.");
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -110,9 +101,7 @@ const TeacherRegister = () => {
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Register Teacher
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Register Teacher</h1>
           <p className="mt-1 text-sm text-gray-500">
             Add a new teacher to the system
           </p>
@@ -121,9 +110,7 @@ const TeacherRegister = () => {
         {/* Success Message */}
         {success && (
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
-            <p className="text-sm font-medium text-green-700">
-              {success}
-            </p>
+            <p className="text-sm font-medium text-green-700">{success}</p>
           </div>
         )}
 
@@ -146,9 +133,7 @@ const TeacherRegister = () => {
                 />
               </svg>
               <div>
-                <p className="text-sm font-medium text-red-700">
-                  {error}
-                </p>
+                <p className="text-sm font-medium text-red-700">{error}</p>
                 {(error.includes("phone number") ||
                   error.includes("email address")) && (
                   <p className="mt-1 text-sm text-red-600">
@@ -290,11 +275,11 @@ const TeacherRegister = () => {
                   Hire Date (تاریخ شمسی) <span className="text-red-500">*</span>
                 </label>
 
-              <ShamsiDatePicker
-  value={formData.hireDate}
-  onChange={handleHireDateChange}
-  placeholder="تاریخ"
-/>
+                <ShamsiDatePicker
+                  value={formData.hireDate}
+                  onChange={handleHireDateChange}
+                  placeholder="تاریخ"
+                />
               </div>
 
               {/* Address - Optional */}
@@ -404,9 +389,7 @@ const TeacherRegister = () => {
                     max="100"
                     step="0.01"
                     value={
-                      formData.feePercentage === 0
-                        ? ""
-                        : formData.feePercentage
+                      formData.feePercentage === 0 ? "" : formData.feePercentage
                     }
                     onChange={handleChange}
                     placeholder="Enter percentage"
@@ -431,9 +414,7 @@ const TeacherRegister = () => {
 
           {/* Status */}
           <div className="mb-8 border-t border-gray-200 pt-8">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              Status
-            </h2>
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">Status</h2>
 
             <label className="flex cursor-pointer items-center gap-3">
               <input
