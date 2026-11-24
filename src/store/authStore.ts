@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+console.log("MP SYSTEM API URL:", API_URL);
 // One year in milliseconds
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -107,6 +108,6 @@ export const useAuthStore = create<AuthState>()(
           state.isAuthenticated = false;
         }
       },
-    }
-  )
+    },
+  ),
 );

@@ -1,9 +1,10 @@
 // src/routes/index.tsx (Add other expenses route)
-import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "@components/layout/DashboardLayout/DashboardLayout";
 import Dashboard from "@pages/Dashboard/Dashboard";
-import PrivateRoute from "./PrivateRoute";
 import Login from "@pages/Login/Login";
+import { HashRouter, Route, Routes } from "react-router-dom";
+import PrivateRoute from "./PrivateRoute";
+
 
 // Teacher pages
 import AllTeachers from "@pages/Teachers/AllTeachers";
@@ -11,16 +12,16 @@ import TeacherRegister from "@pages/Teachers/TeacherRegister";
 
 // Student pages
 import AllStudents from "@/pages/Students/AllStudents";
-import StudentRegister from "@/pages/Students/StudentRegister";
 import EnrollStudent from "@/pages/Students/EnrollStudent";
+import StudentRegister from "@/pages/Students/StudentRegister";
 
 // Book pages
-import AllBooks from "@/pages/Books/AllBooks";
 import AddBook from "@/pages/Books/AddBook";
+import AllBooks from "@/pages/Books/AllBooks";
 
 // Class pages
-import AllClasses from "@/pages/Classes/AllClasses";
 import AddClass from "@/pages/Classes/AddClass";
+import AllClasses from "@/pages/Classes/AllClasses";
 
 // Payment pages - Teacher Payroll
 import TeacherPayrollPage from "@/pages/Payment/TeacherPayroll";
@@ -32,11 +33,10 @@ import AddScores from "@/pages/Students/AddScores";
 // Note pages
 import Notes from "@/pages/Notes/Notes";
 import SettingPage from "@/pages/settings/SettingsPage";
-import PrintResultCart from "@/pages/Students/PrintResultCard";
 import PrintResultCard from "@/pages/Students/PrintResultCard";
 
 const AppRoutes = () => (
-  <BrowserRouter>
+  <HashRouter>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<PrivateRoute />}>
@@ -76,7 +76,7 @@ const AppRoutes = () => (
         </Route>
       </Route>
     </Routes>
-  </BrowserRouter>
+</HashRouter>
 );
 
 export default AppRoutes;
